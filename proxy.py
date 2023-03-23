@@ -3,7 +3,7 @@ A simple proxy server, based on original by gear11:
 https://gist.github.com/gear11/8006132
 Modified from original to support both GET and POST, status code passthrough, header and form data passthrough.
 Usage: http://hostname:port/p/(URL to be proxied, minus protocol)
-For example: http://localhost:8080/p/www.google.com
+For example: http://localhost:5000/p/www.google.com
 """
 import re
 from urllib.parse import urlparse, urlunparse
@@ -89,24 +89,30 @@ def handle_socket(ws, path):
 
     while p.is_alive() or c.is_alive():
         continue
-
+    
+    ws.close()
     p.join()
     c.join()
 
 
 def producer(ws, wss):
-    while True:
+    while wss.connected and ws.connected:
         data = ws.receive()
         if data is None:
             wss.close()
+            ws.close()
             break
         wss.send(data)
     return
 
 
 def consumer(ws, wss):
-    while wss.connected:
+    while wss.connected and ws.connected:
         response = wss.recv()
+        if response is None:
+            wss.close()
+            ws.close()
+            break
         ws.send(response)
     return
 
