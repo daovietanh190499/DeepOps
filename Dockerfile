@@ -1,4 +1,5 @@
-# docker run --privileged --rm -it --init --gpus=all --ipc=host --user="$(id -u):$(id -g)" --volume="$PWD:/projects" -p 8443:8443 daovietanh99/deepops
+# docker run --name=codeserver --rm -it --init --gpus device=0 --ipc=host --user="$(id -u):$(id -g)" -v ./results:/results -v ./Custom_Benchmarking:/code -v ./tiny-imagenet-200:/data -p 8443:8443 -e PASSWORD=daovietanh99 daovietanh99/deepops
+# docker run --name=codeserver --rm -it --init --gpus device=1 --ipc=host --user="$(id -u):$(id -g)" -v ./results:/results -v ./Custom_Benchmarking:/code -v ./imagenet:/data -p 8443:8443 -e PASSWORD=daovietanh99 -e WANDB_API_KEY=49d00f97c2faf751e194885af42b0d9ac4196b0f daovietanh99/deepops 
 ARG FROM_IMAGE_NAME=nvcr.io/nvidia/pytorch:22.10-py3
 FROM ${FROM_IMAGE_NAME}
 
