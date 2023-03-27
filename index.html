@@ -5,14 +5,17 @@
     <meta http-equiv="X-UA-Compatible" content="IE=edge">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <link href="https://fonts.googleapis.com/css2?family=League+Spartan:wght@100;200;300;400;500;600&family=Poppins:wght@400;500;600&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/font-awesome/4.7.0/css/font-awesome.min.css">
     <link rel="stylesheet" type="text/css" href="style.css">
+    <link rel="icon" href="img/logo.png">
     <title>DoHub</title>
 </head>
-<body class="space-between">
+<body class="space-between horizontal-flex">
+<div class="main-container space-between">
     <div class="main-content">
         <div class="header">
             <h1>Virtual Server Options</h1>
-            <div class="account space-between">
+            <div class="account space-between hover-blue button">
                 <div class="user-img center">
                     <img src="img/github.png">
                 </div>
@@ -165,7 +168,7 @@
                         <img src="img/kubernetes.png" class="item-block-img">
                         <div class="item-block-metric horizontal-flex">
                             <span class="item-block-title">Kubernetes</span>
-                            <span class="item-block-value">20.04 LTS</span>
+                            <span class="item-block-value">v1.26.0</span>
                         </div>
                     </div>
                 </div>
@@ -191,6 +194,56 @@
                     </div>
                     <div class="item-space"></div>
                     <div class="item-block vertical-flex"></div>
+                </div>
+
+                <div class="menu vertical-flex">
+                    <h3>Server Options</h3>
+                </div>
+                <div class="item vertical-flex">
+                    <div class="item-block vertical-flex hover-blue button">
+                        <img src="img/lollipop.png" class="item-block-img">
+                        <div class="item-block-metric horizontal-flex">
+                            <span class="item-block-title">Lollipop Server</span>
+                            <span class="item-block-value">1x vCPU, 0 GB GPU</span>
+                        </div>
+                    </div>
+                    <div class="item-space"></div>
+                    <div class="item-block vertical-flex hover-blue button">
+                        <img src="img/oreo.png" class="item-block-img">
+                        <div class="item-block-metric horizontal-flex">
+                            <span class="item-block-title">Oreo Server</span>
+                            <span class="item-block-value">4x vCPU, 10 GB GPU</span>
+                        </div>
+                    </div>
+                    <div class="item-space"></div>
+                    <div class="item-block vertical-flex hover-blue button">
+                        <img src="img/popeyes.png" class="item-block-img">
+                        <div class="item-block-metric horizontal-flex">
+                            <span class="item-block-title">Popeyes Server</span>
+                            <span class="item-block-value">8x vCPU, 20 GB GPU</span>
+                        </div>
+                    </div>
+                </div>
+                <div class="item vertical-flex">
+                    <div class="item-block vertical-flex hover-blue button">
+                        <img src="img/pizza.png" class="item-block-img">
+                        <div class="item-block-metric horizontal-flex">
+                            <span class="item-block-title">Pizza Server</span>
+                            <span class="item-block-value">8x vCPU, 40 GB GPU</span>
+                        </div>
+                    </div>
+                    <div class="item-space"></div>
+                    <div class="item-block vertical-flex hover-blue button">
+                        <img src="img/spagetti.png" class="item-block-img">
+                        <div class="item-block-metric horizontal-flex">
+                            <span class="item-block-title">Spagetti Server</span>
+                            <span class="item-block-value">16x vCPU, 2x 40 GB GPU</span>
+                        </div>
+                    </div>
+                    <div class="item-space"></div>
+                    <div class="item-block-add vertical-flex center button">
+                        <span><i class="fa fa-plus"></i> Add new options</span>
+                    </div>
                 </div>
             </div>
             <div class="right-container">
@@ -255,7 +308,7 @@
                     </div>
                 </div>
                 <div class="list-plan horizontal-flex">
-                    <div class="plan-block space-between">
+                    <div class="plan-block space-between activate">
                         <div class="specification-key">Default</div>
                         <div class="specification-value">Never Shutdown</div>
                     </div>
@@ -278,7 +331,7 @@
                     <input type="text" class="input-text" value="daovietanh190499" disabled>
                 </div>
                 <div class="list-plan horizontal-flex">
-                    <button class="button-input">Start Server</button>
+                    <button class="button-input button">Start Server</button>
                 </div>
             </div>
         </div>
@@ -308,6 +361,98 @@
             </div>
         </div>
     </div>
+</div>
+<div class="main-container space-between">
+    <div class="main-admin-content">
+        <div class="full-container">
+            <div class="table">
+                <div class="menu vertical-flex">
+                    <h3>Users Management</h3>
+                </div>
+                <div class="user-row vertical-flex space-between">
+                    <div class="vertical-flex user-cell center" style="padding-left: 0;">
+                        <img src="img/logo.png" class="item-block-img">
+                    </div>
+                    <div class="horizontal-flex space-between user-cell user-cell-info">
+                        <div class="vertical-flex space-between item-block-title">
+                            <div class="item-block-title" style="width: 15%;">{{user.username}}</div>
+                            <div class="user-space"></div>
+                            <div class="item-block-title" style="width: 10%;">Role</div>
+                            <div class="user-space"></div>
+                            <div class="item-block-title" style="width: 10%">Last Activity</div>
+                            <div class="user-space"></div>
+                            <div class="item-block-title" style="width: 20%;">Server List</div>
+                            <div class="user-space"></div>
+                            <div class="item-block-title" style="width: 30%;">Current Configuration</div>
+                            <div class="user-space"></div>
+                            <div class="item-block-title" style="width: 15%;">Running</div>
+                        </div>
+                        <div class="vertical-flex">
+                            <div class="item-block-value" style="width: 15%;">On</div>
+                            <div class="user-space"></div>
+                            <div class="item-block-value" style="width: 10%;">admin</div>
+                            <div class="user-space"></div>
+                            <div class="item-block-value" style="width: 10%">13 seconds ago</div>
+                            <div class="user-space"></div>
+                            <div class="item-block-value" style="width: 20%;">
+                                <div class="tag background-violet">Lollipop <span class="close-tag"><i class="fa fa-close"></i></span></div>
+                                <div class="tag background-blue">Oreo <span class="close-tag"><i class="fa fa-close"></i></span></div>
+                                <div class="tag background-orange">Popeyes <span class="close-tag"><i class="fa fa-close"></i></span></div>
+                                <div class="tag background-yellow">Pizza <span class="close-tag"><i class="fa fa-close"></i></span></div>
+                                <div class="tag background-yellow-1">Spagetti <span class="close-tag"><i class="fa fa-close"></i></span></div>
+                                <div class="tag add-tag button">Add <span class="close-tag"><i class="fa fa-plus"></i></div>
+                            </div>
+                            <div class="user-space"></div>
+                            <div class="item-block-value" style="width: 30%;">Spagetti, 16x vCPU, 32 GB RAM, 30 TB HDD, 2x 40 GB GPU</div>
+                            <div class="user-space"></div>
+                            <div class="item-block-value" style="width: 15%;"><button class="button-user button">Start Server</button></div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="user-row vertical-flex space-between">
+                    <div class="vertical-flex user-cell center" style="padding-left: 0;">
+                        <img src="img/logo.png" class="item-block-img">
+                    </div>
+                    <div class="horizontal-flex space-between user-cell user-cell-info">
+                        <div class="vertical-flex space-between item-block-title">
+                            <div class="item-block-title" style="width: 15%;">{{user.username}}</div>
+                            <div class="user-space"></div>
+                            <div class="item-block-title" style="width: 10%;">Role</div>
+                            <div class="user-space"></div>
+                            <div class="item-block-title" style="width: 10%">Last Activity</div>
+                            <div class="user-space"></div>
+                            <div class="item-block-title" style="width: 20%;">Server List</div>
+                            <div class="user-space"></div>
+                            <div class="item-block-title" style="width: 30%;">Current Configuration</div>
+                            <div class="user-space"></div>
+                            <div class="item-block-title" style="width: 15%;">Running</div>
+                        </div>
+                        <div class="vertical-flex">
+                            <div class="item-block-value" style="width: 15%;">On</div>
+                            <div class="user-space"></div>
+                            <div class="item-block-value" style="width: 10%;">admin</div>
+                            <div class="user-space"></div>
+                            <div class="item-block-value" style="width: 10%">13 seconds ago</div>
+                            <div class="user-space"></div>
+                            <div class="item-block-value" style="width: 20%;">
+                                <div class="tag background-violet">Lollipop <span class="close-tag"><i class="fa fa-close"></i></span></div>
+                                <div class="tag background-blue">Oreo <span class="close-tag"><i class="fa fa-close"></i></span></div>
+                                <div class="tag background-orange">Popeyes <span class="close-tag"><i class="fa fa-close"></i></span></div>
+                                <div class="tag background-yellow">Pizza <span class="close-tag"><i class="fa fa-close"></i></span></div>
+                                <div class="tag add-tag button">Add <span class="close-tag"><i class="fa fa-plus"></i></div>
+                            </div>
+                            <div class="user-space"></div>
+                            <div class="item-block-value" style="width: 30%;">Pizza, 8x vCPU, 16 GB RAM, 30 TB HDD, 40 GB GPU</div>
+                            <div class="user-space"></div>
+                            <div class="item-block-value" style="width: 15%;"><button class="button-user button">Start Server</button></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
 </body>
 <script src="index.js"></script>
 </html>
