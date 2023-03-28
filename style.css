@@ -79,41 +79,50 @@ html {
 
 .main-content {
 	padding: 0 1rem 2rem 2rem;
-    margin: 0;
+    margin: 2rem 0 0 0;
     width: 80%;
-    height: 100%;
 }
 
 .side-content {
 	padding: 0 2rem 2rem 0;
-    margin: 0;
+    margin: 2rem 0 0 0;
     width: 20%;
 }
 
 .content {
-    /* position: sticky;
-    top: 2rem; */
     width: 100%;
-    /* height: 100vh; */
     height: 100%;
     background-color: white;
     border-radius: .5rem;
 }
 
 .header {
-    /* align-items: flex-start; */
+    position: relative;
+    height: 7rem;
     display: flex; 
     justify-content: space-between; 
-    padding-top: 2rem; 
-    padding-bottom: 2rem;
-    width: 100%;
-    height: calc(100% - 2rem);
+    margin-bottom: 1rem;
+    width: calc(100% - 4rem);
+    background-color: white;
+    border-radius: .4rem;
+    padding: 1rem 2rem 0 2rem;
+}
+
+.welcome {
+    font-size: 2rem;
+    font-weight: bold;
 }
 
 .account {
+    top: 0;
+    right: 0;
+    margin: 1rem 2rem 0 0;
+    position: absolute;
     padding: 0.5rem 0.5rem 0.5rem 1rem;
-    background-color: white;
+    background-color: #464646;
     border-radius: .4rem;
+    color: white;
+    cursor: pointer;
 }
 
 .user-img {
@@ -126,7 +135,6 @@ html {
 
 .full-container {
     width: 100%;
-    /* height: 100vh; */
     border-radius: .5rem;
     background-color: white;
 }
@@ -195,10 +203,13 @@ html {
 }
 
 .equipment-metric-title {
-    /* height: 1.75rem; */
     color: lightgray;
     text-align: left !important;
     margin: auto 0;
+}
+
+.row-block-title {
+    margin-bottom: .5rem;
 }
 
 .item-block-title {
@@ -207,7 +218,6 @@ html {
 }
 
 .equipment-metric-value {
-    /* height: 1.75rem; */
     text-align: left !important;
     margin: auto 0;
 }
@@ -227,7 +237,6 @@ input[type="range"] {
     -webkit-appearance: none;
 
     width: 100%;
-    /* height: 100%; */
 
     background: transparent;
     outline: none;
@@ -454,7 +463,7 @@ input[type="range"]::-webkit-slider-runnable-track {
 }
 
 .user-row {
-    padding: 1rem 2rem 1rem 2rem;
+    /* padding: 1rem 2rem 1rem 2rem; */
 }
 
 .user-cell {
@@ -467,6 +476,7 @@ input[type="range"]::-webkit-slider-runnable-track {
 }
 
 .user-cell-info {
+    margin-top: 1rem;
     padding: 1rem;
     border-bottom: 2px solid #eff3f6;
     width: calc(100% - 5.5rem);

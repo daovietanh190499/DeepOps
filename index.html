@@ -13,16 +13,20 @@
 <body class="space-between horizontal-flex">
 <div class="main-container space-between">
     <div class="main-content">
+
         <div class="header">
-            <h1>Virtual Server Options</h1>
-            <div class="account space-between hover-blue button">
+            <span class="welcome">Welcome to DoHub!</span>
+            <div class="account vertical-flex button">
                 <div class="user-img center">
                     <img src="img/github.png">
                 </div>
-                <span class="user-name center">{{ current_user.username }}</span>
+                <span class="user-name center">Login with Github</span>
             </div>
         </div>
+
         <div class="full-container space-between">
+
+            <!-- LEFT CONTAINER ==============================================================================================-->
             <div class="left-container">
                 <div class="menu vertical-flex">
                     <h3>Equipment Metric</h3>
@@ -197,7 +201,7 @@
                 </div>
 
                 <div class="menu vertical-flex">
-                    <h3>Server Options</h3>
+                    <h3>Choose An Option</h3>
                 </div>
                 <div class="item vertical-flex">
                     <div class="item-block vertical-flex hover-blue button">
@@ -246,6 +250,8 @@
                     </div>
                 </div>
             </div>
+
+            <!-- RIGHT CONTAINER ===========================================================================================-->
             <div class="right-container">
                 <div class="menu vertical-flex">
                     <h3>Current Specifications</h3>
@@ -334,56 +340,27 @@
                     <button class="button-input button">Start Server</button>
                 </div>
             </div>
-        </div>
-    </div>
-    <div class="side-content">
-        <div class="header">
-            <div class="content">
-                <div class="side-title center">Tips and Tricks</div>
-                <div class="side-title center horizontal-flex">
-                    <span class="justify"><b>How to proxy a port from inside your server to public url?</b></span>
-                    <span class="side-detail-content">
-                        Visual Studio Code Server already have proxy service. If you run a program on specific port 
-                        on VSCode, it will automatically detect that port and proxy to the path ".../proxy/(port)"
-                        where (port) is your running program port.
-                    </span>
-                </div>
-                <div class="side-title center horizontal-flex">
-                    <span class="justify"><b>How to save state of previous server running session?</b></span>
-                    <span class="side-detail-content">
-                        DoHub now having enough resources and supported softwares for minimum demand on training, inferencing or
-                        especially deploying services. <br/><br/> But sometimes you want to save your enviroment libraries or packages like pip packages,
-                        you should use framework that can generate virtual environment for you such as conda and virtualenv and then save that
-                        environment folder to the directory which being mounted by NAS (common, it is the home directory). <br/><br/>
-                        Futhermore, you can also make your services run automatically by defining a startup file inside "/etc/init.d". 
-                    </span>
-                </div>
-            </div>
-        </div>
-    </div>
-</div>
-<div class="main-container space-between">
-    <div class="main-admin-content">
-        <div class="full-container">
-            <div class="table">
+
+            <!-- ADMIN PAGE ================================================================================================== -->
+            <div class="table" style="display: none;">
                 <div class="menu vertical-flex">
                     <h3>Users Management</h3>
                 </div>
                 <div class="user-row vertical-flex space-between">
-                    <div class="vertical-flex user-cell center" style="padding-left: 0;">
+                    <div class="vertical-flex user-cell center">
                         <img src="img/logo.png" class="item-block-img">
                     </div>
                     <div class="horizontal-flex space-between user-cell user-cell-info">
-                        <div class="vertical-flex space-between item-block-title">
+                        <div class="vertical-flex space-between row-block-title">
                             <div class="item-block-title" style="width: 15%;">{{user.username}}</div>
                             <div class="user-space"></div>
                             <div class="item-block-title" style="width: 10%;">Role</div>
                             <div class="user-space"></div>
                             <div class="item-block-title" style="width: 10%">Last Activity</div>
                             <div class="user-space"></div>
-                            <div class="item-block-title" style="width: 20%;">Server List</div>
+                            <div class="item-block-title" style="width: 40%;">Server List</div>
                             <div class="user-space"></div>
-                            <div class="item-block-title" style="width: 30%;">Current Configuration</div>
+                            <div class="item-block-title" style="width: 10%;">Server</div>
                             <div class="user-space"></div>
                             <div class="item-block-title" style="width: 15%;">Running</div>
                         </div>
@@ -394,7 +371,7 @@
                             <div class="user-space"></div>
                             <div class="item-block-value" style="width: 10%">13 seconds ago</div>
                             <div class="user-space"></div>
-                            <div class="item-block-value" style="width: 20%;">
+                            <div class="item-block-value" style="width: 40%;">
                                 <div class="tag background-violet">Lollipop <span class="close-tag"><i class="fa fa-close"></i></span></div>
                                 <div class="tag background-blue">Oreo <span class="close-tag"><i class="fa fa-close"></i></span></div>
                                 <div class="tag background-orange">Popeyes <span class="close-tag"><i class="fa fa-close"></i></span></div>
@@ -403,7 +380,9 @@
                                 <div class="tag add-tag button">Add <span class="close-tag"><i class="fa fa-plus"></i></div>
                             </div>
                             <div class="user-space"></div>
-                            <div class="item-block-value" style="width: 30%;">Spagetti, 16x vCPU, 32 GB RAM, 30 TB HDD, 2x 40 GB GPU</div>
+                            <div class="item-block-value" style="width: 10%;">
+                                <div class="tag background-yellow-1">Spagetti</div>
+                            </div>
                             <div class="user-space"></div>
                             <div class="item-block-value" style="width: 15%;"><button class="button-user button">Start Server</button></div>
                         </div>
@@ -411,20 +390,20 @@
                 </div>
 
                 <div class="user-row vertical-flex space-between">
-                    <div class="vertical-flex user-cell center" style="padding-left: 0;">
+                    <div class="vertical-flex user-cell center">
                         <img src="img/logo.png" class="item-block-img">
                     </div>
                     <div class="horizontal-flex space-between user-cell user-cell-info">
-                        <div class="vertical-flex space-between item-block-title">
+                        <div class="vertical-flex space-between row-block-title">
                             <div class="item-block-title" style="width: 15%;">{{user.username}}</div>
                             <div class="user-space"></div>
                             <div class="item-block-title" style="width: 10%;">Role</div>
                             <div class="user-space"></div>
                             <div class="item-block-title" style="width: 10%">Last Activity</div>
                             <div class="user-space"></div>
-                            <div class="item-block-title" style="width: 20%;">Server List</div>
+                            <div class="item-block-title" style="width: 40%;">Server List</div>
                             <div class="user-space"></div>
-                            <div class="item-block-title" style="width: 30%;">Current Configuration</div>
+                            <div class="item-block-title" style="width: 10%;">Server</div>
                             <div class="user-space"></div>
                             <div class="item-block-title" style="width: 15%;">Running</div>
                         </div>
@@ -435,7 +414,7 @@
                             <div class="user-space"></div>
                             <div class="item-block-value" style="width: 10%">13 seconds ago</div>
                             <div class="user-space"></div>
-                            <div class="item-block-value" style="width: 20%;">
+                            <div class="item-block-value" style="width: 40%;">
                                 <div class="tag background-violet">Lollipop <span class="close-tag"><i class="fa fa-close"></i></span></div>
                                 <div class="tag background-blue">Oreo <span class="close-tag"><i class="fa fa-close"></i></span></div>
                                 <div class="tag background-orange">Popeyes <span class="close-tag"><i class="fa fa-close"></i></span></div>
@@ -443,12 +422,37 @@
                                 <div class="tag add-tag button">Add <span class="close-tag"><i class="fa fa-plus"></i></div>
                             </div>
                             <div class="user-space"></div>
-                            <div class="item-block-value" style="width: 30%;">Pizza, 8x vCPU, 16 GB RAM, 30 TB HDD, 40 GB GPU</div>
+                            <div class="item-block-value" style="width: 10%;">
+                                <div class="tag background-yellow">Pizza</div>
+                            </div>
                             <div class="user-space"></div>
                             <div class="item-block-value" style="width: 15%;"><button class="button-user button">Start Server</button></div>
                         </div>
                     </div>
                 </div>
+            </div>
+        </div>
+    </div>
+    <div class="side-content">
+        <div class="content horizontal-flex">
+            <div class="side-title center">Tips and Tricks</div>
+            <div class="side-title center horizontal-flex">
+                <span class="justify"><b>How to proxy a port from inside your server to public url?</b></span>
+                <span class="side-detail-content">
+                    Visual Studio Code Server already have proxy service. If you run a program on specific port 
+                    on VSCode, it will automatically detect that port and proxy to the path ".../proxy/(port)"
+                    where (port) is your running program port.
+                </span>
+            </div>
+            <div class="side-title center horizontal-flex">
+                <span class="justify"><b>How to save state of previous server running session?</b></span>
+                <span class="side-detail-content">
+                    DoHub now having enough resources and supported softwares for minimum demand on training, inferencing or
+                    especially deploying services. <br/><br/> But sometimes you want to save your enviroment libraries or packages like pip packages,
+                    you should use framework that can generate virtual environment for you such as conda and virtualenv and then save that
+                    environment folder to the directory which being mounted by NAS (common, it is the home directory). <br/><br/>
+                    Futhermore, you can also make your services run automatically by defining a startup file inside "/etc/init.d". 
+                </span>
             </div>
         </div>
     </div>
