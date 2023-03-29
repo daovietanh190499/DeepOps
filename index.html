@@ -35,7 +35,28 @@
         <div class="full-container space-between">
 
             <!-- LEFT CONTAINER ==============================================================================================-->
-            <div class="left-container" v-if="menu=='home'">
+            <div class="left-container" v-if="menu=='home' || admin_open_spawn">
+                <div class="menu vertical-flex">
+                    <h3>Choose An Option</h3>
+                </div>
+                <div class="item vertical-flex" v-for="part in Math.ceil((current_server_list.length + 1)/3)" :key="part">
+                    <item-block
+                        v-for="index in ((part == Math.ceil((current_server_list.length +1)/3)) ? ((current_server_list.length)%3) : 3)"
+                        :key="part*3 + index - 4"
+                        :img="serverList[current_server_list[part*3 + index - 4]]['image']" 
+                        :title="serverList[current_server_list[part*3 + index - 4]]['name'] + ' Server'" 
+                        :short_description="serverList[current_server_list[part*3 + index - 4]]['cpu'] + 'x vCPU, ' + serverList[current_server_list[part*3 + index - 4]]['gpu'] + ' GPU'" 
+                        :hover_blue="state=='offline'" 
+                        :button="state=='offline'"
+                        :space="index < 3"
+                        :activate="serverList[current_server_list[part*3 + index - 4]]['name'] == server"
+                        @click="changeServer(serverList[current_server_list[part*3 + index - 4]]['name'])">
+                    </item-block>
+                    <div class="item-block-add vertical-flex center" :class="{'button': is_admin, 'hover-blue': is_admin}" v-if="part == Math.ceil((current_server_list.length +1)/3)">
+                        <span><i class="fa fa-plus"></i> Add new options</span>
+                    </div>
+                </div>
+
                 <div class="menu vertical-flex">
                     <h3>Equipment Metric</h3>
                 </div>
@@ -101,31 +122,10 @@
                     </item-block>
                     <div class="item-block vertical-flex"></div>
                 </div>
-
-                <div class="menu vertical-flex">
-                    <h3>Choose An Option</h3>
-                </div>
-                <div class="item vertical-flex" v-for="part in Math.ceil((Object.keys(serverList).length + 1)/3)" :key="part">
-                    <item-block
-                        v-for="index in ((part == Math.ceil((Object.keys(serverList).length +1)/3)) ? ((Object.keys(serverList).length)%3) : 3)"
-                        :key="part*3 + index - 4"
-                        :img="serverList[Object.keys(serverList)[part*3 + index - 4]]['image']" 
-                        :title="serverList[Object.keys(serverList)[part*3 + index - 4]]['name'] + ' Server'" 
-                        :short_description="serverList[Object.keys(serverList)[part*3 + index - 4]]['short_description']" 
-                        hover_blue="true" 
-                        button="true"
-                        :space="index < 3"
-                        :activate="serverList[Object.keys(serverList)[part*3 + index - 4]]['name'] == server"
-                        @click="changeServer(serverList[Object.keys(serverList)[part*3 + index - 4]]['name'])">
-                    </item-block>
-                    <div class="item-block-add vertical-flex center" :class="{'button': is_admin, 'hover-blue': is_admin}" v-if="part == Math.ceil((Object.keys(serverList).length +1)/3)">
-                        <span><i class="fa fa-plus"></i> Add new options</span>
-                    </div>
-                </div>
             </div>
 
             <!-- RIGHT CONTAINER ===========================================================================================-->
-            <div class="right-container" v-if="menu=='home'">
+            <div class="right-container" v-if="menu=='home' || admin_open_spawn">
                 <div class="menu vertical-flex">
                     <h3>Current Specifications</h3>
                 </div>
@@ -145,7 +145,7 @@
                     <specification-item item_key="Operating System" value="Ubuntu 20.04"></specification-item>
                     <specification-item item_key="Docker Image" :value="serverList[server]['docker_image']"></specification-item>
                     <specification-item item_key="Application" value="VSCode Server"></specification-item>
-                    <specification-item item_key="Status" value="Running"></specification-item>
+                    <specification-item item_key="Status" :value="state"></specification-item>
                 </div>
 
                 <div class="menu vertical-flex">
@@ -182,100 +182,31 @@
                 <div class="list-plan horizontal-flex">
                     <input type="text" class="input-text" value="daovietanh190499" disabled>
                 </div>
-                <div class="list-plan horizontal-flex">
-                    <button class="button-input button">Start Server</button>
+                <div class="list-plan horizontal-flex" v-if="state=='offline'">
+                    <button class="button-input button" @click="startServer()">Start Server</button>
+                </div>
+                <div class="list-plan horizontal-flex" v-if="state=='running'">
+                    <button class="button-input-2 button" @click="stopServer()">Stop Server</button>
+                </div>
+                <div class="list-plan horizontal-flex" v-if="state=='running'">
+                    <button class="button-input-1 button" @click="accessServer()">Access Server</button>
                 </div>
             </div>
 
             <!-- ADMIN PAGE ================================================================================================== -->
-            <div class="table" v-if="menu=='admin'">
+            <div class="table" v-if="menu=='admin' && !admin_open_spawn">
                 <div class="menu vertical-flex">
                     <h3>Users Management</h3>
                 </div>
-                <div class="user-row vertical-flex space-between">
-                    <div class="vertical-flex user-cell center">
-                        <img src="img/logo.png" class="item-block-img">
-                    </div>
-                    <div class="horizontal-flex space-between user-cell user-cell-info">
-                        <div class="vertical-flex space-between row-block-title">
-                            <div class="item-block-title" style="width: 15%;">user.name</div>
-                            <div class="user-space"></div>
-                            <div class="item-block-title" style="width: 10%;">Role</div>
-                            <div class="user-space"></div>
-                            <div class="item-block-title" style="width: 10%">Last Activity</div>
-                            <div class="user-space"></div>
-                            <div class="item-block-title" style="width: 40%;">Server List</div>
-                            <div class="user-space"></div>
-                            <div class="item-block-title" style="width: 10%;">Server</div>
-                            <div class="user-space"></div>
-                            <div class="item-block-title" style="width: 15%;">Running</div>
-                        </div>
-                        <div class="vertical-flex">
-                            <div class="item-block-value" style="width: 15%;">On</div>
-                            <div class="user-space"></div>
-                            <div class="item-block-value" style="width: 10%;">admin</div>
-                            <div class="user-space"></div>
-                            <div class="item-block-value" style="width: 10%">13 seconds ago</div>
-                            <div class="user-space"></div>
-                            <div class="item-block-value" style="width: 40%;">
-                                <div class="tag background-violet">Lollipop <span class="close-tag"><i class="fa fa-close"></i></span></div>
-                                <div class="tag background-blue">Oreo <span class="close-tag"><i class="fa fa-close"></i></span></div>
-                                <div class="tag background-orange">Popeyes <span class="close-tag"><i class="fa fa-close"></i></span></div>
-                                <div class="tag background-yellow">Pizza <span class="close-tag"><i class="fa fa-close"></i></span></div>
-                                <div class="tag background-yellow-1">Spagetti <span class="close-tag"><i class="fa fa-close"></i></span></div>
-                                <div class="tag add-tag button">Add <span class="close-tag"><i class="fa fa-plus"></i></div>
-                            </div>
-                            <div class="user-space"></div>
-                            <div class="item-block-value" style="width: 10%;">
-                                <div class="tag background-yellow-1">Spagetti</div>
-                            </div>
-                            <div class="user-space"></div>
-                            <div class="item-block-value" style="width: 15%;"><button class="button-user button">Start Server</button></div>
-                        </div>
-                    </div>
-                </div>
-
-                <div class="user-row vertical-flex space-between">
-                    <div class="vertical-flex user-cell center">
-                        <img src="img/logo.png" class="item-block-img">
-                    </div>
-                    <div class="horizontal-flex space-between user-cell user-cell-info">
-                        <div class="vertical-flex space-between row-block-title">
-                            <div class="item-block-title" style="width: 15%;">user.name</div>
-                            <div class="user-space"></div>
-                            <div class="item-block-title" style="width: 10%;">Role</div>
-                            <div class="user-space"></div>
-                            <div class="item-block-title" style="width: 10%">Last Activity</div>
-                            <div class="user-space"></div>
-                            <div class="item-block-title" style="width: 40%;">Server List</div>
-                            <div class="user-space"></div>
-                            <div class="item-block-title" style="width: 10%;">Server</div>
-                            <div class="user-space"></div>
-                            <div class="item-block-title" style="width: 15%;">Running</div>
-                        </div>
-                        <div class="vertical-flex">
-                            <div class="item-block-value" style="width: 15%;">On</div>
-                            <div class="user-space"></div>
-                            <div class="item-block-value" style="width: 10%;">admin</div>
-                            <div class="user-space"></div>
-                            <div class="item-block-value" style="width: 10%">13 seconds ago</div>
-                            <div class="user-space"></div>
-                            <div class="item-block-value" style="width: 40%;">
-                                <div class="tag background-violet">Lollipop <span class="close-tag"><i class="fa fa-close"></i></span></div>
-                                <div class="tag background-blue">Oreo <span class="close-tag"><i class="fa fa-close"></i></span></div>
-                                <div class="tag background-orange">Popeyes <span class="close-tag"><i class="fa fa-close"></i></span></div>
-                                <div class="tag background-yellow">Pizza <span class="close-tag"><i class="fa fa-close"></i></span></div>
-                                <div class="tag add-tag button">Add <span class="close-tag"><i class="fa fa-plus"></i></div>
-                            </div>
-                            <div class="user-space"></div>
-                            <div class="item-block-value" style="width: 10%;">
-                                <div class="tag background-yellow">Pizza</div>
-                            </div>
-                            <div class="user-space"></div>
-                            <div class="item-block-value" style="width: 15%;"><button class="button-user button">Start Server</button></div>
-                        </div>
-                    </div>
-                </div>
+                <user-row 
+                    v-for="user in userList" 
+                    :user="user" 
+                    :key="user.username"
+                    :server_list="serverList"
+                    @admin_open_spawn="adminOpenSpawnPage(user)"
+                    @admin_stop_server="adminStopServer(user)"
+                    @admin_accept_user="adminAcceptUser(user)"
+                ></user-row>
             </div>
         </div>
     </div>
