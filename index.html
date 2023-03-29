@@ -11,248 +11,121 @@
     <title>DoHub</title>
 </head>
 <body class="space-between horizontal-flex">
-<div class="main-container space-between">
+<div class="main-container space-between" id="root">
     <div class="main-content">
 
         <div class="header">
-            <span class="welcome">Welcome to DoHub!</span>
+            <span class="welcome">Dohub, Welcome</span>
             <div class="account vertical-flex button">
                 <div class="user-img center">
                     <img src="img/github.png">
                 </div>
                 <span class="user-name center">Login with Github</span>
             </div>
+            <div class="navigation vertical-flex">
+                <div class='navigation-item' :class="{ 'navigation-item-activate': menu=='home'}" @click="changeMenu('home')">
+                    Home
+                </div>
+                <div class="navigation-item" :class="{ 'navigation-item-activate': menu=='admin'}" @click="changeMenu('admin')" v-if="is_admin">
+                    Admin
+                </div>
+            </div>
         </div>
 
         <div class="full-container space-between">
 
             <!-- LEFT CONTAINER ==============================================================================================-->
-            <div class="left-container">
+            <div class="left-container" v-if="menu=='home'">
                 <div class="menu vertical-flex">
                     <h3>Equipment Metric</h3>
                 </div>
                 <div class="item vertical-flex">
                     <img src="img/cpu.png" class="equipment-img">
-                    <div class="equipment-metric horizontal-flex">
-                        <span class="equipment-metric-title">CPU</span>
-                        <span class="equipment-metric-value">8x vCPU</span>
-                    </div>
-                    <div class="equipment-slider center">
-                        <div class="label-slider bottom">
-                            <div id="cpuLabels" class="label-container space-between"></div>
-                        </div>
-                        <div class="tick-slider-background"></div>
-                        <div id="cpuProgress" class="tick-slider-progress"></div>
-                        <div id="cpuTicks" class="tick-slider-tick-container"></div>
-                        <input
-                            disabled
-                            class="tick-slider-input"
-                            type="range"
-                            min="0"
-                            max="5"
-                            step="1"
-                            value="3"
-                            data-tick-step="1"
-                            data-labels="2,4,8,16,32"
-                            data-tick-id="cpuTicks"
-                            data-progress-id="cpuProgress"
-                            data-label-id="cpuLabels"
-                        />
-                    </div>
+                    <equipment-metric :item_key="'CPU'" :value="serverList[server]['cpu'] + 'x vCPU'"></equipment-metric>
+                    <slider :labels="equipmentList.cpu.labels" :value="serverList[server]['cpu']" @change_value="val => serverList[server]['cpu'] = val" :disabled="!is_admin"></slider>
                 </div>
                 <div class="item vertical-flex">
                     <img src="img/ram.png" class="equipment-img">
-                    <div class="equipment-metric horizontal-flex">
-                        <span class="equipment-metric-title">RAM</span>
-                        <span class="equipment-metric-value">4 GB</span>
-                    </div>
-                    <div class="equipment-slider center">
-                        <div class="label-slider bottom">
-                            <div id="ramLabels" class="label-container space-between"></div>
-                        </div>
-                        <div class="tick-slider-background"></div>
-                        <div id="ramProgress" class="tick-slider-progress"></div>
-                        <div id="ramTicks" class="tick-slider-tick-container"></div>
-                        <input
-                            disabled
-                            class="tick-slider-input"
-                            type="range"
-                            min="0"
-                            max="5"
-                            step="1"
-                            value="2"
-                            data-tick-step="1"
-                            data-labels="2,4,8,16,32"
-                            data-tick-id="ramTicks"
-                            data-progress-id="ramProgress"
-                            data-label-id="ramLabels"
-                        />
-                    </div>
+                    <equipment-metric :item_key="'RAM'" :value="serverList[server]['ram']"></equipment-metric>
+                    <slider :labels="equipmentList.ram.labels" :value="serverList[server]['ram']" @change_value="val => serverList[server]['ram'] = val" :disabled="!is_admin"></slider>
                 </div>
                 <div class="item vertical-flex">
                     <img src="img/hdd.png" class="equipment-img">
-                    <div class="equipment-metric horizontal-flex">
-                        <span class="equipment-metric-title">Storage Device: NAS</span>
-                        <span class="equipment-metric-value">30 TB HDD</span>
-                    </div>
-                    <div class="equipment-slider center">
-                        <div class="label-slider bottom">
-                            <div id="hddLabels" class="label-container space-between"></div>
-                        </div>
-                        <div class="tick-slider-background"></div>
-                        <div id="hddProgress" class="tick-slider-progress"></div>
-                        <div id="hddTicks" class="tick-slider-tick-container"></div>
-                        <input
-                            disabled
-                            class="tick-slider-input"
-                            type="range"
-                            min="0"
-                            max="6"
-                            step="1"
-                            value="6"
-                            data-tick-step="1"
-                            data-labels="20 GB,100 GB,500 GB,1 TB,10 TB, 30 TB"
-                            data-tick-id="hddTicks"
-                            data-progress-id="hddProgress"
-                            data-label-id="hddLabels"
-                        />
-                    </div>
+                    <equipment-metric :item_key="'Storage Device: NAS'" :value="serverList[server]['drive'] + ' HDD'"></equipment-metric>
+                    <slider :labels="equipmentList.drive.labels" :value="serverList[server]['drive']" @change_value="val => serverList[server]['drive'] = val" :disabled="!is_admin"></slider>
                 </div>
                 <div class="item vertical-flex">
                     <img src="img/gpu.png" class="equipment-img">
-                    <div class="equipment-metric horizontal-flex">
-                        <span class="equipment-metric-title">GPU: NVIDIA A100</span>
-                        <span class="equipment-metric-value">1x 20 GB</span>
-                    </div>
-                    <div class="equipment-slider center">
-                        <div class="label-slider bottom">
-                            <div id="gpuLabels" class="label-container space-between"></div>
-                        </div>
-                        <div class="tick-slider-background"></div>
-                        <div id="gpuProgress" class="tick-slider-progress"></div>
-                        <div id="gpuTicks" class="tick-slider-tick-container"></div>
-                        <input
-                            disabled
-                            class="tick-slider-input"
-                            type="range"
-                            min="0"
-                            max="4"
-                            step="1"
-                            value="3"
-                            data-tick-step="1"
-                            data-labels="0 GB, 10 GB, 20 GB, 40 GB"
-                            data-tick-id="gpuTicks"
-                            data-progress-id="gpuProgress"
-                            data-label-id="gpuLabels"
-                        />
-                    </div>
+                    <equipment-metric :item_key="'GPU: NVIDIA A100'" :value="serverList[server]['gpu']"></equipment-metric>
+                    <slider :labels="equipmentList.gpu.labels" :value="serverList[server]['gpu']" @change_value="val => serverList[server]['gpu'] = val" :disabled="!is_admin"></slider>
                 </div>
 
                 <div class="menu vertical-flex">
                     <h3>System Information</h3>
                 </div>
                 <div class="item vertical-flex">
-                    <div class="item-block vertical-flex">
-                        <img src="img/ubuntu.png" class="item-block-img">
-                        <div class="item-block-metric horizontal-flex">
-                            <span class="item-block-title">Ubuntu</span>
-                            <span class="item-block-value">20.04 LTS</span>
-                        </div>
-                    </div>
-                    <div class="item-space"></div>
-                    <div class="item-block vertical-flex">
-                        <img src="img/docker.png" class="item-block-img">
-                        <div class="item-block-metric horizontal-flex">
-                            <span class="item-block-title">Docker Image</span>
-                            <span class="item-block-value">daovietanh99/deepops</span>
-                        </div>
-                    </div>
-                    <div class="item-space"></div>
-                    <div class="item-block vertical-flex">
-                        <img src="img/kubernetes.png" class="item-block-img">
-                        <div class="item-block-metric horizontal-flex">
-                            <span class="item-block-title">Kubernetes</span>
-                            <span class="item-block-value">v1.26.0</span>
-                        </div>
-                    </div>
+                    <item-block 
+                        img="ubuntu.png" 
+                        title="Ubuntu" 
+                        short_description="20.04 LTS" 
+                        space="true">
+                    </item-block>
+                    <item-block 
+                        img="docker.png" 
+                        title="Docker Image" 
+                        :short_description="serverList[server]['docker_image']" 
+                        space="true">
+                    </item-block>
+                    <item-block 
+                        img="kubernetes.png" 
+                        title="Kubernetes" 
+                        short_description="v1.26.0">
+                    </item-block>
                 </div>
 
                 <div class="menu vertical-flex">
                     <h3>Supported Software</h3>
                 </div>
                 <div class="item vertical-flex">
-                    <div class="item-block vertical-flex">
-                        <img src="img/codeserver.png" class="item-block-img">
-                        <div class="item-block-metric horizontal-flex">
-                            <span class="item-block-title">Code Server</span>
-                            <span class="item-block-value">Visual Studio Code</span>
-                        </div>
-                    </div>
-                    <div class="item-space"></div>
-                    <div class="item-block vertical-flex">
-                        <img src="img/pytorch.png" class="item-block-img">
-                        <div class="item-block-metric horizontal-flex">
-                            <span class="item-block-title">Pytorch Cuda</span>
-                            <span class="item-block-value">2.0.0 + cu11.4</span>
-                        </div>
-                    </div>
-                    <div class="item-space"></div>
+                    <item-block 
+                        img="codeserver.png" 
+                        title="Code Server" 
+                        short_description="Visual Studio Code" 
+                        space="true">
+                    </item-block>
+                    <item-block 
+                        img="pytorch.png" 
+                        title="Pytorch Cuda" 
+                        short_description="2.0.0 + cu11.4" 
+                        space="true">
+                    </item-block>
                     <div class="item-block vertical-flex"></div>
                 </div>
 
                 <div class="menu vertical-flex">
                     <h3>Choose An Option</h3>
                 </div>
-                <div class="item vertical-flex">
-                    <div class="item-block vertical-flex hover-blue button">
-                        <img src="img/lollipop.png" class="item-block-img">
-                        <div class="item-block-metric horizontal-flex">
-                            <span class="item-block-title">Lollipop Server</span>
-                            <span class="item-block-value">1x vCPU, 0 GB GPU</span>
-                        </div>
-                    </div>
-                    <div class="item-space"></div>
-                    <div class="item-block vertical-flex hover-blue button">
-                        <img src="img/oreo.png" class="item-block-img">
-                        <div class="item-block-metric horizontal-flex">
-                            <span class="item-block-title">Oreo Server</span>
-                            <span class="item-block-value">4x vCPU, 10 GB GPU</span>
-                        </div>
-                    </div>
-                    <div class="item-space"></div>
-                    <div class="item-block vertical-flex hover-blue button">
-                        <img src="img/popeyes.png" class="item-block-img">
-                        <div class="item-block-metric horizontal-flex">
-                            <span class="item-block-title">Popeyes Server</span>
-                            <span class="item-block-value">8x vCPU, 20 GB GPU</span>
-                        </div>
-                    </div>
-                </div>
-                <div class="item vertical-flex">
-                    <div class="item-block vertical-flex hover-blue button">
-                        <img src="img/pizza.png" class="item-block-img">
-                        <div class="item-block-metric horizontal-flex">
-                            <span class="item-block-title">Pizza Server</span>
-                            <span class="item-block-value">8x vCPU, 40 GB GPU</span>
-                        </div>
-                    </div>
-                    <div class="item-space"></div>
-                    <div class="item-block vertical-flex hover-blue button">
-                        <img src="img/spagetti.png" class="item-block-img">
-                        <div class="item-block-metric horizontal-flex">
-                            <span class="item-block-title">Spagetti Server</span>
-                            <span class="item-block-value">16x vCPU, 2x 40 GB GPU</span>
-                        </div>
-                    </div>
-                    <div class="item-space"></div>
-                    <div class="item-block-add vertical-flex center button">
+                <div class="item vertical-flex" v-for="part in Math.ceil((Object.keys(serverList).length + 1)/3)" :key="part">
+                    <item-block
+                        v-for="index in ((part == Math.ceil((Object.keys(serverList).length +1)/3)) ? ((Object.keys(serverList).length)%3) : 3)"
+                        :key="part*3 + index - 4"
+                        :img="serverList[Object.keys(serverList)[part*3 + index - 4]]['image']" 
+                        :title="serverList[Object.keys(serverList)[part*3 + index - 4]]['name'] + ' Server'" 
+                        :short_description="serverList[Object.keys(serverList)[part*3 + index - 4]]['short_description']" 
+                        hover_blue="true" 
+                        button="true"
+                        :space="index < 3"
+                        :activate="serverList[Object.keys(serverList)[part*3 + index - 4]]['name'] == server"
+                        @click="changeServer(serverList[Object.keys(serverList)[part*3 + index - 4]]['name'])">
+                    </item-block>
+                    <div class="item-block-add vertical-flex center" :class="{'button': is_admin, 'hover-blue': is_admin}" v-if="part == Math.ceil((Object.keys(serverList).length +1)/3)">
                         <span><i class="fa fa-plus"></i> Add new options</span>
                     </div>
                 </div>
             </div>
 
             <!-- RIGHT CONTAINER ===========================================================================================-->
-            <div class="right-container">
+            <div class="right-container" v-if="menu=='home'">
                 <div class="menu vertical-flex">
                     <h3>Current Specifications</h3>
                 </div>
@@ -264,42 +137,15 @@
                     </div>
                 </div>
                 <div class="list-specification horizontal-flex">
-                    <div class="specification-item space-between">
-                        <div class="specification-key">Option Name:</div>
-                        <div class="specification-value">Pizza</div>
-                    </div>
-                    <div class="specification-item space-between">
-                        <div class="specification-key">CPU:</div>
-                        <div class="specification-value">8 vCPU</div>
-                    </div>
-                    <div class="specification-item space-between">
-                        <div class="specification-key">RAM:</div>
-                        <div class="specification-value">4 GB</div>
-                    </div>
-                    <div class="specification-item space-between">
-                        <div class="specification-key">Storage Device:</div>
-                        <div class="specification-value">30 TB HDD</div>
-                    </div>
-                    <div class="specification-item space-between">
-                        <div class="specification-key">GPU:</div>
-                        <div class="specification-value">16 GB NVIDIA A100</div>
-                    </div>
-                    <div class="specification-item space-between">
-                        <div class="specification-key">Operating System:</div>
-                        <div class="specification-value">Ubuntu 20.04</div>
-                    </div>
-                    <div class="specification-item space-between">
-                        <div class="specification-key">Docker Image:</div>
-                        <div class="specification-value">daovietanh99/deepops</div>
-                    </div>
-                    <div class="specification-item space-between">
-                        <div class="specification-key">Application:</div>
-                        <div class="specification-value">VSCode Server</div>
-                    </div>
-                    <div class="specification-item space-between">
-                        <div class="specification-key">Status:</div>
-                        <div class="specification-value">Running</div>
-                    </div>
+                    <specification-item item_key="Option Name" :value="serverList[server]['name']"></specification-item>
+                    <specification-item item_key="CPU" :value="serverList[server]['cpu'] + 'x vCPU'"></specification-item>
+                    <specification-item item_key="RAM" :value="serverList[server]['ram']"></specification-item>
+                    <specification-item item_key="Storage Device" :value="serverList[server]['drive'] + ' HDD'"></specification-item>
+                    <specification-item item_key="GPU" :value="serverList[server]['gpu'] + ' NVIDIA A100'"></specification-item>
+                    <specification-item item_key="Operating System" value="Ubuntu 20.04"></specification-item>
+                    <specification-item item_key="Docker Image" :value="serverList[server]['docker_image']"></specification-item>
+                    <specification-item item_key="Application" value="VSCode Server"></specification-item>
+                    <specification-item item_key="Status" value="Running"></specification-item>
                 </div>
 
                 <div class="menu vertical-flex">
@@ -342,7 +188,7 @@
             </div>
 
             <!-- ADMIN PAGE ================================================================================================== -->
-            <div class="table" style="display: none;">
+            <div class="table" v-if="menu=='admin'">
                 <div class="menu vertical-flex">
                     <h3>Users Management</h3>
                 </div>
@@ -352,7 +198,7 @@
                     </div>
                     <div class="horizontal-flex space-between user-cell user-cell-info">
                         <div class="vertical-flex space-between row-block-title">
-                            <div class="item-block-title" style="width: 15%;">{{user.username}}</div>
+                            <div class="item-block-title" style="width: 15%;">user.name</div>
                             <div class="user-space"></div>
                             <div class="item-block-title" style="width: 10%;">Role</div>
                             <div class="user-space"></div>
@@ -395,7 +241,7 @@
                     </div>
                     <div class="horizontal-flex space-between user-cell user-cell-info">
                         <div class="vertical-flex space-between row-block-title">
-                            <div class="item-block-title" style="width: 15%;">{{user.username}}</div>
+                            <div class="item-block-title" style="width: 15%;">user.name</div>
                             <div class="user-space"></div>
                             <div class="item-block-title" style="width: 10%;">Role</div>
                             <div class="user-space"></div>
@@ -458,5 +304,6 @@
     </div>
 </div>
 </body>
+<script src="vue.global.js"></script>
 <script src="index.js"></script>
 </html>

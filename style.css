@@ -133,6 +133,25 @@ html {
     width: 2rem;
 }
 
+.navigation {
+    position: absolute;
+    bottom: 0;
+    left: 2rem;
+}
+
+.navigation-item {
+    padding: 1rem 0rem 1rem 0;
+    margin-right: 2rem;
+    cursor: pointer;
+    color: gray;
+    font-weight: 600;
+}
+
+.navigation-item-activate {
+    color: #000000 !important;
+    border-bottom: 3px solid #4596dd;
+}
+
 .full-container {
     width: 100%;
     border-radius: .5rem;
@@ -555,13 +574,7 @@ input[type="range"]::-webkit-slider-runnable-track {
     border-radius: .3rem;
     background-color: white;
     border: 2px dashed #e0e0e0;
-    color: #e0e0e0;
-}
-
-.item-block-add:hover {
-    background-color: #e3eefa;
-    color: #4596dd;
-    cursor: pointer;
+    color: darkgray;
 }
 
 .button:active {
