@@ -1,8 +1,8 @@
 from functools import wraps
-from flask import Flask, request, session, redirect, url_for
+from flask import Flask, request, session, redirect, url_for, render_template
 from flask import render_template_string, jsonify
 
-from sqlalchemy import create_engine, Column, Integer, String, Float
+from sqlalchemy import create_engine, Column, Integer, String, Float, Boolean, Text
 from sqlalchemy.orm import scoped_session, sessionmaker
 from sqlalchemy.ext.declarative import declarative_base
 
@@ -11,13 +11,18 @@ import requests
 import json
 import uuid
 
+import yaml
+
+with open("config.yaml", 'r') as stream:
+    config_file = yaml.safe_load(stream)
+
 DATABASE_URI = 'sqlite:///./dohub.db'
 SECRET_KEY = 'dohub'
 DEBUG = True
 
 # Set these values
-GITHUB_CLIENT_ID = '3ee19bc1b2b6e07b190f'
-GITHUB_CLIENT_SECRET = '0b64b39fb19aae0ddc40ea10dd6d16fea7eeb86f'
+GITHUB_CLIENT_ID = config_file['githubOauth']['GITHUB_CLIENT_ID']
+GITHUB_CLIENT_SECRET = config_file['githubOauth']['GITHUB_CLIENT_SECRET']
 
 # setup flask
 app = Flask(__name__)
@@ -38,22 +43,34 @@ class User(Base):
     github_access_token = Column(String(255))
     github_id = Column(Integer)
     username = Column(String(255))
+    image = Column(Text)
     access_key = Column(String(255))
     server_ip = Column(String(15))
-    pod_name = Column(String(255))
-    role = Column(String(255))
+    role = Column(String(255), default='normal_user')
+    is_accept = Column(Boolean, unique=False, default=False)
+    current_server = Column(Integer, default=1)
+    state = Column(String(255), default='offline')
+    access_password = Column(String(255))
     last_activity = Column(Float)
 
-    def __init__(self, username):
-        self.username = username
+    def __init__(self, **kwargs):
+        for property, value in kwargs.items():
+            if hasattr(value, '__iter__') and not isinstance(value, str):
+                value = value[0]
+            setattr(self, property, value)
 
 class ServerOption(Base):
     __tablename__ = 'server_options'
 
     id = Column(Integer, primary_key=True)
-    profile_name = Column(String(255))
-    description = Column(String(1000))
-    config = Column(String(255))
+    name = Column(String(255), unique=True)
+    image = Column(String(255), default='logo.png')
+    docker_image = Column(String(255), default="daovietanh99/deepops")
+    cpu = Column(Integer)
+    ram = Column(String(255))
+    drive = Column(String(255))
+    gpu = Column(String(255))
+    color = Column(String(255), default="#fcb040")
 
     def __init__(self, **kwargs):
         for property, value in kwargs.items():
@@ -63,6 +80,40 @@ class ServerOption(Base):
 
     def __repr__(self):
         return str(self.id)
+
+class ServerPort(Base):
+    __tablename__ = 'server_ports'
+
+    id = Column(Integer, primary_key=True)
+    server_id = Column(Integer)
+    internal_port = Column(Integer)
+    external_port = Column(Integer)
+
+    def __init__(self, **kwargs):
+        for property, value in kwargs.items():
+            if hasattr(value, '__iter__') and not isinstance(value, str):
+                value = value[0]
+            setattr(self, property, value)
+
+    def __repr__(self):
+        return str(self.id)
+    
+class UserServer(Base):
+    __tablename__ = 'user_server_relations'
+
+    id = Column(Integer, primary_key=True)
+    user_id = Column(Integer)
+    server_id = Column(Integer)
+
+    def __init__(self, **kwargs):
+        for property, value in kwargs.items():
+            if hasattr(value, '__iter__') and not isinstance(value, str):
+                value = value[0]
+            setattr(self, property, value)
+
+    def __repr__(self):
+        return str(self.id)
+
 
 class GitAuth():
     BASE_URL = 'https://api.github.com/'
@@ -99,7 +150,7 @@ class GitAuth():
         def decorated(*args, **kwargs):
 
             if not 'code' in request.args:
-                return {'message': 'no permission'}, 400
+                return {'message': 'no permission'}, 403
 
             code = request.args.get('code')
 
@@ -110,8 +161,8 @@ class GitAuth():
                 'state': 'An unguessable random string.'
             }
             r = requests.post(self.BASE_AUTH_URL + 'access_token', json=payload, headers={'Accept': 'application/json'})
-            if not 'code' in json.loads(r.text):
-                return {'message': 'no permission'}, 400
+            if not 'access_token' in json.loads(r.text):
+                return {'message': 'no permission'}, 403
             access_token = json.loads(r.text)['access_token']
             
             access_user_url = self.BASE_URL + 'user'
@@ -129,7 +180,9 @@ class GitAuth():
             if not 'user_access_key' in session:
                 user = None
             else:
-                user = User.query.filter_by(access_key=session['user_access_key']).first().__dict__
+                user = User.query.filter_by(access_key=session['user_access_key']).first()
+                if user:
+                    user = user.__dict__
             return f(*((user,) + args), **kwargs)
         return decorated
         
@@ -146,11 +199,10 @@ class GitAuth():
 
 auth = GitAuth(app, db_session)
 
-# g.user = User.query.get(session['user_id'])
-
 @app.before_first_request
 def initialize_database():
     Base.metadata.create_all(bind=engine)
+    migrate()
 
 
 @app.after_request
@@ -159,31 +211,34 @@ def after_request(response):
     return response
 
 
-@app.route('/')
-@auth.verify
-def index(user):
-    if user:
-        t = 'Hello! %s <a href="{{ url_for("user") }}">Get user</a> ' \
-            '<a href="{{ url_for("index") }}">Get repo</a> ' \
-            '<a href="{{ url_for("logout") }}">Logout</a>'
-        t %= user['username']
-    else:
-        t = 'Hello! <a href="{{ url_for("login") }}">Login</a>'
-
-    return render_template_string(t)
-
-
 @app.route('/github-callback')
 @auth.handle_callback
 def authorized(user):
     user_ = User.query.filter_by(username=user['login']).first()
     if user_ is None:
-        user_ = User(username=user['login'])
+        user_ = User(
+            username=user['login'], 
+            image=user['avatar_url'], 
+            role=("admin" if user['login'] == 'daovietanh190499' else 'normal_user'), 
+            is_accept=user['login'] == 'daovietanh190499',
+            access_password = user['login'] + '-' + str(uuid.uuid4()).split('-')[0]
+        )
         db_session.add(user_)
+        db_session.commit()
+
+        if user['login'] == 'daovietanh190499':
+            server_ids = db_session.query(ServerOption.id).all()
+            for server_id in server_ids:
+                userserver = UserServer(user_id=user_.id, server_id=server_id[0])
+                db_session.add(userserver)
+                db_session.commit()
+        else:
+            userserver = UserServer(user_id=user_.id, server_id=1)
+            db_session.add(userserver)
+            db_session.commit()
 
     user_.github_access_token = user['access_token']
     user_.github_id = int(user['id'])
-    db_session.commit()
 
     auth.login_user(user_)
 
@@ -204,6 +259,21 @@ def logout():
     auth.logout_user()
     return redirect(url_for('index'))
 
+@app.route('/')
+@auth.verify
+def index(user):
+    if user and user['state'] == 'running':
+        return redirect(url_for('user'))
+    else:
+        return redirect(url_for('hub'))
+
+@app.route('/hub')
+@auth.verify
+def hub(user):
+    if user:
+        return render_template('index.html', user=user)
+    else:
+        return render_template('index.html', user=user)
 
 @app.route('/user')
 @auth.verify
@@ -212,6 +282,277 @@ def user(user):
         return redirect(url_for('index'))
     return user['username'], 200
 
+@app.route('/user_state')
+@auth.verify
+def user_state(user):
+    if not user:
+        return jsonify({"message": "no permission"}), 403
+    del user['_sa_instance_state']
+    all_servers = db_session.query(ServerOption.name) \
+            .filter(ServerOption.id == UserServer.server_id) \
+            .filter(UserServer.user_id == user['id']) \
+            .all()
+    current_server = db_session.query(ServerOption.name).filter(ServerOption.id == user['current_server']).first()
+    all_servers = [db[0] for db in all_servers]
+    user['server_list'] = all_servers
+    user['current_server'] = current_server[0]
+    return jsonify({'result': user}), 200
 
-if __name__ == '__main__':
+@app.route('/all_users')
+@auth.verify
+def all_user(user):
+    if not user:
+        return jsonify({"message": "no permission"}), 403
+    if not user['role'] == "admin":
+        return jsonify({"message": "no permission"}), 403
+    users = db_session.query(
+        User.id,
+        User.username, 
+        User.image,
+        User.server_ip, 
+        User.last_activity, 
+        User.role, 
+        User.is_accept, 
+        ServerOption.name,
+        User.state,
+        User.access_password) \
+        .filter(User.current_server == ServerOption.id).all()
+    fields = ['id', 'username', 'image', 'server_ip', 'last_activity', 'role', 'is_accept', 'current_server', 'state', 'access_password', 'server_list']
+    result_list = []
+    for user in users:
+        user_dict = {}
+        all_servers = db_session.query(ServerOption.name) \
+            .filter(ServerOption.id == UserServer.server_id) \
+            .filter(UserServer.user_id == user[0]) \
+            .all()
+        all_servers = [db[0] for db in all_servers]
+        user = list(user)
+        user.append(all_servers)
+        for i, field in enumerate(fields):
+            user_dict[field] = user[i]
+        result_list.append(user_dict)
+    
+    return jsonify({'result': result_list}), 200
+
+@app.route('/all_servers')
+def all_server():
+    servers = db_session.query(
+        ServerOption.name,
+        ServerOption.image,
+        ServerOption.docker_image,
+        ServerOption.cpu,
+        ServerOption.ram,
+        ServerOption.drive,
+        ServerOption.gpu,
+        ServerOption.color).all()
+    fields = ['name', 'image', 'docker_image', 'cpu', 'ram', 'drive', 'gpu', 'color']
+    result_list = {}
+    for server in servers:
+        server_dict = {}
+        for i, field in enumerate(fields):
+            server_dict[field] = server[i] if server[i] != '' else 'none'
+        result_list[server[0]] = server_dict
+
+    return jsonify({'result': result_list}), 200
+
+@app.route('/accept_user/<username>')
+@auth.verify
+def accept_user(user, username):
+    if not user:
+        return jsonify({"message": "no permission"}), 403
+    if not user['role'] == "admin":
+        return jsonify({"message": "no permission"}), 403
+    user_accept = User.query.filter_by(username=username).first()
+    if not user_accept:
+        return jsonify({"message": "not found"}), 404
+    
+    user_accept.is_accept = True
+    db_session.commit()
+    
+    return jsonify({'message': 'success'}), 200
+
+@app.route('/delete_user/<username>')
+@auth.verify
+def delete_user(user, username):
+    if not user:
+        return jsonify({"message": "no permission"}), 403
+    if not user['role'] == "admin":
+        return jsonify({"message": "no permission"}), 403
+    user_delete = User.query.filter_by(username=username).first()
+    if not user_delete:
+        return jsonify({"message": "not found"}), 404
+    
+    #TODO: close user pod
+    
+    delete_q = UserServer.__table__.delete().where(UserServer.user_id == user_delete.id)
+    db_session.execute(delete_q)
+    db_session.delete(user_delete)
+    db_session.commit()
+
+    return jsonify({'message': 'success'}), 200
+
+@app.route('/change_server/<username>/<server_name>')
+@auth.verify
+def change_server(user, username, server_name):
+    if not user:
+        return jsonify({"message": "no permission"}), 403
+    if not user['role'] == "admin" and user['username'] != username:
+        return jsonify({"message": "no permission"}), 403
+    if not user['is_accept']:
+        return jsonify({"message": "no permission"}), 403
+    
+    user_change = User.query.filter_by(username=username).first()
+    if not user_change:
+        return jsonify({"message": "not found"}), 404
+    if not user_change.is_accept:
+        return jsonify({"message": "no permission"}), 403
+    if not user_change.state == 'offline':
+        return jsonify({"message": "no permission"}), 403
+    
+    server = ServerOption.query.filter_by(name=server_name).first()
+    if not server:
+        return jsonify({"message": "not found"}), 404
+    
+    userserver = UserServer.query.filter_by(user_id=user_change.id, server_id=server.id).first()
+    if not userserver:
+        return jsonify({"message": "no permission"}), 403
+    
+    user_change.current_server = server.id
+    db_session.commit()
+
+    return jsonify({'message': 'success'}), 200
+
+@app.route('/add_server_user/<username>/<server_name>')
+@auth.verify
+def add_server_user(user, username, server_name):
+    if not user:
+        return jsonify({"message": "no permission"}), 403
+    if not user['role'] == "admin":
+        return jsonify({"message": "no permission"}), 403
+    
+    user_change = User.query.filter_by(username=username).first()
+    if not user_change:
+        return jsonify({"message": "not found"}), 404
+    
+    server = ServerOption.query.filter_by(name=server_name).first()
+    if not server:
+        return jsonify({"message": "not found"}), 404
+    
+    userserver = UserServer.query.filter_by(user_id=user_change.id, server_id=server.id).first()
+    if not userserver:
+        userserver = UserServer(user_id=user_change.id, server_id=server.id)
+        db_session.add(userserver)
+        db_session.commit()
+
+    return jsonify({'message': 'success'}), 200
+
+@app.route('/delete_server_user/<username>/<server_name>')
+@auth.verify
+def delete_server_user(user, username, server_name):
+    if not user:
+        return jsonify({"message": "no permission"}), 403
+    if not user['role'] == "admin":
+        return jsonify({"message": "no permission"}), 403
+    
+    user_change = User.query.filter_by(username=username).first()
+    if not user_change:
+        return jsonify({"message": "not found"}), 404
+    
+    server = ServerOption.query.filter_by(name=server_name).first()
+    if not server:
+        return jsonify({"message": "not found"}), 404
+    
+    userserver = UserServer.query.filter_by(user_id=user_change.id, server_id=server.id).first()
+    available_server = UserServer.query.filter_by(user_id=user_change.id).first()
+    if not userserver:
+        return jsonify({"message": "not found"}), 404
+    
+    if server.id == user_change.current_server and available_server:
+        user_change.current_server = available_server.server_id
+    elif server.id == user_change.current_server:
+        user_change.current_server = 1
+
+    db_session.delete(userserver)
+    db_session.commit()
+
+    return jsonify({'message': 'success'}), 200
+
+@app.route('/start_server/<username>')
+@auth.verify
+def start_server(user, username):
+    if not user:
+        return jsonify({"message": "no permission"}), 403
+    if not user['role'] == "admin" and user['username'] != username:
+        return jsonify({"message": "no permission"}), 403
+    if not user['is_accept']:
+        return jsonify({"message": "no permission"}), 403
+    
+    user_change = User.query.filter_by(username=username).first()
+    if not user_change:
+        return jsonify({"message": "not found"}), 404
+    if not user_change.is_accept:
+        return jsonify({"message": "no permission"}), 403
+    if not user_change.state == 'offline':
+        return jsonify({"message": "no permission"}), 403
+    
+    user_change.state = 'running'
+
+    #TODO: thread start server with current server option and send event if success change state to online else to ofline
+    # user_change.current_server
+    # user_change.state
+    # save pod id to user_change.ip
+
+    db_session.commit()
+
+    return jsonify({'message': 'success'}), 200
+
+
+@app.route('/stop_server/<username>')
+@auth.verify
+def stop_server(user, username):
+    if not user:
+        return jsonify({"message": "no permission"}), 403
+    if not user['role'] == "admin" and user['username'] != username:
+        return jsonify({"message": "no permission"}), 403
+    if not user['is_accept']:
+        return jsonify({"message": "no permission"}), 403
+    
+    user_change = User.query.filter_by(username=username).first()
+    if not user_change:
+        return jsonify({"message": "not found"}), 404
+    if not user_change.is_accept:
+        return jsonify({"message": "no permission"}), 403
+    if not user_change.state == 'running':
+        return jsonify({"message": "no permission"}), 403
+    
+    user_change.state = 'offline'
+
+    #TODO: thread stop server with current server option and send event and change state to ofline
+    # user_change.current_server
+    # user_change.state
+    # clear user pod ip
+
+    db_session.commit()
+
+    return jsonify({'message': 'success'}), 200
+
+
+def migrate():
+    for server_option in config_file['initServerOptions']:
+        server = ServerOption.query.filter_by(name=server_option['name']).first()
+        if server:
+            continue
+        server_option_entity = ServerOption(
+                    name = server_option['name'], 
+                    image = server_option['image'], 
+                    docker_image = server_option['docker_image'], 
+                    cpu = server_option['cpu'],
+                    ram = server_option['ram'],
+                    drive = server_option['drive'],
+                    gpu = server_option['gpu'],
+                    color = server_option['color'])
+        db_session.add_all(server_option_entity)
+        db_session.commit()
+
+if __name__ == '__main__': 
     app.run("0.0.0.0", 5000, debug=False)

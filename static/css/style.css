@@ -125,6 +125,22 @@ html {
     cursor: pointer;
 }
 
+.button-logout {
+    font-family: 'League Spartan', sans-serif;
+    background-color: #e7effe;
+    border: 1px solid #e7effe;
+    padding: 1rem 1rem 1rem 1rem;
+    border-radius: .4rem;
+    color: #4596dd;
+    font-weight: bold;
+    font-size: 1rem;
+    top: 0;
+    right: 0;
+    margin: 1rem 2rem 0 0;
+    position: absolute;
+    cursor: pointer;
+}
+
 .user-img {
     margin-right: .5rem;
 }
@@ -178,6 +194,10 @@ html {
 
 .menu {
     padding: 1rem 2rem 1rem 2rem;
+}
+
+.notify-user {
+    float: right;
 }
 
 .item {
@@ -650,3 +670,46 @@ input[type="range"]::-webkit-slider-runnable-track {
 .button:active {
     transform: scale(0.95);
 }
+  
+
+
+.search-dropdown {
+    font-family: 'League Spartan', sans-serif;
+    box-sizing: border-box;
+    font-size: 1rem;
+    padding: 1rem;
+    border: none;
+    border-bottom: 1px solid #ddd;
+}
+
+.search-dropdown:focus {outline: 3px solid #ddd;}
+
+.dropdown {
+    position: relative;
+    display: inline-block;
+}
+
+.dropdown-content {
+    position: absolute;
+    background-color: #f6f6f6;
+    border: 1px solid #ddd;
+    z-index: 1;
+    border-radius: .3rem;
+}
+
+.dropdown-items {
+    overflow-y: scroll;
+    max-height: 10rem;
+}
+
+.dropdown-content a {
+    color: black;
+    padding: 1rem;
+    text-decoration: none;
+    display: block;
+    border-bottom: 1px solid #ddd;
+    font-weight: 700;
+    cursor: pointer;
+}
+
+.dropdown a:hover {background-color: #ddd;}

@@ -6,8 +6,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <link href="https://fonts.googleapis.com/css2?family=League+Spartan:wght@100;200;300;400;500;600&family=Poppins:wght@400;500;600&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/font-awesome/4.7.0/css/font-awesome.min.css">
-    <link rel="stylesheet" type="text/css" href="style.css">
-    <link rel="icon" href="img/logo.png">
+    <link rel="stylesheet" type="text/css" href="static/css/style.css">
+    <link rel="icon" href="static/img/logo.png">
     <title>DoHub</title>
 </head>
 <body class="space-between horizontal-flex">
@@ -15,13 +15,14 @@
     <div class="main-content">
 
         <div class="header">
-            <span class="welcome">Dohub, Welcome</span>
-            <div class="account vertical-flex button">
-                <div class="user-img center">
-                    <img src="img/github.png">
+            <span class="welcome">Dohub, Welcome {{ user.username if user else '' }}</span>
+            <div class="account vertical-flex button" @click="loginWithGithub()" v-if="!is_login">
+                <div class="user-img center"> 
+                    <img src="static/img/github.png">
                 </div>
                 <span class="user-name center">Login with Github</span>
             </div>
+            <button class="button-logout button" v-if="is_login" @click="logout()">Logout <span style="padding-left: .5rem; font-size: 1.1rem;"><i class="fa fa-sign-out"></i></span></button>
             <div class="navigation vertical-flex">
                 <div class='navigation-item' :class="{ 'navigation-item-activate': menu=='home'}" @click="changeMenu('home')">
                     Home
@@ -36,12 +37,14 @@
 
             <!-- LEFT CONTAINER ==============================================================================================-->
             <div class="left-container" v-if="menu=='home' || admin_open_spawn">
-                <div class="menu vertical-flex">
+                <div class="menu space-between">
                     <h3>Choose An Option</h3>
+                    <h3 class="notify-user">Spawn Page For {{ '{{current_spawn_user}}' }}</h3>
                 </div>
                 <div class="item vertical-flex" v-for="part in Math.ceil((current_server_list.length + 1)/3)" :key="part">
                     <item-block
                         v-for="index in ((part == Math.ceil((current_server_list.length +1)/3)) ? ((current_server_list.length)%3) : 3)"
+                        v-if="serverList[current_server_list[part*3 + index - 4]]"
                         :key="part*3 + index - 4"
                         :img="serverList[current_server_list[part*3 + index - 4]]['image']" 
                         :title="serverList[current_server_list[part*3 + index - 4]]['name'] + ' Server'" 
@@ -61,22 +64,22 @@
                     <h3>Equipment Metric</h3>
                 </div>
                 <div class="item vertical-flex">
-                    <img src="img/cpu.png" class="equipment-img">
+                    <img src="static/img/cpu.png" class="equipment-img">
                     <equipment-metric :item_key="'CPU'" :value="serverList[server]['cpu'] + 'x vCPU'"></equipment-metric>
                     <slider :labels="equipmentList.cpu.labels" :value="serverList[server]['cpu']" @change_value="val => serverList[server]['cpu'] = val" :disabled="!is_admin"></slider>
                 </div>
                 <div class="item vertical-flex">
-                    <img src="img/ram.png" class="equipment-img">
+                    <img src="static/img/ram.png" class="equipment-img">
                     <equipment-metric :item_key="'RAM'" :value="serverList[server]['ram']"></equipment-metric>
                     <slider :labels="equipmentList.ram.labels" :value="serverList[server]['ram']" @change_value="val => serverList[server]['ram'] = val" :disabled="!is_admin"></slider>
                 </div>
                 <div class="item vertical-flex">
-                    <img src="img/hdd.png" class="equipment-img">
+                    <img src="static/img/hdd.png" class="equipment-img">
                     <equipment-metric :item_key="'Storage Device: NAS'" :value="serverList[server]['drive'] + ' HDD'"></equipment-metric>
                     <slider :labels="equipmentList.drive.labels" :value="serverList[server]['drive']" @change_value="val => serverList[server]['drive'] = val" :disabled="!is_admin"></slider>
                 </div>
                 <div class="item vertical-flex">
-                    <img src="img/gpu.png" class="equipment-img">
+                    <img src="static/img/gpu.png" class="equipment-img">
                     <equipment-metric :item_key="'GPU: NVIDIA A100'" :value="serverList[server]['gpu']"></equipment-metric>
                     <slider :labels="equipmentList.gpu.labels" :value="serverList[server]['gpu']" @change_value="val => serverList[server]['gpu'] = val" :disabled="!is_admin"></slider>
                 </div>
@@ -180,7 +183,7 @@
                     </div>
                 </div>
                 <div class="list-plan horizontal-flex">
-                    <input type="text" class="input-text" value="daovietanh190499" disabled>
+                    <input type="text" class="input-text" :value="access_password" disabled>
                 </div>
                 <div class="list-plan horizontal-flex" v-if="state=='offline'">
                     <button class="button-input button" @click="startServer()">Start Server</button>
@@ -194,7 +197,7 @@
             </div>
 
             <!-- ADMIN PAGE ================================================================================================== -->
-            <div class="table" v-if="menu=='admin' && !admin_open_spawn">
+            <div class="table" v-if="menu=='admin' && !admin_open_spawn && is_admin && userList.length > 0">
                 <div class="menu vertical-flex">
                     <h3>Users Management</h3>
                 </div>
@@ -206,6 +209,9 @@
                     @admin_open_spawn="adminOpenSpawnPage(user)"
                     @admin_stop_server="adminStopServer(user)"
                     @admin_accept_user="adminAcceptUser(user)"
+                    @admin_delete_user="adminDeleteUser(user)"
+                    @admin_add_server_user="server => adminAddServerUser(user, server)"
+                    @admin_delete_server_user="server => adminDeleteServerUser(user, server)"
                 ></user-row>
             </div>
         </div>
@@ -235,6 +241,9 @@
     </div>
 </div>
 </body>
-<script src="vue.global.js"></script>
-<script src="index.js"></script>
+<script>
+    var is_login = {{ 1 if user else 0 }}
+</script>
+<script src="static/js/vue.global.js"></script>
+<script src="static/js/index.js"></script>
 </html>
