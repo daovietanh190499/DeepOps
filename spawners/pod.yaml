@@ -23,7 +23,7 @@ spec:
     name: codeserver
     ports:
     - containerPort: 8443
-      name: code-server-port
+      name: dohub-port
       protocol: TCP
     resources:
       limits:

@@ -1,6 +1,5 @@
 from functools import wraps
-from flask import Flask, request, session, redirect, url_for, render_template
-from flask import render_template_string, jsonify
+from flask import Flask, request, session, redirect, url_for, render_template, Response, jsonify
 
 from sqlalchemy import create_engine, Column, Integer, String, Float, Boolean, Text
 from sqlalchemy.orm import scoped_session, sessionmaker
@@ -10,6 +9,12 @@ from furl import furl
 import requests
 import json
 import uuid
+
+import re
+from urllib.parse import urlparse, urlunparse
+import threading
+from flask_sock import Sock
+from websocket import create_connection
 
 import yaml
 
@@ -27,6 +32,7 @@ GITHUB_CLIENT_SECRET = config_file['githubOauth']['GITHUB_CLIENT_SECRET']
 # setup flask
 app = Flask(__name__)
 app.config.from_object(__name__)
+sock = Sock(app)
 
 # setup sqlalchemy
 engine = create_engine(app.config['DATABASE_URI'])
@@ -219,14 +225,14 @@ def authorized(user):
         user_ = User(
             username=user['login'], 
             image=user['avatar_url'], 
-            role=("admin" if user['login'] == 'daovietanh190499' else 'normal_user'), 
-            is_accept=user['login'] == 'daovietanh190499',
+            role=("admin" if user['login'] in config_file['admin'] else 'normal_user'), 
+            is_accept=user['login'] in config_file['admin'],
             access_password = user['login'] + '-' + str(uuid.uuid4()).split('-')[0]
         )
         db_session.add(user_)
         db_session.commit()
 
-        if user['login'] == 'daovietanh190499':
+        if user['login'] in config_file['admin']:
             server_ids = db_session.query(ServerOption.id).all()
             for server_id in server_ids:
                 userserver = UserServer(user_id=user_.id, server_id=server_id[0])
@@ -263,7 +269,7 @@ def logout():
 @auth.verify
 def index(user):
     if user and user['state'] == 'running':
-        return redirect(url_for('user'))
+        return redirect("/user/" + user["username"] + "/")
     else:
         return redirect(url_for('hub'))
 
@@ -274,13 +280,6 @@ def hub(user):
         return render_template('index.html', user=user)
     else:
         return render_template('index.html', user=user)
-
-@app.route('/user')
-@auth.verify
-def user(user):
-    if not user:
-        return redirect(url_for('index'))
-    return user['username'], 200
 
 @app.route('/user_state')
 @auth.verify
@@ -500,7 +499,8 @@ def start_server(user, username):
     #TODO: thread start server with current server option and send event if success change state to online else to ofline
     # user_change.current_server
     # user_change.state
-    # save pod id to user_change.ip
+    # save pod ip to user_change.ip
+    user_change.server_ip = '127.0.0.1'
 
     db_session.commit()
 
@@ -531,10 +531,110 @@ def stop_server(user, username):
     # user_change.current_server
     # user_change.state
     # clear user pod ip
+    user_change.ip = ""
 
     db_session.commit()
 
     return jsonify({'message': 'success'}), 200
+
+@sock.route('/user/<username>/')
+@sock.route('/user/<username>/<path:path>')
+@auth.verify
+def handle_socket(user, ws, username, path=None):
+    if not user:
+        return jsonify({"message": "no permission"}), 403
+    if not user['role'] == "admin" and user['username'] != username:
+        return jsonify({"message": "no permission"}), 403
+    if not user['is_accept']:
+        return jsonify({"message": "no permission"}), 403
+    
+    user_change = User.query.filter_by(username=username).first()
+    if not user_change:
+        return jsonify({"message": "not found"}), 404
+    if not user_change.is_accept:
+        return jsonify({"message": "no permission"}), 403
+    if not user_change.state == 'running':
+        return jsonify({"message": "no permission"}), 403
+    
+    params_str = '/?'
+    for key, value in request.args.items():
+        params_str += f'{key}={value}&'
+    params_str = params_str.rstrip('&')
+
+    headers = dict(request.headers)
+
+    wss = create_connection('ws://' + user_change.server_ip + ":8443/" +  (path if path else '') + params_str, cookie=headers['Cookie'])
+
+    p = threading.Thread(target=producer, args=(ws,wss))
+    c = threading.Thread(target=consumer, args=(ws,wss))
+
+    p.start()
+    c.start()
+
+    while p.is_alive() or c.is_alive():
+        continue
+    
+    ws.close()
+    p.join()
+    c.join()
+
+@app.route('/user/<username>/')
+@app.route('/user/<username>/<path:path>')
+@auth.verify
+def proxy(user, username, path=None):
+    if not user:
+        return jsonify({"message": "no permission"}), 403
+    if not user['role'] == "admin" and user['username'] != username:
+        return jsonify({"message": "no permission"}), 403
+    if not user['is_accept']:
+        return jsonify({"message": "no permission"}), 403
+    
+    user_change = User.query.filter_by(username=username).first()
+    if not user_change:
+        return jsonify({"message": "not found"}), 404
+    if not user_change.is_accept:
+        return jsonify({"message": "no permission"}), 403
+    if not user_change.state == 'running':
+        return jsonify({"message": "no permission"}), 403
+    
+    url = user_change.server_ip + ":8443/" + (path if path else '')
+
+    r = make_request(url, request.method, dict(request.headers), request.form)
+    headers = dict(r.raw.headers)
+    def generate():
+        for chunk in r.raw.stream(decode_content=False):
+            yield chunk
+    out = Response(generate(), headers=headers)
+    out.status_code = r.status_code
+    return out
+
+
+
+def make_request(url, method, headers={}, data=None):
+    url = 'http://%s' % url
+    return requests.request(method, url, params=request.args, stream=True, headers=headers, allow_redirects=False, data=data, cookies=request.cookies)
+
+
+def producer(ws, wss):
+    while wss.connected and ws.connected:
+        data = ws.receive()
+        if data is None:
+            wss.close()
+            ws.close()
+            break
+        wss.send(data)
+    return
+
+
+def consumer(ws, wss):
+    while wss.connected and ws.connected:
+        response = wss.recv()
+        if response is None:
+            wss.close()
+            ws.close()
+            break
+        ws.send(response)
+    return
 
 
 def migrate():
