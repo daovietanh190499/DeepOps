@@ -18,6 +18,8 @@ from websocket import create_connection
 
 import yaml
 
+from spawners.kubespawn import delete_pv, delete_pvc, delete_server, create_pv, create_pvc, create_server, get_server, get_pv, get_pvc, get_servers
+
 with open("config.yaml", 'r') as stream:
     config_file = yaml.safe_load(stream)
 
@@ -381,7 +383,7 @@ def delete_user(user, username):
     if not user_delete:
         return jsonify({"message": "not found"}), 404
     
-    #TODO: close user pod
+    stop_server_pipline(user_delete)
     
     delete_q = UserServer.__table__.delete().where(UserServer.user_id == user_delete.id)
     db_session.execute(delete_q)
@@ -476,6 +478,49 @@ def delete_server_user(user, username, server_name):
 
     return jsonify({'message': 'success'}), 200
 
+
+def start_server_pipline(user, server):
+    config = {
+        'username': user.username,
+        'cpu': server.cpu,
+        'ram': server.ram,
+        'gpu_type': 'nvidia.com/' + (server.gpu.split(':')[0] if ':' in server.gpu else server.gpu),
+        'gpu_quantity': int(server.gpu.split(':')[1]) if ':' in server.gpu else 1,
+        'use_gpu': not server.gpu or server.gpu == '' or server.gpu == 'null' or server.gpu == "",
+        'image': server.docker_image,
+        'path': config_file['nasPath'],
+        'file_server': config_file['nasAddresses'][0]
+    }
+    res = get_pv(user.username)
+    if not res:
+        res = create_pv(config)
+        if not res:
+            return jsonify({'message': 'action failed'}), 500
+    res = get_pvc(user.username)
+    if not res:
+        res = create_pvc(config)
+        if not res:
+            return jsonify({'message': 'action failed'}), 500
+    res = create_server(config)
+    if not res:
+        return jsonify({'message': 'action failed'}), 500
+    res = get_server(user.username)
+    if not res:
+        return jsonify({'message': 'action failed'}), 500
+    user.state = 'running'
+    user.server_ip = res['ip']
+    db_session.commit()
+
+
+def stop_server_pipline(user):
+    res = delete_server(user.username)
+    if not res:
+        return jsonify({'message': 'action failed'}), 500
+    user.state = 'offline'
+    user.server_ip = ""
+    db_session.commit()
+
+
 @app.route('/start_server/<username>')
 @auth.verify
 def start_server(user, username):
@@ -494,16 +539,12 @@ def start_server(user, username):
     if not user_change.state == 'offline':
         return jsonify({"message": "no permission"}), 403
     
-    user_change.state = 'running'
+    server = ServerOption.query.filter_by(id=user_change.current_server).first()
+    if not server:
+        return jsonify({"message": "not found"}), 404
 
-    #TODO: thread start server with current server option and send event if success change state to online else to ofline
-    # user_change.current_server
-    # user_change.state
-    # save pod ip to user_change.ip
-    user_change.server_ip = '127.0.0.1'
-
-    db_session.commit()
-
+    start_server_pipline(user=user_change, server=server)
+ 
     return jsonify({'message': 'success'}), 200
 
 
@@ -525,15 +566,7 @@ def stop_server(user, username):
     if not user_change.state == 'running':
         return jsonify({"message": "no permission"}), 403
     
-    user_change.state = 'offline'
-
-    #TODO: thread stop server with current server option and send event and change state to ofline
-    # user_change.current_server
-    # user_change.state
-    # clear user pod ip
-    user_change.ip = ""
-
-    db_session.commit()
+    stop_server_pipline(user_change)
 
     return jsonify({'message': 'success'}), 200
 
@@ -563,7 +596,10 @@ def handle_socket(user, ws, username, path=None):
 
     headers = dict(request.headers)
 
-    wss = create_connection('ws://' + user_change.server_ip + ":8443/" +  (path if path else '') + params_str, cookie=headers['Cookie'])
+    try:
+        wss = create_connection('ws://' + user_change.server_ip + ":8443/" +  (path if path else '') + params_str, cookie=headers['Cookie'])
+    except:
+        redirect(url_for('hub'))
 
     p = threading.Thread(target=producer, args=(ws,wss))
     c = threading.Thread(target=consumer, args=(ws,wss))
@@ -597,7 +633,10 @@ def proxy(user, username, path=None):
     if not user_change.state == 'running':
         return jsonify({"message": "no permission"}), 403
     
-    url = user_change.server_ip + ":8443/" + (path if path else '')
+    try:
+        url = user_change.server_ip + ":8443/" + (path if path else '')
+    except:
+        redirect(url_for('hub'))
 
     r = make_request(url, request.method, dict(request.headers), request.form)
     headers = dict(r.raw.headers)
