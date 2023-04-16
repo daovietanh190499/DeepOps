@@ -9,12 +9,14 @@ from furl import furl
 import requests
 import json
 import uuid
+import time
 
 import re
 from urllib.parse import urlparse, urlunparse
 import threading
 from flask_sock import Sock
 from websocket import create_connection
+import contextlib
 
 import yaml
 
@@ -478,25 +480,85 @@ def delete_server_user(user, username, server_name):
 
     return jsonify({'message': 'success'}), 200
 
+@contextlib.contextmanager
+def thread_start_pending(username):
+    res = None
+    count = 0
+    while (not res or not res['ip']) and count < 100:
+        count += 1
+        try:
+            res = get_server(username)
+        except:
+            continue
+        if res and res['ip']:
+            user_change = User.query.filter_by(username=username).first()
+            user_change.state = 'running'
+            user_change.server_ip = res['ip']
+            db_session.commit()
+            break
+        time.sleep(1)
+    user_change = User.query.filter_by(username=username).first()
+    if not user_change.server_ip or user_change.server_ip == '':
+        user_change.state = 'offline'
+        db_session.commit()
+    return
+
+
+@contextlib.contextmanager
+def thread_stop_pending(username):
+    res = {'ip': 'available'}
+    count = 0
+    while res and res['ip'] and count < 100:
+        count += 1
+        try:
+            res = get_server(username)
+        except:
+            user_change = User.query.filter_by(username=username).first()
+            user_change.state = 'offline'
+            user_change.server_ip = ''
+            db_session.commit()
+            break
+        if not res or not res['ip']:
+            user_change = User.query.filter_by(username=username).first()
+            user_change.state = 'offline'
+            user_change.server_ip = ''
+            db_session.commit()
+            break
+        time.sleep(1)
+    user_change = User.query.filter_by(username=username).first()
+    if user_change.server_ip and user_change.server_ip != '':
+        user_change.state = 'running'
+        db_session.commit()
+    return
+
 
 def start_server_pipline(user, server):
     config = {
         'username': user.username,
         'cpu': server.cpu,
+        'max_cpu': server.cpu*1.5,
+        'max_ram': str(int(server.ram[:-1])*1.5) + 'G',
         'ram': server.ram,
         'gpu_type': 'nvidia.com/' + (server.gpu.split(':')[0] if ':' in server.gpu else server.gpu),
         'gpu_quantity': int(server.gpu.split(':')[1]) if ':' in server.gpu else 1,
-        'use_gpu': not server.gpu or server.gpu == '' or server.gpu == 'null' or server.gpu == "",
+        'not_use_gpu': not server.gpu or server.gpu == '' or server.gpu == 'null' or server.gpu == "",
         'image': server.docker_image,
         'path': config_file['nasPath'],
-        'file_server': config_file['nasAddresses'][0]
+        'file_server': config_file['nasAddresses'][0],
+        'password': user.access_password
     }
-    res = get_pv(user.username)
+    try:
+        res = get_pv(user.username)
+    except:
+        res = None
     if not res:
         res = create_pv(config)
         if not res:
             return jsonify({'message': 'action failed'}), 500
-    res = get_pvc(user.username)
+    try:
+        res = get_pvc(user.username)
+    except:
+        res = None
     if not res:
         res = create_pvc(config)
         if not res:
@@ -504,21 +566,30 @@ def start_server_pipline(user, server):
     res = create_server(config)
     if not res:
         return jsonify({'message': 'action failed'}), 500
-    res = get_server(user.username)
-    if not res:
-        return jsonify({'message': 'action failed'}), 500
-    user.state = 'running'
-    user.server_ip = res['ip']
+
+    user.state = 'pending_start'
+    user.server_ip = ''
     db_session.commit()
+    
+    x = threading.Thread(target=thread_start_pending, args=(user.username, ))
+    x.start()
+
+    return jsonify({'message': 'success'}), 200
 
 
 def stop_server_pipline(user):
-    res = delete_server(user.username)
+    try:
+        res = delete_server(user.username)
+    except:
+        return jsonify({'message': 'action failed'}), 500
     if not res:
         return jsonify({'message': 'action failed'}), 500
-    user.state = 'offline'
-    user.server_ip = ""
+    
+    user.state = 'pending_stop'
     db_session.commit()
+    
+    x = threading.Thread(target=thread_stop_pending, args=(user.username, ))
+    x.start()
 
 
 @app.route('/start_server/<username>')
@@ -543,9 +614,7 @@ def start_server(user, username):
     if not server:
         return jsonify({"message": "not found"}), 404
 
-    start_server_pipline(user=user_change, server=server)
- 
-    return jsonify({'message': 'success'}), 200
+    return start_server_pipline(user=user_change, server=server)
 
 
 @app.route('/stop_server/<username>')
@@ -570,8 +639,8 @@ def stop_server(user, username):
 
     return jsonify({'message': 'success'}), 200
 
-@sock.route('/user/<username>/')
-@sock.route('/user/<username>/<path:path>')
+@sock.route('/user/<username>/', methods=['GET', 'HEAD', 'OPTIONS'])
+@sock.route('/user/<username>/<path:path>', methods=['GET', 'HEAD', 'OPTIONS'])
 @auth.verify
 def handle_socket(user, ws, username, path=None):
     if not user:
@@ -614,8 +683,8 @@ def handle_socket(user, ws, username, path=None):
     p.join()
     c.join()
 
-@app.route('/user/<username>/')
-@app.route('/user/<username>/<path:path>')
+@app.route('/user/<username>/', methods=['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'HEAD'])
+@app.route('/user/<username>/<path:path>', methods=['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'HEAD'])
 @auth.verify
 def proxy(user, username, path=None):
     if not user:
@@ -633,10 +702,7 @@ def proxy(user, username, path=None):
     if not user_change.state == 'running':
         return jsonify({"message": "no permission"}), 403
     
-    try:
-        url = user_change.server_ip + ":8443/" + (path if path else '')
-    except:
-        redirect(url_for('hub'))
+    url = user_change.server_ip + ":8443/" + (path if path else '')
 
     r = make_request(url, request.method, dict(request.headers), request.form)
     headers = dict(r.raw.headers)
@@ -690,7 +756,7 @@ def migrate():
                     drive = server_option['drive'],
                     gpu = server_option['gpu'],
                     color = server_option['color'])
-        db_session.add_all(server_option_entity)
+        db_session.add(server_option_entity)
         db_session.commit()
 
 if __name__ == '__main__': 

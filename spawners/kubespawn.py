@@ -1,13 +1,11 @@
 from kubernetes import client, config, utils
 
 # config.load_incluster_config()
+config.load_config()
 
 def get_servers():
     v1 = client.CoreV1Api()
-    try:
-        ret = v1.list_namespaced_pod('dohub')
-    except:
-        return None
+    ret = v1.list_namespaced_pod('dohub')
     items = []
     for i in ret.items:
         items.append[{
@@ -19,27 +17,18 @@ def get_servers():
 
 def get_pvc(username):
     v1 = client.CoreV1Api()
-    try:
-        api_response = v1.read_namespaced_persistent_volume_claim('claim-dohub-' + username, 'dohub')
-    except:
-        return None
+    api_response = v1.read_namespaced_persistent_volume_claim('claim-dohub-' + username, 'dohub')
     return api_response
 
 def get_pv(username):
     v1 = client.CoreV1Api()
-    try:
-        api_response = v1.read_namespaced_persistent_volume('dohub-' + username, 'dohub')
-    except:
-        return None
+    api_response = v1.read_persistent_volume('dohub-' + username)
     return api_response
 
 def get_server(username):
     v1 = client.CoreV1Api()
-    try:
-        api_response = v1.read_namespaced_pod('dohub-' + username, 'dohub')
-    except:
-        return None
-    if not api_response:
+    api_response = v1.read_namespaced_pod('dohub-' + username, 'dohub')
+    if not api_response or not  api_response.status or not api_response.status.container_statuses:
         return None
     return {
         'name': api_response.metadata.name,
@@ -68,10 +57,8 @@ def create_pv(config):
             }
         }
     }
-    try:
-        api_response = utils.create_from_dict(k8s_client, persistent_volume_manifest)
-    except:
-        return None
+
+    api_response = utils.create_from_dict(k8s_client, persistent_volume_manifest)
     return api_response
 
 def create_pvc(config):
@@ -93,11 +80,8 @@ def create_pvc(config):
             }
         }
     }
-
-    try:
-        api_response = utils.create_from_dict(k8s_client, persistent_volume_claim_manifest)
-    except:
-        return None
+    
+    api_response = utils.create_from_dict(k8s_client, persistent_volume_claim_manifest)
     return api_response
 
 def create_server(config):
@@ -119,7 +103,7 @@ def create_server(config):
             'namespace': 'dohub'
         }, 
         'spec': {
-            'automountServiceAccountToken': 'false', 
+            'automountServiceAccountToken': False, 
             'containers': [
                 {
                     'env': [
@@ -130,7 +114,6 @@ def create_server(config):
                     ],
                     'image': config['image'], 
                     'imagePullPolicy': 'IfNotPresent',
-                    'lifecycle': {},
                     'name': 'codeserver',
                     'ports': [
                         {
@@ -199,32 +182,24 @@ def create_server(config):
         }
     }
 
-    try:
-        api_response = utils.create_from_dict(k8s_client, server_manifest)
-    except:
-        return None
+    if config['not_use_gpu']:
+        del server_manifest['spec']['containers'][0]['resources']['limits'][config['gpu_type']]
+        del server_manifest['spec']['containers'][0]['resources']['requests'][config['gpu_type']]
+
+    api_response = utils.create_from_dict(k8s_client, server_manifest)
     return api_response
 
 def delete_server(username):
     v1 = client.CoreV1Api()
-    try:
-        api_response = v1.delete_namespaced_pod('dohub-' + username, 'dohub')
-    except:
-        return None
+    api_response = v1.delete_namespaced_pod('dohub-' + username, 'dohub')
     return api_response
 
 def delete_pvc(username):
     v1 = client.CoreV1Api()
-    try:
-        api_response = v1.delete_namespaced_persistent_volume_claim('claim-dohub-' + username, 'dohub')
-    except:
-        return None
+    api_response = v1.delete_namespaced_persistent_volume_claim('claim-dohub-' + username, 'dohub')
     return api_response
 
 def delete_pv(username):
     v1 = client.CoreV1Api()
-    try:
-        api_response = v1.delete_namespaced_persistent_volume('dohub-' + username, 'dohub')
-    except:
-        return None
+    api_response = v1.delete_persistent_volume('dohub-' + username)
     return api_response
