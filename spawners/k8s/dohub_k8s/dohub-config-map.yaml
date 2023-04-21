@@ -1,0 +1,99 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: dohub-config
+  namespace: dohub
+data:
+  nginx.conf: |
+    user  nginx;
+    worker_processes  1;
+    error_log  /var/log/nginx/error.log warn;
+    pid        /var/run/nginx.pid;
+    events {
+        worker_connections  1024;
+    }
+    http {
+      include       /etc/nginx/mime.types;
+      default_type  application/octet-stream;
+      log_format  main  '$remote_addr - $remote_user [$time_local] "$request" '
+                          '$status $body_bytes_sent "$http_referer" '
+                          '"$http_user_agent" "$http_x_forwarded_for"';
+      access_log  /var/log/nginx/access.log  main;
+      sendfile        on;
+      keepalive_timeout  65;
+      server {
+        listen 80;
+
+        resolver kube-dns.kube-system.svc.cluster.local valid=5s;
+
+        location /healthz {
+          return 200;
+        }
+
+        location / {
+          proxy_set_header Upgrade $http_upgrade;
+          proxy_set_header Connection "Upgrade";
+          proxy_pass http://dohub.dohub.svc.cluster.local:5000;
+          proxy_set_header Host $host;
+        }
+
+        location ~ ^/user/(?<user_id>\d+) {
+          proxy_set_header Upgrade $http_upgrade;
+          proxy_set_header Connection "Upgrade";
+          proxy_pass http://dohub-$user_id.dohub.svc.cluster.local;
+          proxy_set_header Host $host;
+        }
+      }
+    }
+  config.yaml: |
+    githubOauth:
+      GITHUB_CLIENT_ID: '3ee19bc1b2b6e07b190f'
+      GITHUB_CLIENT_SECRET: '0b64b39fb19aae0ddc40ea10dd6d16fea7eeb86f'
+    admin:
+      - daovietanh190499
+    defaultPort: 8443
+    nasAddresses:
+      - 10.1.8.99
+      - 10.1.8.100
+    nasPath: '/data/nas/dohub'
+    initServerOptions:
+      - name: 'Lollipop'
+        image: 'lollipop.png'
+        docker_image: "daovietanh99/deepops"
+        cpu: 2
+        ram: '4G'
+        drive: '30TB'
+        gpu: ''
+        color: 'violet'
+      - name: 'Oreo' 
+        image: 'oreo.png' 
+        docker_image: "daovietanh99/deepops" 
+        cpu: 4
+        ram: '8G'
+        drive: '30TB'
+        gpu: 'mig-2g.10gb'
+        color: '#1e88d2'
+      - name: 'Popeyes' 
+        image: 'popeyes.png' 
+        docker_image: "daovietanh99/deepops" 
+        cpu: 8
+        ram: '16G'
+        drive: '30TB'
+        gpu: 'mig-3g.20gb'
+        color: '#f27802'
+      - name: 'Pizza' 
+        image: 'pizza.png' 
+        docker_image: "daovietanh99/deepops" 
+        cpu: 8
+        ram: '32G'
+        drive: '30TB'
+        gpu: 'gpu'
+        color: '#fcca37'
+      - name: 'Spagetti' 
+        image: 'spagetti.png' 
+        docker_image: "daovietanh99/deepops" 
+        cpu: 16
+        ram: '64G'
+        drive: '30TB'
+        gpu: 'gpu:2'
+        color: '#fcb040'

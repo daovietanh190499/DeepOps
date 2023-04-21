@@ -1,0 +1,16 @@
+kind: Service
+apiVersion: v1
+metadata:
+  name: dohub-daovietanh190499
+  namespace: dohub
+spec:
+  selector:
+    app: dohub
+    heritage: dohub
+    do.hub/username: daovietanh190499
+    release: dohub
+  ports:
+  - protocol: TCP
+    port: 5000
+    targetPort: 5000
+    name: user-dohub

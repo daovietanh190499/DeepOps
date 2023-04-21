@@ -1,0 +1,52 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: dohub
+  namespace: dohub
+  labels:
+    app: dohub
+    release: dohub-main
+spec:
+  selector:
+    matchLabels:
+      app: dohub
+  replicas: 1
+  template:
+    metadata:
+      name: dohub
+      namespace: dohub
+      labels:
+        app: dohub
+        release: dohub-main
+    spec:
+      serviceAccountName: dohub-schedule
+      containers:
+        - name: dohub-nginx
+          image: nginx:alpine
+          ports:
+          - containerPort: 80
+          volumeMounts:
+            - name: dohub-config
+              mountPath: /etc/nginx/nginx.conf
+              subPath: nginx.conf
+        - name: dohub
+          image: daovietanh99/dohub
+          ports:
+          - containerPort: 5000
+          securityContext:
+            capabilities:
+              add: ['SYS_ADMIN']
+          command: ['python', 'app.py']
+          volumeMounts:
+            - name: dohub-config
+              mountPath: /etc/dohub/config.yaml
+              subPath: config.yaml
+            - mountPath: /home/dohub
+              name: volume-dohub
+      volumes:
+        - name: dohub-config
+          configMap:
+            name: dohub-config
+        - name: volume-dohub
+          persistentVolumeClaim:
+            claimName: claim-dohub

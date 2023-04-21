@@ -1,2 +1,12 @@
 furl
 flask-sock
+sqlalchemy
+kubernetes
+websocket
+contextlib
+yaml
+urllib
+uuid
+json
+requests
+functools
