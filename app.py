@@ -1,5 +1,6 @@
+import os
 from functools import wraps
-from flask import Flask, request, session, redirect, url_for, render_template, Response, jsonify
+from flask import Flask, request, session, redirect, url_for, render_template, Response, jsonify, send_from_directory
 
 from sqlalchemy import create_engine, Column, Integer, String, Float, Boolean, Text
 from sqlalchemy.orm import scoped_session, sessionmaker
@@ -10,6 +11,7 @@ import requests
 import json
 import uuid
 import time
+from pubsub import pub
 
 import re
 from urllib.parse import urlparse, urlunparse
@@ -219,6 +221,10 @@ def initialize_database():
 def after_request(response):
     db_session.remove()
     return response
+
+@app.route('/favicon.ico')
+def favicon():
+    return send_from_directory(os.path.join(app.root_path, 'static', 'img'), 'favicon.ico')
 
 
 @app.route('/github-callback')
@@ -636,56 +642,11 @@ def stop_server(user, username):
     
     return stop_server_pipline(user_change)
 
-# @sock.route('/user/<username>/', methods=['GET', 'HEAD', 'OPTIONS'])
-# @sock.route('/user/<username>/<path:path>', methods=['GET', 'HEAD', 'OPTIONS'])
-# # @auth.verify
-# # def handle_socket(user, ws, username, path=None):
-# def handle_socket(ws, username, path=None):
-#     # if not user:
-#     #     return jsonify({"message": "no permission"}), 403
-#     # if not user['role'] == "admin" and user['username'] != username:
-#     #     return jsonify({"message": "no permission"}), 403
-#     # if not user['is_accept']:
-#     #     return jsonify({"message": "no permission"}), 403
-    
-#     user_change = User.query.filter_by(username=username).first()
-#     # if not user_change:
-#     #     return jsonify({"message": "not found"}), 404
-#     # if not user_change.is_accept:
-#     #     return jsonify({"message": "no permission"}), 403
-#     # if not user_change.state == 'running':
-#     #     return jsonify({"message": "no permission"}), 403
-    
-#     params_str = '/?'
-#     for key, value in request.args.items():
-#         params_str += f'{key}={value}&'
-#     params_str = params_str.rstrip('&')
-
-#     headers = dict(request.headers)
-
-#     try:
-#         wss = create_connection('ws://' + user_change.server_ip + ":8443/" +  (path if path else '') + params_str, cookie=headers['Cookie'])
-#     except:
-#         redirect(url_for('hub'))
-
-#     p = threading.Thread(target=producer, args=(ws,wss))
-#     c = threading.Thread(target=consumer, args=(ws,wss))
-
-#     p.start()
-#     c.start()
-
-#     while p.is_alive() or c.is_alive():
-#         continue
-    
-#     ws.close()
-#     p.join()
-#     c.join()
-
-# @app.route('/user/<username>/', methods=['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'HEAD'])
-# @app.route('/user/<username>/<path:path>', methods=['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'HEAD'])
+@sock.route('/user/<username>/', methods=['GET', 'HEAD', 'OPTIONS'])
+@sock.route('/user/<username>/<path:path>', methods=['GET', 'HEAD', 'OPTIONS'])
 # @auth.verify
-# def proxy(user, username, path=None):
-# def proxy(username, path=None):
+# def handle_socket(user, ws, username, path=None):
+def handle_socket(ws, username, path=None):
     # if not user:
     #     return jsonify({"message": "no permission"}), 403
     # if not user['role'] == "admin" and user['username'] != username:
@@ -693,7 +654,7 @@ def stop_server(user, username):
     # if not user['is_accept']:
     #     return jsonify({"message": "no permission"}), 403
     
-    # user_change = User.query.filter_by(username=username).first()
+    user_change = User.query.filter_by(username=username).first()
     # if not user_change:
     #     return jsonify({"message": "not found"}), 404
     # if not user_change.is_accept:
@@ -701,44 +662,109 @@ def stop_server(user, username):
     # if not user_change.state == 'running':
     #     return jsonify({"message": "no permission"}), 403
     
-    # url = user_change.server_ip + ":8443/" + (path if path else '')
+    params_str = '/?'
+    for key, value in request.args.items():
+        params_str += f'{key}={value}&'
+    params_str = params_str.rstrip('&')
 
-    # r = make_request(url, request.method, dict(request.headers), request.form)
-    # headers = dict(r.raw.headers)
-    # def generate():
-    #     for chunk in r.raw.stream(decode_content=False):
-    #         yield chunk
-    # out = Response(generate(), headers=headers)
-    # out.status_code = r.status_code
-    # return out
+    headers = dict(request.headers)
+
+    try:
+        wss = create_connection('ws://' + user_change.server_ip + ":8443/" +  (path if path else '') + params_str, cookie=headers['Cookie'])
+    except:
+        redirect(url_for('hub'))
+
+    # p = threading.Thread(target=producer, args=(ws,wss))
+    # c = threading.Thread(target=consumer, args=(ws,wss))
+
+    # p.start()
+    # c.start()
+
+    # while p.is_alive() or c.is_alive():
+    #     continue
+    
+    # ws.close()
+    # p.join()
+    # c.join()
+
+    receiveClient = threading.Thread(target=producer, args=(ws, wss, username + '-receiveClient',))
+    receiveServer = threading.Thread(target=consumer, args=(ws, wss, username + '-receiveServer',))
+    pub.subscribe(handle_send, username + '-receiveClient')
+    pub.subscribe(handle_send, username + '-receiveServer')
+
+    receiveClient.start()
+    receiveServer.start()
+
+    while receiveClient.is_alive() or receiveServer.is_alive():
+        continue
+    
+    ws.close()
+    receiveClient.join()
+    receiveServer.join()
 
 
+@app.route('/user/<username>/', methods=['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'HEAD'])
+@app.route('/user/<username>/<path:path>', methods=['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'HEAD'])
+# @auth.verify
+# def proxy(user, username, path=None):
+def proxy(username, path=None):
+    # if not user:
+    #     return jsonify({"message": "no permission"}), 403
+    # if not user['role'] == "admin" and user['username'] != username:
+    #     return jsonify({"message": "no permission"}), 403
+    # if not user['is_accept']:
+    #     return jsonify({"message": "no permission"}), 403
+    
+    user_change = User.query.filter_by(username=username).first()
+    # if not user_change:
+    #     return jsonify({"message": "not found"}), 404
+    # if not user_change.is_accept:
+    #     return jsonify({"message": "no permission"}), 403
+    # if not user_change.state == 'running':
+    #     return jsonify({"message": "no permission"}), 403
+    
+    url = user_change.server_ip + ":8443/" + (path if path else '')
 
-# def make_request(url, method, headers={}, data=None):
-#     url = 'http://%s' % url
-#     return requests.request(method, url, params=request.args, stream=True, headers=headers, allow_redirects=False, data=data, cookies=request.cookies)
+    r = make_request(url, request.method, dict(request.headers), request.form)
+    headers = dict(r.raw.headers)
+    def generate():
+        for chunk in r.raw.stream(decode_content=False):
+            yield chunk
+    out = Response(generate(), headers=headers)
+    out.status_code = r.status_code
+    return out
 
+def make_request(url, method, headers={}, data=None):
+    url = 'http://%s' % url
+    return requests.request(method, url, params=request.args, stream=True, headers=headers, allow_redirects=False, data=data, cookies=request.cookies)
 
-# def producer(ws, wss):
-#     while wss.connected and ws.connected:
-#         data = ws.receive()
-#         if data is None:
-#             wss.close()
-#             ws.close()
-#             break
-#         wss.send(data)
-#     return
+def producer(ws, wss, topic):
+    while wss.connected and ws.connected:
+        try:
+            data = ws.receive()
+        except:
+            data = None
+        if data is None:
+            wss.close()
+            ws.close()
+            break
+        pub.sendMessage(topic, wss=wss, data=data)
+    return
 
+def handle_send(wss, data=None):
+    if wss.connected:
+        wss.send(data)
+    return
 
-# def consumer(ws, wss):
-#     while wss.connected and ws.connected:
-#         response = wss.recv()
-#         if response is None:
-#             wss.close()
-#             ws.close()
-#             break
-#         ws.send(response)
-#     return
+def consumer(ws, wss, topic):
+    while wss.connected and ws.connected:
+        response = wss.recv()
+        if response is None:
+            wss.close()
+            ws.close()
+            break
+        pub.sendMessage(topic, wss=ws, data=response)
+    return
 
 
 def migrate():

@@ -10,3 +10,4 @@ uuid
 json
 requests
 functools
+pypubsub
