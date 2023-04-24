@@ -88,7 +88,20 @@ var userRow = Vue.component('user-row', {
     data() {
         return {
             is_open_dropdown: false,
-            filter: ""
+            filter: "",
+            last_activity: "--.--"
+        }
+    },
+    created () {
+        let duration = (Date.now() - parseFloat(this.user.last_activity))/1000
+        if(duration < 60) {
+            this.last_activity = Math.round(duration) + ' seconds'
+        } else if(duration < 3600) {
+            this.last_activity = Math.round(duration/60) + ' minutes'
+        } else if(duration < 3600*24) {
+            this.last_activity = Math.round(duration/3600) + ' hours'
+        } else {
+            this.last_activity = Math.round(duration/(3600*24)) + ' days'
         }
     },
     methods: {
@@ -130,7 +143,7 @@ var userRow = Vue.component('user-row', {
                 <div class="user-space"></div>
                 <div class="item-block-value" style="width: 10%;">{{user.role}}</div>
                 <div class="user-space"></div>
-                <div class="item-block-value" style="width: 10%">13 seconds ago</div>
+                <div class="item-block-value" style="width: 10%">{{last_activity}}</div>
                 <div class="user-space"></div>
                 <div class="item-block-value" style="width: 40%;">
                     <div class="tag" 
@@ -221,7 +234,9 @@ const appVue = new Vue({
         server_log: {
             message: "Idle",
             reason: "Idling"
-        }
+        },
+
+        socket_change_state: null
     },
     created () {
         this.getInfo()
@@ -237,6 +252,20 @@ const appVue = new Vue({
             await this.getAllServers()
             await this.getAllUsers()
             await this.getCurrentUserState()
+        },
+        setupSocket() {
+            if(this.socket_change_state) {
+                this.socket_change_state.close()
+            }
+            try {
+                this.socket_change_state = new WebSocket('wss://' + window.location.hostname + ':3112/state_change/' + this.current_spawn_user)
+            } catch {
+                this.socket_change_state = null
+            }
+            this.socket_change_state.onmessage = e => {
+                this.state = e.data
+                this.socket_change_state.close()
+            }
         },
         async getCurrentUserState() {
             if(this.is_login) {
@@ -289,6 +318,9 @@ const appVue = new Vue({
         },
         changeMenu(menu) {
             this.getInfo()
+            if(this.socket_change_state) {
+                this.socket_change_state.close()
+            }
             this.menu = menu
         },
         changeServer(server) {
@@ -359,6 +391,7 @@ const appVue = new Vue({
                 .then(res => {
                     if(res.status == 200){
                         this.state = "pending_start"
+                        this.setupSocket()
                     }
                 })
             }
@@ -369,6 +402,7 @@ const appVue = new Vue({
                 .then(res => {
                     if(res.status == 200){
                         this.state = "pending_stop"
+                        this.setupSocket()
                     }
                 })
             }

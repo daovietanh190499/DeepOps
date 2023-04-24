@@ -656,6 +656,33 @@ def stop_server(user, username):
     
     return stop_server_pipline(user_change)
 
+@sock.route('/state_change/<username>', methods=['GET', 'HEAD', 'OPTIONS'])
+@auth.verify
+def handle_state_change(user, ws, username):
+    if not user:
+        return jsonify({"message": "no permission"}), 403
+    if not user['role'] == "admin" and user['username'] != username:
+        return jsonify({"message": "no permission"}), 403
+    if not user['is_accept']:
+        return jsonify({"message": "no permission"}), 403
+    
+    user_change = User.query.filter_by(username=username).first()
+    if not user_change:
+        return jsonify({"message": "not found"}), 404
+    if not user_change.is_accept:
+        return jsonify({"message": "no permission"}), 403
+    
+    listenState = threading.Thread(target=stage_change, args=(ws, username,))
+
+    listenState.start()
+
+    while listenState.is_alive() :
+        continue
+    
+    ws.close()
+    listenState.join()
+
+
 @sock.route('/user/<username>/<port>/', methods=['GET', 'HEAD', 'OPTIONS'])
 @sock.route('/user/<username>/<port>/<path:path>', methods=['GET', 'HEAD', 'OPTIONS'])
 # @auth.verify
@@ -668,7 +695,7 @@ def handle_socket(ws, port, username, path=None):
     # if not user['is_accept']:
     #     return jsonify({"message": "no permission"}), 403
     
-    # user_change = User.query.filter_by(username=username).first()
+    user_change = User.query.filter_by(username=username).first()
     # if not user_change:
     #     return jsonify({"message": "not found"}), 404
     # if not user_change.is_accept:
@@ -684,7 +711,6 @@ def handle_socket(ws, port, username, path=None):
     headers = dict(request.headers)
 
     if config_file['spawner'] == 'local':
-        user_change = User.query.filter_by(username=username).first()
         server_domain = user_change.server_ip
     else:
         server_domain = f'dohub-{username}'
@@ -703,6 +729,9 @@ def handle_socket(ws, port, username, path=None):
 
     receiveClient.start()
     receiveServer.start()
+
+    user_change.last_activity = time.time() * 1000
+    db_session.commit()
 
     while receiveClient.is_alive() or receiveServer.is_alive():
         continue
@@ -766,6 +795,22 @@ def producer(ws, wss, topic):
             ws.close()
             break
         pub.sendMessage(topic, wss=wss, data=data)
+    return
+
+def stage_change(ws, username):
+    prev_state = get_server(username)['state']['message']
+    while ws.connected:
+        data = get_server(username)
+        if data is None:
+            ws.close()
+            break
+        if data['state']['message'] != prev_state:
+            if data['state']['message'] == 'Running':
+                ws.send('running')
+            if data['state']['message'] == 'Idle':
+                ws.send('offline')
+        prev_state = data['state']['message']
+        time.sleep(2)
     return
 
 def handle_send(wss, data=None):
