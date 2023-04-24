@@ -23,6 +23,7 @@ import contextlib
 import yaml
 
 from spawners.k8s.kubespawn import delete_pv, delete_pvc, delete_server, create_pv, create_pvc, create_server, get_server, get_pv, get_pvc, get_servers
+from fileserver.controller import create_folder
 
 with open("/etc/dohub/config.yaml", 'r') as stream:
     config_file = yaml.safe_load(stream)
@@ -302,6 +303,7 @@ def user_state(user):
     all_servers = [db[0] for db in all_servers]
     user['server_list'] = all_servers
     user['current_server'] = current_server[0]
+    user['server_log'] = get_server(user['username'])
     return jsonify({'result': user}), 200
 
 @app.route('/all_users')
@@ -336,6 +338,7 @@ def all_user(user):
         user.append(all_servers)
         for i, field in enumerate(fields):
             user_dict[field] = user[i]
+        user_dict['server_log'] = get_server(user[1])
         result_list.append(user_dict)
     
     return jsonify({'result': result_list}), 200
@@ -550,8 +553,12 @@ def start_server_pipline(user, server):
         'image': server.docker_image,
         'path': config_file['nasPath'],
         'file_server': config_file['nasAddresses'][0],
-        'password': user.access_password
+        'file_server_index': 0,
+        'password': user.access_password,
+        'defaultPort': config_file['defaultPort']
     }
+    if config_file['spawner'] == 'k8s':
+        create_folder(config)
     try:
         res = get_pv(user.username)
     except:
@@ -790,4 +797,6 @@ def migrate():
         db_session.commit()
 
 if __name__ == '__main__': 
+    from waitress import serve
     app.run("0.0.0.0", 5000, debug=False, ssl_context=('cert.pem', 'key.pem'))
+    # serve(app, host="0.0.0.0", port=5000)

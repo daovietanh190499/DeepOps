@@ -74,6 +74,15 @@ var equipmentMetric = Vue.component('equipment-metric', {
     `
 })
 
+var serverLog = Vue.component('server-log', {
+    props: ['message', 'reason'],
+    template: `
+    <div class="list-plan horizontal-flex">
+        <div> {{message}}: {{reason}} </div>
+    </div>
+    `
+})
+
 var userRow = Vue.component('user-row', {
     props: ['user', 'server_list'],
     data() {
@@ -208,7 +217,11 @@ const appVue = new Vue({
         current_server_list: [],
         admin_open_spawn: false,
         access_password: "",
-        state: "offline"
+        state: "offline",
+        server_log: {
+            message: "Idle",
+            reason: "Idling"
+        }
     },
     created () {
         this.getInfo()
@@ -245,6 +258,7 @@ const appVue = new Vue({
                             this.is_admin = res['result']['role'] == 'admin'
                             this.state = res['result']['state']
                             this.access_password = res['result']['access_password']
+                            this.server_log = res['result']['server_log']
                         }
                     })
             }
@@ -296,6 +310,7 @@ const appVue = new Vue({
                 this.server = user.current_server
                 this.current_server_list = user.server_list
                 this.access_password = user.access_password
+                this.server_log = user.server_log
             }
         },
         adminStopServer(user) {

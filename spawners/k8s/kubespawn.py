@@ -32,13 +32,40 @@ def get_pv(username):
 
 def get_server(username):
     v1 = client.CoreV1Api()
-    api_response = v1.read_namespaced_pod('dohub-' + username, 'dohub')
+    try:
+        api_response = v1.read_namespaced_pod('dohub-' + username, 'dohub')
+    except:
+        return {
+            'state': {
+                'message': 'Idle',
+                'reason': 'Idling'
+            }
+        }
     if not api_response or not  api_response.status or not api_response.status.container_statuses:
-        return None
+        return {
+            'state': {
+                'message': 'Idle',
+                'reason': 'Idling'
+            }
+        }
+    message = 'Idle'
+    reason = 'Idling'
+    if api_response.status.container_statuses[0].state.running:
+        message = 'Running'
+        reason = 'Success'
+    elif api_response.status.container_statuses[0].state.terminated:
+        message = api_response.status.container_statuses[0].state.terminated.message
+        reason = api_response.status.container_statuses[0].state.terminated.reason
+    elif api_response.status.container_statuses[0].state.waiting:
+        message = api_response.status.container_statuses[0].state.waiting.message
+        reason = api_response.status.container_statuses[0].state.waiting.reason
     return {
         'name': api_response.metadata.name,
         'ip': api_response.status.pod_ip, 
-        'state': api_response.status.container_statuses[0].state 
+        'state': {
+            'message': message,
+            'reason': reason
+        }
     }
 
 def create_service(config):

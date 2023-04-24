@@ -185,10 +185,15 @@
                 <div class="list-plan horizontal-flex">
                     <input type="text" class="input-text" :value="access_password" disabled>
                 </div>
-                <div class="list-plan horizontal-flex" v-if="state=='offline'">
+                <server-log
+                    :message="server_log.state.message"
+                    :reason="server_log.state.reason"
+                    v-if="state=='pending_start' || state=='pending_stop'"
+                ></server-log>
+                <div class="list-plan horizontal-flex" v-if="state=='offline' || state=='pending_stop'">
                     <button class="button-input button" @click="startServer()">Start Server</button>
                 </div>
-                <div class="list-plan horizontal-flex" v-if="state=='running'">
+                <div class="list-plan horizontal-flex" v-if="state=='running' || state=='pending_start'">
                     <button class="button-input-2 button" @click="stopServer()">Stop Server</button>
                 </div>
                 <div class="list-plan horizontal-flex" v-if="state=='running'">

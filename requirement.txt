@@ -1,6 +1,6 @@
 furl
 flask-sock
-sqlalchemy
+sqlalchemy<2.0
 kubernetes
 websocket
 contextlib
@@ -11,3 +11,4 @@ json
 requests
 functools
 pypubsub
+waitress

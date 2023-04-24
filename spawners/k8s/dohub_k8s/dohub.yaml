@@ -43,6 +43,8 @@ spec:
               subPath: config.yaml
             - mountPath: /home/dohub
               name: volume-dohub
+            - mountPath: /mnt/nas0/
+              name: volume-dohub-server
       volumes:
         - name: dohub-config
           configMap:
@@ -50,3 +52,6 @@ spec:
         - name: volume-dohub
           persistentVolumeClaim:
             claimName: claim-dohub-main
+        - name: volume-dohub-server
+          persistentVolumeClaim:
+            claimName: claim-dohub-server
