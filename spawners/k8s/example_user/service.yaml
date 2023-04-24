@@ -1,7 +1,7 @@
 kind: Service
 apiVersion: v1
 metadata:
-  name: dohub-daovietanh190499
+  name: dohub-daovietanh190499-service
   namespace: dohub
 spec:
   selector:
@@ -11,6 +11,6 @@ spec:
     release: dohub
   ports:
   - protocol: TCP
-    port: 5000
-    targetPort: 5000
+    port: 8443
+    targetPort: 8443
     name: user-dohub

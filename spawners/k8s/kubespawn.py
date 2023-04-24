@@ -15,6 +15,11 @@ def get_servers():
         }]
     return items
 
+def get_service(username):
+    v1 = client.CoreV1Api()
+    api_response = v1.read_namespaced_service('dohub-' + username + '-service', 'dohub')
+    return api_response
+
 def get_pvc(username):
     v1 = client.CoreV1Api()
     api_response = v1.read_namespaced_persistent_volume_claim('claim-dohub-' + username, 'dohub')
@@ -35,6 +40,34 @@ def get_server(username):
         'ip': api_response.status.pod_ip, 
         'state': api_response.status.container_statuses[0].state 
     }
+
+def create_service(config):
+    k8s_client = client.ApiClient()
+    service_manifest = {
+        'apiVersion': 'v1',
+        'kind': 'Service',
+        'metadata': {
+            'name': 'dohub-' + config['username'] + '-service',
+            'namespace': 'dohub'
+        },
+        'spec': {
+            'selector': {
+                'app': 'dohub',
+                'heritage': 'dohub',
+                'do.hub/username': config['username'],
+                'release': 'dohub'
+            },
+            'ports': [{
+                'protocol': 'TCP',
+                'port': config['defaultPort'],
+                'targetPort': config['defaultPort'],
+                'name': 'user-dohub'
+            }]
+        }
+    }
+
+    api_response = utils.create_from_dict(k8s_client, service_manifest)
+    return api_response
 
 def create_pv(config):
     k8s_client = client.ApiClient()
@@ -117,7 +150,7 @@ def create_server(config):
                     'name': 'codeserver',
                     'ports': [
                         {
-                            'containerPort': 8443,
+                            'containerPort': config['defaultPort'],
                             'name': 'dohub-port',
                             'protocol': 'TCP',
                         }

@@ -24,7 +24,7 @@ import yaml
 
 from spawners.k8s.kubespawn import delete_pv, delete_pvc, delete_server, create_pv, create_pvc, create_server, get_server, get_pv, get_pvc, get_servers
 
-with open("config.yaml", 'r') as stream:
+with open("/etc/dohub/config.yaml", 'r') as stream:
     config_file = yaml.safe_load(stream)
 
 DATABASE_URI = 'sqlite:///./dohub.db'
@@ -656,7 +656,7 @@ def handle_socket(ws, port, username, path=None):
     # if not user['is_accept']:
     #     return jsonify({"message": "no permission"}), 403
     
-    user_change = User.query.filter_by(username=username).first()
+    # user_change = User.query.filter_by(username=username).first()
     # if not user_change:
     #     return jsonify({"message": "not found"}), 404
     # if not user_change.is_accept:
@@ -671,25 +671,18 @@ def handle_socket(ws, port, username, path=None):
 
     headers = dict(request.headers)
 
-    port_str = config_file['defaultPort'] if port == 'main' else str(port)
+    if config_file['spawner'] == 'local':
+        user_change = User.query.filter_by(username=username).first()
+        server_domain = user_change.server_ip
+    else:
+        server_domain = f'dohub-{username}'
+
+    port_str = str(config_file['defaultPort']) if port == 'main' else str(port)
 
     try:
-        wss = create_connection('ws://' + user_change.server_ip + ":" + port_str + "/" +  (path if path else '') + params_str, cookie=headers['Cookie'])
+        wss = create_connection('ws://' + server_domain + ":" + port_str + "/" +  (path if path else '') + params_str, cookie=headers['Cookie'])
     except:
         redirect(url_for('hub'))
-
-    # p = threading.Thread(target=producer, args=(ws,wss))
-    # c = threading.Thread(target=consumer, args=(ws,wss))
-
-    # p.start()
-    # c.start()
-
-    # while p.is_alive() or c.is_alive():
-    #     continue
-    
-    # ws.close()
-    # p.join()
-    # c.join()
 
     receiveClient = threading.Thread(target=producer, args=(ws, wss, username + '-receiveClient',))
     receiveServer = threading.Thread(target=consumer, args=(ws, wss, username + '-receiveServer',))
@@ -719,7 +712,7 @@ def proxy(port, username, path=None):
     # if not user['is_accept']:
     #     return jsonify({"message": "no permission"}), 403
     
-    user_change = User.query.filter_by(username=username).first()
+    # user_change = User.query.filter_by(username=username).first()
     # if not user_change:
     #     return jsonify({"message": "not found"}), 404
     # if not user_change.is_accept:
@@ -727,9 +720,15 @@ def proxy(port, username, path=None):
     # if not user_change.state == 'running':
     #     return jsonify({"message": "no permission"}), 403
 
-    port_str = config_file['defaultPort'] if port == 'main' else str(port)
+    if config_file['spawner'] == 'local':
+        user_change = User.query.filter_by(username=username).first()
+        server_domain = user_change.server_ip
+    else:
+        server_domain = f'dohub-{username}'
+
+    port_str = str(config_file['defaultPort']) if port == 'main' else str(port)
     
-    url = user_change.server_ip + ":" + port_str + "/" + (path if path else '')
+    url = server_domain + ":" + port_str + "/" + (path if path else '')
 
     r = make_request(url, request.method, dict(request.headers), request.form)
     headers = dict(r.raw.headers)
@@ -791,4 +790,4 @@ def migrate():
         db_session.commit()
 
 if __name__ == '__main__': 
-    app.run("0.0.0.0", 5000, debug=False,)# ssl_context=('cert.pem', 'key.pem'))
+    app.run("0.0.0.0", 5000, debug=False, ssl_context=('cert.pem', 'key.pem'))

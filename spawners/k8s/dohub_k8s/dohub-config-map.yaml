@@ -24,6 +24,7 @@ data:
         default upgrade;
         `` close;
       }
+
       server {
         listen 80;
 
@@ -41,9 +42,10 @@ data:
         }
 
         location ~ /user/([^/]+)/(.*) {
+          rewrite /user/([^/]+)/(.*) /$2;
           proxy_set_header Upgrade $http_upgrade;
           proxy_set_header Connection "Upgrade";
-          proxy_pass http://dohub-$1.dohub.svc.cluster.local:8443/$2;
+          proxy_pass http://dohub-$1.dohub.svc.cluster.local:8443;
           proxy_set_header Host $host;
         }
       }
@@ -55,6 +57,7 @@ data:
     admin:
       - daovietanh190499
     defaultPort: 8443
+    spawner: 'k8s'
     nasAddresses:
       - 10.1.8.99
       - 10.1.8.100
@@ -93,7 +96,7 @@ data:
         gpu: 'gpu'
         color: '#fcca37'
       - name: 'Spagetti' 
-        image: 'spagetti.png' 
+        image: 'spagetti.png'
         docker_image: "daovietanh99/deepops" 
         cpu: 16
         ram: '64G'
