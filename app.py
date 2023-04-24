@@ -537,6 +537,11 @@ def thread_stop_pending(username):
     if user_change.server_ip and user_change.server_ip != '':
         user_change.state = 'running'
         db_session.commit()
+    else:
+        user_change = User.query.filter_by(username=username).first()
+        user_change.state = 'offline'
+        user_change.server_ip = ''
+        db_session.commit()
     return
 
 
