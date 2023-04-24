@@ -22,7 +22,7 @@ import contextlib
 
 import yaml
 
-from spawners.kubespawn import delete_pv, delete_pvc, delete_server, create_pv, create_pvc, create_server, get_server, get_pv, get_pvc, get_servers
+from spawners.k8s.kubespawn import delete_pv, delete_pvc, delete_server, create_pv, create_pvc, create_server, get_server, get_pv, get_pvc, get_servers
 
 with open("config.yaml", 'r') as stream:
     config_file = yaml.safe_load(stream)
@@ -279,7 +279,7 @@ def logout():
 @auth.verify
 def index(user):
     if user and user['state'] == 'running':
-        return redirect("/user/" + user["username"] + "/")
+        return redirect("/user/" + user["username"] + "/main/")
     else:
         return redirect(url_for('hub'))
 
@@ -520,12 +520,14 @@ def thread_stop_pending(username):
             user_change.state = 'offline'
             user_change.server_ip = ''
             db_session.commit()
+            res['ip'] = None
             break
         if not res or not res['ip']:
             user_change = User.query.filter_by(username=username).first()
             user_change.state = 'offline'
             user_change.server_ip = ''
             db_session.commit()
+            res['ip'] = None
             break
         time.sleep(1)
     user_change = User.query.filter_by(username=username).first()
@@ -642,11 +644,11 @@ def stop_server(user, username):
     
     return stop_server_pipline(user_change)
 
-@sock.route('/user/<username>/', methods=['GET', 'HEAD', 'OPTIONS'])
-@sock.route('/user/<username>/<path:path>', methods=['GET', 'HEAD', 'OPTIONS'])
+@sock.route('/user/<username>/<port>/', methods=['GET', 'HEAD', 'OPTIONS'])
+@sock.route('/user/<username>/<port>/<path:path>', methods=['GET', 'HEAD', 'OPTIONS'])
 # @auth.verify
 # def handle_socket(user, ws, username, path=None):
-def handle_socket(ws, username, path=None):
+def handle_socket(ws, port, username, path=None):
     # if not user:
     #     return jsonify({"message": "no permission"}), 403
     # if not user['role'] == "admin" and user['username'] != username:
@@ -669,8 +671,10 @@ def handle_socket(ws, username, path=None):
 
     headers = dict(request.headers)
 
+    port_str = config_file['defaultPort'] if port == 'main' else str(port)
+
     try:
-        wss = create_connection('ws://' + user_change.server_ip + ":8443/" +  (path if path else '') + params_str, cookie=headers['Cookie'])
+        wss = create_connection('ws://' + user_change.server_ip + ":" + port_str + "/" +  (path if path else '') + params_str, cookie=headers['Cookie'])
     except:
         redirect(url_for('hub'))
 
@@ -703,11 +707,11 @@ def handle_socket(ws, username, path=None):
     receiveServer.join()
 
 
-@app.route('/user/<username>/', methods=['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'HEAD'])
-@app.route('/user/<username>/<path:path>', methods=['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'HEAD'])
+@app.route('/user/<username>/<port>/', methods=['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'HEAD'])
+@app.route('/user/<username>/<port>/<path:path>', methods=['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'HEAD'])
 # @auth.verify
 # def proxy(user, username, path=None):
-def proxy(username, path=None):
+def proxy(port, username, path=None):
     # if not user:
     #     return jsonify({"message": "no permission"}), 403
     # if not user['role'] == "admin" and user['username'] != username:
@@ -722,8 +726,10 @@ def proxy(username, path=None):
     #     return jsonify({"message": "no permission"}), 403
     # if not user_change.state == 'running':
     #     return jsonify({"message": "no permission"}), 403
+
+    port_str = config_file['defaultPort'] if port == 'main' else str(port)
     
-    url = user_change.server_ip + ":8443/" + (path if path else '')
+    url = user_change.server_ip + ":" + port_str + "/" + (path if path else '')
 
     r = make_request(url, request.method, dict(request.headers), request.form)
     headers = dict(r.raw.headers)
@@ -785,4 +791,4 @@ def migrate():
         db_session.commit()
 
 if __name__ == '__main__': 
-    app.run("0.0.0.0", 5000, debug=False)
+    app.run("0.0.0.0", 5000, debug=False,)# ssl_context=('cert.pem', 'key.pem'))

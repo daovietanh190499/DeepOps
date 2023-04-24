@@ -21,14 +21,6 @@ spec:
     spec:
       serviceAccountName: dohub-schedule
       containers:
-        - name: dohub-nginx
-          image: nginx:alpine
-          ports:
-          - containerPort: 80
-          volumeMounts:
-            - name: dohub-config
-              mountPath: /etc/nginx/nginx.conf
-              subPath: nginx.conf
         - name: dohub
           image: daovietanh99/dohub
           ports:

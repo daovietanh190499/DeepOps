@@ -360,7 +360,7 @@ const appVue = new Vue({
         },
         accessServer() {
             if(this.current_user == this.current_spawn_user || (this.current_user != this.current_spawn_user && this.is_admin)) {
-                window.location = `user/${this.current_spawn_user}/`
+                window.location = `user/${this.current_spawn_user}/main/`
                 this.state = "running"
             }
         }
