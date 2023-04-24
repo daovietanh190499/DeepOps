@@ -525,7 +525,7 @@ def thread_stop_pending(username):
             db_session.commit()
             res['ip'] = None
             break
-        if not res or not res['ip']:
+        if not res or not 'ip' in res or not res['ip']:
             user_change = User.query.filter_by(username=username).first()
             user_change.state = 'offline'
             user_change.server_ip = ''
@@ -626,7 +626,7 @@ def start_server(user, username):
         return jsonify({"message": "not found"}), 404
     if not user_change.is_accept:
         return jsonify({"message": "no permission"}), 403
-    if not user_change.state == 'offline':
+    if not user_change.state == 'offline' and not user_change.state == 'pending_stop':
         return jsonify({"message": "no permission"}), 403
     
     server = ServerOption.query.filter_by(id=user_change.current_server).first()
@@ -651,7 +651,7 @@ def stop_server(user, username):
         return jsonify({"message": "not found"}), 404
     if not user_change.is_accept:
         return jsonify({"message": "no permission"}), 403
-    if not user_change.state == 'running':
+    if not user_change.state == 'running' and not user_change.state == 'pending_start':
         return jsonify({"message": "no permission"}), 403
     
     return stop_server_pipline(user_change)

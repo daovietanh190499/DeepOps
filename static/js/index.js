@@ -78,7 +78,7 @@ var serverLog = Vue.component('server-log', {
     props: ['message', 'reason'],
     template: `
     <div class="list-plan horizontal-flex">
-        <div> {{message}}: {{reason}} </div>
+        <div class="input-text"> {{message}}: {{reason}} </div>
     </div>
     `
 })
@@ -358,7 +358,7 @@ const appVue = new Vue({
                 fetch(`start_server/${this.current_spawn_user}`)
                 .then(res => {
                     if(res.status == 200){
-                        this.state = "running"
+                        this.state = "pending_start"
                     }
                 })
             }
@@ -368,7 +368,7 @@ const appVue = new Vue({
                 fetch(`stop_server/${this.current_spawn_user}`)
                 .then(res => {
                     if(res.status == 200){
-                        this.state = "offline"
+                        this.state = "pending_stop"
                     }
                 })
             }
