@@ -52,8 +52,8 @@ data:
     }
   config.yaml: |
     githubOauth:
-      GITHUB_CLIENT_ID: '3ee19bc1b2b6e07b190f'
-      GITHUB_CLIENT_SECRET: '0b64b39fb19aae0ddc40ea10dd6d16fea7eeb86f'
+      GITHUB_CLIENT_ID: '<YOUR_GITHUB_CLIENT_ID>'
+      GITHUB_CLIENT_SECRET: '<YOUR_GITHUB_CLIENT_SECRET>'
     admin:
       - daovietanh190499
     defaultPort: 8443
