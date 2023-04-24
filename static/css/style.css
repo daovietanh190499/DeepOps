@@ -78,13 +78,13 @@ html {
 }
 
 .main-content {
-	padding: 0 1rem 2rem 2rem;
+	padding: 0 1rem 1rem 2rem;
     margin: 2rem 0 0 0;
     width: 80%;
 }
 
 .side-content {
-	padding: 0 2rem 2rem 0;
+	padding: 0 2rem 1rem 0;
     margin: 2rem 0 0 0;
     width: 20%;
 }
@@ -106,6 +106,22 @@ html {
     background-color: white;
     border-radius: .4rem;
     padding: 1rem 2rem 0 2rem;
+}
+
+.footer {
+    position: relative;
+    height: 7rem;
+    display: flex; 
+    justify-content: center; 
+    align-items: center;
+    margin-bottom: 2rem;
+    margin-left: 2rem;
+    margin-right: 2rem;
+    width: calc(100% - 8rem);
+    background-color: white;
+    border-radius: .4rem;
+    padding: 1rem 2rem 0 2rem;
+    font-size: 1.2rem;
 }
 
 .welcome {

@@ -217,6 +217,7 @@
                     @admin_delete_user="adminDeleteUser(user)"
                     @admin_add_server_user="server => adminAddServerUser(user, server)"
                     @admin_delete_server_user="server => adminDeleteServerUser(user, server)"
+                    @admin_change_role_user="role => adminChangeRoleUser(user, role)"
                 ></user-row>
             </div>
         </div>
@@ -225,25 +226,28 @@
         <div class="content horizontal-flex">
             <div class="side-title center">Tips and Tricks</div>
             <div class="side-title center horizontal-flex">
-                <span class="justify"><b>How to proxy a port from inside your server to public url?</b></span>
+                <span class="justify"><b>🚀 How to proxy a port from inside your server to public url?</b></span>
                 <span class="side-detail-content">
-                    Visual Studio Code Server already have proxy service. If you run a program on specific port 
+                    Visual Studio Code Server already have proxy service 🖧. If you run a program on specific port 
                     on VSCode, it will automatically detect that port and proxy to the path ".../proxy/(port)"
                     where (port) is your running program port.
                 </span>
             </div>
             <div class="side-title center horizontal-flex">
-                <span class="justify"><b>How to save state of previous server running session?</b></span>
+                <span class="justify"><b>💾 How to save state of previous server running session?</b></span>
                 <span class="side-detail-content">
                     DoHub now having enough resources and supported softwares for minimum demand on training, inferencing or
                     especially deploying services. <br/><br/> But sometimes you want to save your enviroment libraries or packages like pip packages,
                     you should use framework that can generate virtual environment for you such as conda and virtualenv and then save that
-                    environment folder to the directory which being mounted by NAS (common, it is the home directory). <br/><br/>
+                    environment folder to the directory which being mounted by NAS (common, it is the home directory) 📁. <br/><br/>
                     Futhermore, you can also make your services run automatically by defining a startup file inside "/etc/init.d". 
                 </span>
             </div>
         </div>
     </div>
+</div>
+<div class="footer">
+    🎉 Dohub, ⚡ Created by <a href="https://github.com/daovietanh190499" style="padding-left: .5rem; padding-right: .5rem;">daovietanh99,</a> 📫 Please contact me for more infomation.
 </div>
 </body>
 <script>

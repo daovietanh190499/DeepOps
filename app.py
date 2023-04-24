@@ -431,6 +431,30 @@ def change_server(user, username, server_name):
 
     return jsonify({'message': 'success'}), 200
 
+@app.route('/change_role/<username>/<role>')
+@auth.verify
+def change_role(user, username, role):
+    if not user:
+        return jsonify({"message": "no permission"}), 403
+    if not user['role'] == "admin" or user['username'] == username:
+        return jsonify({"message": "no permission"}), 403
+    if not user['is_accept']:
+        return jsonify({"message": "no permission"}), 403
+    
+    user_change = User.query.filter_by(username=username).first()
+    if not user_change:
+        return jsonify({"message": "not found"}), 404
+    if not user_change.is_accept:
+        return jsonify({"message": "no permission"}), 403
+    
+    if not (role in ['admin', 'normal_user']):
+        return jsonify({"message": "no permission"}), 403
+    
+    user_change.role = role
+    db_session.commit()
+
+    return jsonify({'message': 'success'}), 200
+
 @app.route('/add_server_user/<username>/<server_name>')
 @auth.verify
 def add_server_user(user, username, server_name):

@@ -88,6 +88,7 @@ var userRow = Vue.component('user-row', {
     data() {
         return {
             is_open_dropdown: false,
+            is_open_dropdown_role: false,
             filter: "",
             last_activity: "--.--"
         }
@@ -108,10 +109,19 @@ var userRow = Vue.component('user-row', {
         openServerList() {
             this.is_open_dropdown = !this.is_open_dropdown
         },
+        openRoleList() {
+            this.is_open_dropdown_role = !this.is_open_dropdown_role
+        },
         chooseServer(server) {
             this.is_open_dropdown = false
             if(server) {
                 this.$emit('admin_add_server_user', server)
+            }
+        },
+        chooseRole(role) {
+            this.is_open_dropdown_role = false
+            if(role) {
+                this.$emit('admin_change_role_user', role)
             }
         },
         deleteServer(server) {
@@ -139,9 +149,29 @@ var userRow = Vue.component('user-row', {
                 <div class="item-block-title" style="width: 15%;">Running</div>
             </div>
             <div class="vertical-flex">
-                <div class="item-block-value" style="width: 15%;">{{user.state}}</div>
+                <div class="item-block-value" style="width: 15%; font-weight: 700"
+                    :style="{'color': user.state == 'running' ? '#00c851' : (user.state == 'offline' ? '#ff4444' : '#ffbb33')}"
+                > • {{user.state}} </div>
                 <div class="user-space"></div>
-                <div class="item-block-value" style="width: 10%;">{{user.role}}</div>
+                <div class="item-block-value" style="width: 10%;">
+                    <div class="dropdown">
+                        <div class="tag button" 
+                            :style="{'background-color': '#3450ee'}"
+                            @click="openRoleList()">
+                            {{user.role}}
+                        </div>
+                        <div class="dropdown-content" v-if="is_open_dropdown_role">
+                            <div class="dropdown-items">
+                                <a @click="chooseRole('admin')">
+                                    admin
+                                </a>
+                                <a @click="chooseRole('normal_user')">
+                                    normal_user
+                                </a>
+                            </div>
+                        </div>
+                    </div>
+                </div>
                 <div class="user-space"></div>
                 <div class="item-block-value" style="width: 10%">{{last_activity}}</div>
                 <div class="user-space"></div>
@@ -288,6 +318,7 @@ const appVue = new Vue({
                             this.state = res['result']['state']
                             this.access_password = res['result']['access_password']
                             this.server_log = res['result']['server_log']
+                            this.setupSocket()
                         }
                     })
             }
@@ -380,6 +411,14 @@ const appVue = new Vue({
         adminDeleteServerUser(user, server) {
             if(this.is_admin) {
                 fetch(`delete_server_user/${user['username']}/${server}`)
+                .then(res => {
+                    this.getAllUsers()
+                })
+            }
+        },
+        adminChangeRoleUser(user, role) {
+            if(this.is_admin) {
+                fetch(`change_role/${user['username']}/${role}`)
                 .then(res => {
                     this.getAllUsers()
                 })
