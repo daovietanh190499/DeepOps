@@ -9,7 +9,7 @@ spec:
     release: dohub-main
   ports:
   - protocol: TCP
-    port: 80
+    port: 5000
     targetPort: 5000
     name: dohub
   type: LoadBalancer
