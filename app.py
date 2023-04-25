@@ -262,7 +262,7 @@ def authorized(user):
     return redirect(url_for('index'))
 
 
-@app.route('/login')
+@app.route('/login', methods=['GET', 'POST'])
 @auth.verify
 def login(user):
     if user is None:
@@ -271,12 +271,12 @@ def login(user):
         return redirect(url_for('index'))
 
 
-@app.route('/logout')
+@app.route('/logout', methods=['GET', 'POST'])
 def logout():
     auth.logout_user()
     return redirect(url_for('index'))
 
-@app.route('/')
+@app.route('/', methods=['GET', 'POST'])
 @auth.verify
 def index(user):
     if user and user['state'] == 'running':
@@ -289,7 +289,7 @@ def index(user):
 def hub(user):
     return render_template('index.html', user=user)
 
-@app.route('/user_state')
+@app.route('/user_state', methods=['GET', 'POST'])
 @auth.verify
 def user_state(user):
     if not user:
@@ -306,7 +306,7 @@ def user_state(user):
     user['server_log'] = get_server(user['username'])
     return jsonify({'result': user}), 200
 
-@app.route('/all_users')
+@app.route('/all_users', methods=['GET', 'POST'])
 @auth.verify
 def all_user(user):
     if not user:
@@ -343,7 +343,7 @@ def all_user(user):
     
     return jsonify({'result': result_list}), 200
 
-@app.route('/all_servers')
+@app.route('/all_servers', methods=['GET', 'POST'])
 def all_server():
     servers = db_session.query(
         ServerOption.name,
@@ -364,7 +364,7 @@ def all_server():
 
     return jsonify({'result': result_list}), 200
 
-@app.route('/accept_user/<username>')
+@app.route('/accept_user/<username>', methods=['GET', 'POST'])
 @auth.verify
 def accept_user(user, username):
     if not user:
@@ -380,7 +380,7 @@ def accept_user(user, username):
     
     return jsonify({'message': 'success'}), 200
 
-@app.route('/delete_user/<username>')
+@app.route('/delete_user/<username>', methods=['GET', 'POST'])
 @auth.verify
 def delete_user(user, username):
     if not user:
@@ -400,7 +400,7 @@ def delete_user(user, username):
 
     return jsonify({'message': 'success'}), 200
 
-@app.route('/change_server/<username>/<server_name>')
+@app.route('/change_server/<username>/<server_name>', methods=['GET', 'POST'])
 @auth.verify
 def change_server(user, username, server_name):
     if not user:
@@ -431,7 +431,7 @@ def change_server(user, username, server_name):
 
     return jsonify({'message': 'success'}), 200
 
-@app.route('/change_role/<username>/<role>')
+@app.route('/change_role/<username>/<role>', methods=['GET', 'POST'])
 @auth.verify
 def change_role(user, username, role):
     if not user:
@@ -455,7 +455,7 @@ def change_role(user, username, role):
 
     return jsonify({'message': 'success'}), 200
 
-@app.route('/add_server_user/<username>/<server_name>')
+@app.route('/add_server_user/<username>/<server_name>', methods=['GET', 'POST'])
 @auth.verify
 def add_server_user(user, username, server_name):
     if not user:
@@ -479,7 +479,7 @@ def add_server_user(user, username, server_name):
 
     return jsonify({'message': 'success'}), 200
 
-@app.route('/delete_server_user/<username>/<server_name>')
+@app.route('/delete_server_user/<username>/<server_name>', methods=['GET', 'POST'])
 @auth.verify
 def delete_server_user(user, username, server_name):
     if not user:
@@ -635,7 +635,7 @@ def stop_server_pipline(user):
     return jsonify({'message': 'success'}), 200
 
 
-@app.route('/start_server/<username>')
+@app.route('/start_server/<username>', methods=['GET', 'POST'])
 @auth.verify
 def start_server(user, username):
     if not user:
@@ -660,7 +660,7 @@ def start_server(user, username):
     return start_server_pipline(user=user_change, server=server)
 
 
-@app.route('/stop_server/<username>')
+@app.route('/stop_server/<username>', methods=['GET', 'POST'])
 @auth.verify
 def stop_server(user, username):
     if not user:
