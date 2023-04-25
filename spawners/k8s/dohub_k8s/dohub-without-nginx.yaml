@@ -28,7 +28,7 @@ spec:
           securityContext:
             capabilities:
               add: ['SYS_ADMIN']
-              allowPrivilegeEscalation: true
+            allowPrivilegeEscalation: true
           volumeMounts:
             - name: dohub-config
               mountPath: /etc/dohub/config.yaml
