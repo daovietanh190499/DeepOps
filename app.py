@@ -223,6 +223,18 @@ def after_request(response):
     db_session.remove()
     return response
 
+@app.errorhandler(404)
+def not_found_error(error):
+    return render_template('page-error.html', code=404, error=error)
+
+@app.errorhandler(403)
+def not_found_error(error):
+    return render_template('page-error.html', code=403, error=error)
+
+@app.errorhandler(500)
+def not_found_error(error):
+    return render_template('page-error.html', code=500, error=error)
+
 @app.route('/favicon.ico')
 def favicon():
     return send_from_directory(os.path.join(app.root_path, 'static', 'img'), 'favicon.ico')
@@ -587,7 +599,10 @@ def start_server_pipline(user, server):
         'defaultPort': config_file['defaultPort']
     }
     if config_file['spawner'] == 'k8s':
-        create_folder(config)
+        try:
+            create_folder(config)
+        except:
+            return jsonify({'message': 'action create folder failed'}), 500
     try:
         res = get_pv(user.username)
     except:
@@ -595,7 +610,7 @@ def start_server_pipline(user, server):
     if not res:
         res = create_pv(config)
         if not res:
-            return jsonify({'message': 'action failed'}), 500
+            return jsonify({'message': 'action create persistent volume failed'}), 500
     try:
         res = get_pvc(user.username)
     except:
@@ -603,10 +618,15 @@ def start_server_pipline(user, server):
     if not res:
         res = create_pvc(config)
         if not res:
-            return jsonify({'message': 'action failed'}), 500
-    res = create_server(config)
+            return jsonify({'message': 'action create persistent volume claim failed'}), 500
+    try:
+        res = get_server(user.username)
+    except:
+        res = None
     if not res:
-        return jsonify({'message': 'action failed'}), 500
+        res = create_server(config)
+        if not res:
+            return jsonify({'message': 'action create server failed'}), 500
 
     user.state = 'pending_start'
     user.server_ip = ''

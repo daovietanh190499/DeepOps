@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link href="https://fonts.googleapis.com/css2?family=League+Spartan:wght@100;200;300;400;500;600&family=Poppins:wght@400;500;600&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/font-awesome/4.7.0/css/font-awesome.min.css">
+    <link rel="stylesheet" type="text/css" href="/static/css/style.css">
+    <link rel="icon" href="/static/img/logo.png">
+    <meta property="og:title" content="Dohub" />
+    <meta property="og:description" content="Gives users access to computational environments and resources without burdening the users with installation and maintenance tasks">
+    <meta property="og:image" content="/static/img/logo.png" />
+    <title>DoHub</title>
+</head>
+<body class="center horizontal-flex">
+    <div class="main-container center" id="root" style="height: 90vh;">
+        <div>
+            <p style="font-size:5rem; font-family: 'League Spartan'; margin: 2rem; text-align: center;">{{code}}</p>
+            <p style="font-family: 'League Spartan'; margin-left: 2rem; margin-right: 2rem; text-align: center;">{{error}}</p>
+            <div class="list-plan horizontal-flex">
+                <button class="button-input button" onclick="comeback()">Come Back Home</button>
+            </div>
+        </div>
+    </div>
+</body>
+<script>
+    function comeback() {
+        window.location = '/hub'
+    }
+</script>
+</html>
