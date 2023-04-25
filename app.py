@@ -623,7 +623,7 @@ def start_server_pipline(user, server):
         res = get_server(user.username)
     except:
         res = None
-    if not res or res.message == 'Idle':
+    if not res or res['message'] == 'Idle':
         res = create_server(config)
         if not res:
             return jsonify({'message': 'action create server failed'}), 500
