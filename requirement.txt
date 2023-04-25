@@ -1,14 +1,11 @@
 furl
+flask
 flask-sock
 sqlalchemy<2.0
 kubernetes
-websocket
-contextlib
-yaml
-urllib
+websocket-client
+PyYAML
 uuid
-json
 requests
-functools
 pypubsub
 waitress

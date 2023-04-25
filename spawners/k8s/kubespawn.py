@@ -1,7 +1,13 @@
+import yaml
 from kubernetes import client, config, utils
 
-# config.load_incluster_config()
-config.load_config()
+with open("/etc/dohub/config.yaml", 'r') as stream:
+    config_file = yaml.safe_load(stream)
+
+if config_file['spawner'] == 'local':
+    config.load_config()
+else:
+    config.load_incluster_config()
 
 def get_servers():
     v1 = client.CoreV1Api()
@@ -245,6 +251,7 @@ def create_server(config):
     if config['not_use_gpu']:
         del server_manifest['spec']['containers'][0]['resources']['limits'][config['gpu_type']]
         del server_manifest['spec']['containers'][0]['resources']['requests'][config['gpu_type']]
+        del server_manifest['spec']['containers'][0]['securityContext']
 
     api_response = utils.create_from_dict(k8s_client, server_manifest)
     return api_response

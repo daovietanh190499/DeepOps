@@ -1,4 +1,4 @@
-FROM python:3.9.16-bullseye
+FROM ubuntu:20.04
 
 USER root
 
@@ -11,9 +11,10 @@ RUN apt-get update --yes && \
     #   the ubuntu base image is rebuilt too seldom sometimes (less than once a month)
     apt-get upgrade --yes && \
     apt-get install --yes --no-install-recommends \
-    dumb-init
+    dumb-init \
+    python3-pip
 
-RUN pip install -r requirement.txt
+RUN pip3 install -r requirement.txt
 
 EXPOSE 5000
-ENTRYPOINT ["dumb-init", "/usr/bin/python3", "app.py"]
+ENTRYPOINT ["dumb-init", "python3", "app.py"]

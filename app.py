@@ -284,7 +284,7 @@ def index(user):
     else:
         return redirect(url_for('hub'))
 
-@app.route('/hub')
+@app.route('/hub', methods=['GET', 'POST'])
 @auth.verify
 def hub(user):
     return render_template('index.html', user=user)
