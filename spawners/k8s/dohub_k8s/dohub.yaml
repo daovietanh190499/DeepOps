@@ -41,6 +41,12 @@ spec:
             - name: dohub-config
               mountPath: /etc/dohub/config.yaml
               subPath: config.yaml
+            - name: dohub-config
+              mountPath: /etc/dohub/cert.pem
+              subPath: cert.pem
+            - name: dohub-config
+              mountPath: /etc/dohub/key.pem
+              subPath: key.pem
             - mountPath: /home/dohub
               name: volume-dohub
             - mountPath: /mnt/nas0/
