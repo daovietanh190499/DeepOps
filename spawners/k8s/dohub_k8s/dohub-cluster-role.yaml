@@ -11,7 +11,7 @@ rules:
   resources: ["pods/binding"]
   verbs: ["create"]
 - apiGroups: [""]
-  resources: ["pods", "persistentvolumeclaims", "persistentvolume"]
+  resources: ["pods", "persistentvolumeclaims", "persistentvolumes"]
   verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
 - apiGroups: [""]
   resources: ["services", "namespaces"]

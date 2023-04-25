@@ -526,13 +526,13 @@ def delete_server_user(user, username, server_name):
 def thread_start_pending(username):
     res = None
     count = 0
-    while (not res or not res['ip']) and count < 100:
+    while (not res or 'ip' not in res or not res['ip']) and count < 100:
         count += 1
         try:
             res = get_server(username)
         except:
             continue
-        if res and res['ip']:
+        if res and 'ip' in res and res['ip']:
             user_change = User.query.filter_by(username=username).first()
             user_change.state = 'running'
             user_change.server_ip = res['ip']
@@ -550,7 +550,7 @@ def thread_start_pending(username):
 def thread_stop_pending(username):
     res = {'ip': 'available'}
     count = 0
-    while res and res['ip'] and count < 100:
+    while res and 'ip' in res and res['ip'] and count < 100:
         count += 1
         try:
             res = get_server(username)
