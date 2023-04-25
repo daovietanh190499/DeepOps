@@ -754,7 +754,7 @@ def handle_socket(ws, port, username, path=None):
 
     headers = dict(request.headers)
 
-    if config_file['spawner'] == 'local':
+    if config_file['spawner'] == 'local' or config_file['spawner'] == 'k8s':
         server_domain = user_change.server_ip
     else:
         server_domain = f'dohub-{username}'
@@ -805,7 +805,7 @@ def proxy(port, username, path=None):
     # if not user_change.state == 'running':
     #     return jsonify({"message": "no permission"}), 403
 
-    if config_file['spawner'] == 'local':
+    if config_file['spawner'] == 'local' or config_file['spawner'] == 'k8s':
         user_change = User.query.filter_by(username=username).first()
         server_domain = user_change.server_ip
     else:
