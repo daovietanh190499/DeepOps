@@ -1,6 +1,10 @@
 # DeepOps
 
 ```shell
+cd spawners/k8s/dohub_k8s/
+```
+
+```shell
 kubectl apply -f dohub-service-account.yaml
 ```
 
