@@ -103,3 +103,7 @@ data:
         drive: '30TB'
         gpu: 'gpu:2'
         color: '#fcb040'
+  cert.pem: |
+    <YOUR_CLOUDFLARE_CERT_HERE>
+  key.pem: |
+    <YOUR_CLOUDFLARE_KEY_HERE>

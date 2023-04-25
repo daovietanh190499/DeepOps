@@ -872,5 +872,5 @@ def migrate():
 
 if __name__ == '__main__': 
     from waitress import serve
-    app.run("0.0.0.0", 5000, debug=False, ssl_context=('cert.pem', 'key.pem'))
+    app.run("0.0.0.0", 5000, debug=False, ssl_context=("/etc/dohub/cert.pem", "/etc/dohub/key.pem"))
     # serve(app, host="0.0.0.0", port=5000)
