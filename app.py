@@ -28,7 +28,7 @@ from fileserver.controller import create_folder
 with open("/etc/dohub/config.yaml", 'r') as stream:
     config_file = yaml.safe_load(stream)
 
-DATABASE_URI = 'sqlite:///./dohub.db'
+DATABASE_URI = 'sqlite:////mnt/database/dohub.db'
 SECRET_KEY = 'dohub'
 DEBUG = True
 

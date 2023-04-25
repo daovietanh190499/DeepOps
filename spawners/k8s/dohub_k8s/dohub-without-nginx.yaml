@@ -39,7 +39,7 @@ spec:
             - name: dohub-config
               mountPath: /etc/dohub/key.pem
               subPath: key.pem
-            - mountPath: /home/dohub
+            - mountPath: /mnt/database/
               name: volume-dohub
             - mountPath: /mnt/nas0/
               name: volume-dohub-server
