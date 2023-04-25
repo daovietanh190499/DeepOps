@@ -17,7 +17,7 @@ spec:
       namespace: dohub
       labels:
         app: dohub
-        release: dohub-main
+        release: dohub-main-pod
     spec:
       serviceAccountName: dohub-schedule
       containers:
