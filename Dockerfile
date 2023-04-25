@@ -13,7 +13,7 @@ RUN apt-get update --yes && \
     apt-get install --yes --no-install-recommends \
     dumb-init
 
-RUN pip install -r requrement.txt
+RUN pip install -r requirement.txt
 
 EXPOSE 5000
 ENTRYPOINT ["dumb-init", "/usr/bin/python3", "app.py"]
