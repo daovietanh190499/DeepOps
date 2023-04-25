@@ -36,7 +36,7 @@ spec:
           securityContext:
             capabilities:
               add: ['SYS_ADMIN']
-          command: ['python', 'app.py']
+          command: ['python3', 'app.py']
           volumeMounts:
             - name: dohub-config
               mountPath: /etc/dohub/config.yaml
