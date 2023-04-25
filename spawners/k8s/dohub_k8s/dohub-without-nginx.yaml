@@ -28,7 +28,7 @@ spec:
           securityContext:
             capabilities:
               add: ['SYS_ADMIN']
-          command: ['python3', 'app.py']
+              allowPrivilegeEscalation: true
           volumeMounts:
             - name: dohub-config
               mountPath: /etc/dohub/config.yaml

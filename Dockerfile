@@ -16,5 +16,11 @@ RUN apt-get update --yes && \
 
 RUN pip3 install -r requirement.txt
 
+USER root
+ENV USER=root
+ENV HOME=/home/dohub
+
+WORKDIR /home/dohub
+
 EXPOSE 5000
 ENTRYPOINT ["dumb-init", "python3", "app.py"]
