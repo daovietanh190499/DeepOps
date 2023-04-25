@@ -62,6 +62,7 @@ data:
       - 10.1.8.99
       - 10.1.8.100
     nasPath: '/data/nas/dohub'
+    nasIndex: 0
     initServerOptions:
       - name: 'Lollipop'
         image: 'lollipop.png'

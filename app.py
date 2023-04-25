@@ -593,8 +593,8 @@ def start_server_pipline(user, server):
         'not_use_gpu': not server.gpu or server.gpu == '' or server.gpu == 'null' or server.gpu == "",
         'image': server.docker_image,
         'path': config_file['nasPath'],
-        'file_server': config_file['nasAddresses'][0],
-        'file_server_index': 0,
+        'file_server': config_file['nasAddresses'][config_file['nasIndex']],
+        'file_server_index': config_file['nasIndex'],
         'password': user.access_password,
         'defaultPort': config_file['defaultPort']
     }

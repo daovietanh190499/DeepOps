@@ -8,6 +8,7 @@ defaultPort: 8443
 nasAddresses:
   - 10.1.8.99
   - 10.1.8.100
+nasIndex: 0
 nasPath: '/data/nas/dohub'
 initServerOptions:
   - name: 'Lollipop'
