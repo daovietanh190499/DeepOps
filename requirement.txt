@@ -1,11 +1,11 @@
+aiohttp
+aiohttp_jinja2
+jinja2
 furl
-flask
-flask-sock
 sqlalchemy<2.0
 kubernetes
-websocket-client
 PyYAML
 uuid
 requests
 pypubsub
-waitress
+asyncio

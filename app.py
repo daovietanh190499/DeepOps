@@ -1,26 +1,25 @@
-import os
-from functools import wraps
-from flask import Flask, request, session, redirect, url_for, render_template, Response, jsonify, send_from_directory
+from aiohttp import web
+from aiohttp import client
+import aiohttp
+import asyncio
+import pprint
+import ssl
+
+import aiohttp_jinja2
+import jinja2
 
 from sqlalchemy import create_engine, Column, Integer, String, Float, Boolean, Text
 from sqlalchemy.orm import scoped_session, sessionmaker
 from sqlalchemy.ext.declarative import declarative_base
 
+import yaml
 from furl import furl
 import requests
 import json
 import uuid
-import time
-from pubsub import pub
+from functools import wraps
 
-import re
-from urllib.parse import urlparse, urlunparse
-import threading
-from flask_sock import Sock
-from websocket import create_connection
-import contextlib
-
-import yaml
+import traceback
 
 from spawners.k8s.kubespawn import delete_pv, delete_pvc, delete_server, create_pv, create_pvc, create_server, get_server, get_pv, get_pvc, get_servers
 from fileserver.controller import create_folder
@@ -36,13 +35,12 @@ DEBUG = True
 GITHUB_CLIENT_ID = config_file['githubOauth']['GITHUB_CLIENT_ID']
 GITHUB_CLIENT_SECRET = config_file['githubOauth']['GITHUB_CLIENT_SECRET']
 
-# setup flask
-app = Flask(__name__)
-app.config.from_object(__name__)
-sock = Sock(app)
+app = web.Application()
+
+aiohttp_jinja2.setup(app, loader=jinja2.FileSystemLoader('templates'))
 
 # setup sqlalchemy
-engine = create_engine(app.config['DATABASE_URI'])
+engine = create_engine(DATABASE_URI)
 db_session = scoped_session(sessionmaker(autocommit=False,
                                          autoflush=False,
                                          bind=engine))
@@ -93,23 +91,6 @@ class ServerOption(Base):
 
     def __repr__(self):
         return str(self.id)
-
-class ServerPort(Base):
-    __tablename__ = 'server_ports'
-
-    id = Column(Integer, primary_key=True)
-    server_id = Column(Integer)
-    internal_port = Column(Integer)
-    external_port = Column(Integer)
-
-    def __init__(self, **kwargs):
-        for property, value in kwargs.items():
-            if hasattr(value, '__iter__') and not isinstance(value, str):
-                value = value[0]
-            setattr(self, property, value)
-
-    def __repr__(self):
-        return str(self.id)
     
 class UserServer(Base):
     __tablename__ = 'user_server_relations'
@@ -132,20 +113,15 @@ class GitAuth():
     BASE_URL = 'https://api.github.com/'
     BASE_AUTH_URL = 'https://github.com/login/oauth/'
 
-    def __init__(self, app=None, db=None):
-        if app is not None:
-            self.db = db
-            self.app = app
-            self.init_app(self.app)
-        else:
-            self.db = None
-            self.app = None
+    def __init__(self, db=None):
+        self.db = db
+        self.init_app()
 
-    def init_app(self, app):
-        self.client_id = app.config['GITHUB_CLIENT_ID']
-        self.client_secret = app.config['GITHUB_CLIENT_SECRET']
-        self.base_url = app.config.get('GITHUB_BASE_URL', self.BASE_URL)
-        self.auth_url = app.config.get('GITHUB_AUTH_URL', self.BASE_AUTH_URL)
+    def init_app(self):
+        self.client_id = GITHUB_CLIENT_ID
+        self.client_secret = GITHUB_CLIENT_SECRET
+        self.base_url = self.BASE_URL
+        self.auth_url = self.BASE_AUTH_URL
         # self.session = requests.session()
 
     def oauth_login(self):
@@ -156,16 +132,17 @@ class GitAuth():
             'allow_signup': 'true'
         }
         url = furl(self.auth_url + 'authorize').set(params)
-        return redirect(str(url), 302)
+        url = str(url)
+        raise web.HTTPFound(location=url)
     
     def handle_callback(self, f):
         @wraps(f)
         def decorated(*args, **kwargs):
-
-            if not 'code' in request.args:
-                return {'message': 'no permission'}, 403
-
-            code = request.args.get('code')
+            code = args[0].query.get('code')
+            if not code:
+                resp = web.HTTPError(text="No permission")
+                resp.set_status(403)
+                return resp
 
             payload = {
                 'client_id': self.client_id,
@@ -175,7 +152,9 @@ class GitAuth():
             }
             r = requests.post(self.BASE_AUTH_URL + 'access_token', json=payload, headers={'Accept': 'application/json'})
             if not 'access_token' in json.loads(r.text):
-                return {'message': 'no permission'}, 403
+                resp = web.HTTPError(text="No permission")
+                resp.set_status(403)
+                return resp
             access_token = json.loads(r.text)['access_token']
             
             access_user_url = self.BASE_URL + 'user'
@@ -190,59 +169,83 @@ class GitAuth():
         @wraps(f)
         def decorated(*args, **kwargs):
             user = None
-            if not 'user_access_key' in session:
+            try:
+                access_key = args[0].cookies['user_access_key']
+            except:
+                access_key = None
+            if not access_key:
                 user = None
             else:
-                user = User.query.filter_by(access_key=session['user_access_key']).first()
+                user = User.query.filter_by(access_key=access_key).first()
                 if user:
                     user = user.__dict__
             return f(*((user,) + args), **kwargs)
         return decorated
         
-    def login_user(self, user):
+    def login_user(self, user, request):
         access_key = uuid.uuid4()
         user.access_key = str(access_key)
         db_session.commit()
-        session['user_access_key'] = user.access_key
-        return
+        location = request.app.router['index'].url_for()
+        response = web.HTTPSeeOther(location=location)
+        response.cookies['user_access_key'] = user.access_key
+        return response
 
-    def logout_user(self):
-        session.pop('user_access_key', None)
-        return
+    def logout_user(self, request):
+        location = request.app.router['index'].url_for()
+        response = web.HTTPSeeOther(location=location)
+        response.cookies['user_access_key'] = ''
+        return response
 
-auth = GitAuth(app, db_session)
+auth = GitAuth(db_session)
 
-@app.before_first_request
-def initialize_database():
-    Base.metadata.create_all(bind=engine)
-    migrate()
+async def handle_404(request, ex: web.HTTPException):
+    return aiohttp_jinja2.render_template('page-error.html', request, {'code': 404, 'error': ex.text})
 
+async def handle_403(request, ex: web.HTTPException):
+    return aiohttp_jinja2.render_template('page-error.html', request, {'code': 403, 'error': ex.text})
 
-@app.after_request
-def after_request(response):
-    db_session.remove()
-    return response
-
-@app.errorhandler(404)
-def not_found_error(error):
-    return render_template('page-error.html', code=404, error=error)
-
-@app.errorhandler(403)
-def not_found_error(error):
-    return render_template('page-error.html', code=403, error=error)
-
-@app.errorhandler(500)
-def not_found_error(error):
-    return render_template('page-error.html', code=500, error=error)
-
-@app.route('/favicon.ico')
-def favicon():
-    return send_from_directory(os.path.join(app.root_path, 'static', 'img'), 'favicon.ico')
+async def handle_500(request, ex: web.HTTPException):
+    return aiohttp_jinja2.render_template('page-error.html', request, {'code': 500, 'error': ex.text})
 
 
-@app.route('/github-callback')
+def create_error_middleware(overrides):
+    @web.middleware
+    async def error_middleware(request, handler):
+        try:
+            Base.metadata.create_all(bind=engine)
+            migrate()
+            resp = await handler(request)
+            db_session.remove()
+            return resp
+        except web.HTTPException as ex:
+            override = overrides.get(ex.status)
+            if override:
+                resp = await override(request, ex)
+                resp.set_status(ex.status)
+                return resp
+
+            raise
+        except Exception as e:
+            resp = await overrides[500](request, web.HTTPError(text=traceback.format_exc()))
+            resp.set_status(500)
+            return resp
+
+    return error_middleware
+
+
+def setup_middlewares(app):
+    error_middleware = create_error_middleware({
+        403: handle_403,
+        404: handle_404,
+        500: handle_500,
+    })
+    app.middlewares.append(error_middleware)
+
+setup_middlewares(app)
+
 @auth.handle_callback
-def authorized(user):
+async def authorized(user, request):
     user_ = User.query.filter_by(username=user['login']).first()
     if user_ is None:
         user_ = User(
@@ -269,43 +272,36 @@ def authorized(user):
     user_.github_access_token = user['access_token']
     user_.github_id = int(user['id'])
 
-    auth.login_user(user_)
+    return auth.login_user(user_, request)
 
-    return redirect(url_for('index'))
-
-
-@app.route('/login', methods=['GET', 'POST'])
 @auth.verify
-def login(user):
+async def login(user, request):
     if user is None:
         return auth.oauth_login()
     else:
-        return redirect(url_for('index'))
+        location = request.app.router['index'].url_for()
+        raise web.HTTPFound(location=location)
+    
+async def logout(request):
+    return auth.logout_user(request)
 
-
-@app.route('/logout', methods=['GET', 'POST'])
-def logout():
-    auth.logout_user()
-    return redirect(url_for('index'))
-
-@app.route('/', methods=['GET', 'POST'])
 @auth.verify
-def index(user):
+async def index(user, request):
     if user and user['state'] == 'running':
-        return redirect("/user/" + user["username"] + "/main/")
+        raise web.HTTPFound(location="/user/" + user["username"] + "/main/")
     else:
-        return redirect(url_for('hub'))
+        location = request.app.router['hub'].url_for()
+        raise web.HTTPFound(location=location)
 
-@app.route('/hub', methods=['GET', 'POST'])
+@aiohttp_jinja2.template('index.html') 
 @auth.verify
-def hub(user):
-    return render_template('index.html', user=user)
+async def hub(user, request):
+    return {"user": user}
 
-@app.route('/user_state', methods=['GET', 'POST'])
 @auth.verify
-def user_state(user):
+async def user_state(user, request):
     if not user:
-        return jsonify({"message": "no permission"}), 403
+        return web.json_response({"message": "no permission"}, status=403)
     del user['_sa_instance_state']
     all_servers = db_session.query(ServerOption.name) \
             .filter(ServerOption.id == UserServer.server_id) \
@@ -316,15 +312,14 @@ def user_state(user):
     user['server_list'] = all_servers
     user['current_server'] = current_server[0]
     user['server_log'] = get_server(user['username'])
-    return jsonify({'result': user}), 200
+    return web.json_response({"result": user}, status=200)
 
-@app.route('/all_users', methods=['GET', 'POST'])
 @auth.verify
-def all_user(user):
+def all_user(user, request):
     if not user:
-        return jsonify({"message": "no permission"}), 403
+        return web.json_response({"message": "no permission"}, status=403)
     if not user['role'] == "admin":
-        return jsonify({"message": "no permission"}), 403
+        return web.json_response({"message": "no permission"}, status=403)
     users = db_session.query(
         User.id,
         User.username, 
@@ -353,10 +348,9 @@ def all_user(user):
         user_dict['server_log'] = get_server(user[1])
         result_list.append(user_dict)
     
-    return jsonify({'result': result_list}), 200
+    return web.json_response({"result": result_list}, status=200)
 
-@app.route('/all_servers', methods=['GET', 'POST'])
-def all_server():
+async def all_server(request):
     servers = db_session.query(
         ServerOption.name,
         ServerOption.image,
@@ -374,34 +368,34 @@ def all_server():
             server_dict[field] = server[i] if server[i] != '' else 'none'
         result_list[server[0]] = server_dict
 
-    return jsonify({'result': result_list}), 200
+    return web.json_response({"result": result_list}, status=200)
 
-@app.route('/accept_user/<username>', methods=['GET', 'POST'])
 @auth.verify
-def accept_user(user, username):
+async def accept_user(user, request):
+    username = request.match_info.get('username', None)
     if not user:
-        return jsonify({"message": "no permission"}), 403
+        return web.json_response({"message": "no permission"}, status=403)
     if not user['role'] == "admin":
-        return jsonify({"message": "no permission"}), 403
+        return web.json_response({"message": "no permission"}, status=403)
     user_accept = User.query.filter_by(username=username).first()
     if not user_accept:
-        return jsonify({"message": "not found"}), 404
+        return web.json_response({"message": "not found"}, status=404)
     
     user_accept.is_accept = True
     db_session.commit()
     
-    return jsonify({'message': 'success'}), 200
+    return web.json_response({"message": "success"}, status=200)
 
-@app.route('/delete_user/<username>', methods=['GET', 'POST'])
 @auth.verify
-def delete_user(user, username):
+async def delete_user(user, request):
+    username = request.match_info.get('username', None)
     if not user:
-        return jsonify({"message": "no permission"}), 403
+        return web.json_response({"message": "no permission"}, status=403)
     if not user['role'] == "admin":
-        return jsonify({"message": "no permission"}), 403
+        return web.json_response({"message": "no permission"}, status=403)
     user_delete = User.query.filter_by(username=username).first()
     if not user_delete:
-        return jsonify({"message": "not found"}), 404
+        return web.json_response({"message": "not found"}, status=404)
     
     stop_server_pipline(user_delete)
     
@@ -410,78 +404,81 @@ def delete_user(user, username):
     db_session.delete(user_delete)
     db_session.commit()
 
-    return jsonify({'message': 'success'}), 200
+    return web.json_response({"message": "success"}, status=200)
 
-@app.route('/change_server/<username>/<server_name>', methods=['GET', 'POST'])
 @auth.verify
-def change_server(user, username, server_name):
+async def change_server(user, request):
+    username = request.match_info.get('username', None)
+    server_name = request.match_info.get('server_name', None)
     if not user:
-        return jsonify({"message": "no permission"}), 403
+        return web.json_response({"message": "no permission"}, status=403)
     if not user['role'] == "admin" and user['username'] != username:
-        return jsonify({"message": "no permission"}), 403
+        return web.json_response({"message": "no permission"}, status=403)
     if not user['is_accept']:
-        return jsonify({"message": "no permission"}), 403
+        return web.json_response({"message": "no permission"}, status=403)
     
     user_change = User.query.filter_by(username=username).first()
     if not user_change:
-        return jsonify({"message": "not found"}), 404
+        return web.json_response({"message": "not found"}, status=404)
     if not user_change.is_accept:
-        return jsonify({"message": "no permission"}), 403
+        return web.json_response({"message": "no permission"}, status=403)
     if not user_change.state == 'offline':
-        return jsonify({"message": "no permission"}), 403
+        return web.json_response({"message": "no permission"}, status=403)
     
     server = ServerOption.query.filter_by(name=server_name).first()
     if not server:
-        return jsonify({"message": "not found"}), 404
+        return web.json_response({"message": "not found"}, status=404)
     
     userserver = UserServer.query.filter_by(user_id=user_change.id, server_id=server.id).first()
     if not userserver:
-        return jsonify({"message": "no permission"}), 403
+        return web.json_response({"message": "no permission"}, status=403)
     
     user_change.current_server = server.id
     db_session.commit()
 
-    return jsonify({'message': 'success'}), 200
+    return web.json_response({"message": "success"}, status=200)
 
-@app.route('/change_role/<username>/<role>', methods=['GET', 'POST'])
 @auth.verify
-def change_role(user, username, role):
+async def change_role(user, request):
+    username = request.match_info.get('username', None)
+    role = request.match_info.get('role', None)
     if not user:
-        return jsonify({"message": "no permission"}), 403
+        return web.json_response({"message": "no permission"}, status=403)
     if not user['role'] == "admin" or user['username'] == username:
-        return jsonify({"message": "no permission"}), 403
+        return web.json_response({"message": "no permission"}, status=403)
     if not user['is_accept']:
-        return jsonify({"message": "no permission"}), 403
+        return web.json_response({"message": "no permission"}, status=403)
     
     user_change = User.query.filter_by(username=username).first()
     if not user_change:
-        return jsonify({"message": "not found"}), 404
+        return web.json_response({"message": "not found"}, status=404)
     if not user_change.is_accept:
-        return jsonify({"message": "no permission"}), 403
+        return web.json_response({"message": "no permission"}, status=403)
     
     if not (role in ['admin', 'normal_user']):
-        return jsonify({"message": "no permission"}), 403
+        return web.json_response({"message": "no permission"}, status=403)
     
     user_change.role = role
     db_session.commit()
 
-    return jsonify({'message': 'success'}), 200
+    return web.json_response({"message": "success"}, status=200)
 
-@app.route('/add_server_user/<username>/<server_name>', methods=['GET', 'POST'])
 @auth.verify
-def add_server_user(user, username, server_name):
+async def add_server_user(user, request):
+    username = request.match_info.get('username', None)
+    server_name = request.match_info.get('server_name', None)
     if not user:
-        return jsonify({"message": "no permission"}), 403
+        return web.json_response({"message": "no permission"}, status=403)
     if not user['role'] == "admin":
-        return jsonify({"message": "no permission"}), 403
+        return web.json_response({"message": "no permission"}, status=403)
     
     user_change = User.query.filter_by(username=username).first()
     if not user_change:
-        return jsonify({"message": "not found"}), 404
+        return web.json_response({"message": "not found"}, status=404)
     
     server = ServerOption.query.filter_by(name=server_name).first()
     if not server:
-        return jsonify({"message": "not found"}), 404
+        return web.json_response({"message": "not found"}, status=404)
     
     userserver = UserServer.query.filter_by(user_id=user_change.id, server_id=server.id).first()
     if not userserver:
@@ -489,28 +486,29 @@ def add_server_user(user, username, server_name):
         db_session.add(userserver)
         db_session.commit()
 
-    return jsonify({'message': 'success'}), 200
+    return web.json_response({"message": "success"}, status=200)
 
-@app.route('/delete_server_user/<username>/<server_name>', methods=['GET', 'POST'])
 @auth.verify
-def delete_server_user(user, username, server_name):
+async def delete_server_user(user, request):
+    username = request.match_info.get('username', None)
+    server_name = request.match_info.get('server_name', None)
     if not user:
-        return jsonify({"message": "no permission"}), 403
+        return web.json_response({"message": "no permission"}, status=403)
     if not user['role'] == "admin":
-        return jsonify({"message": "no permission"}), 403
+        return web.json_response({"message": "no permission"}, status=403)
     
     user_change = User.query.filter_by(username=username).first()
     if not user_change:
-        return jsonify({"message": "not found"}), 404
+        return web.json_response({"message": "not found"}, status=404)
     
     server = ServerOption.query.filter_by(name=server_name).first()
     if not server:
-        return jsonify({"message": "not found"}), 404
+        return web.json_response({"message": "not found"}, status=404)
     
     userserver = UserServer.query.filter_by(user_id=user_change.id, server_id=server.id).first()
     available_server = UserServer.query.filter_by(user_id=user_change.id).first()
     if not userserver:
-        return jsonify({"message": "not found"}), 404
+        return web.json_response({"message": "not found"}, status=404)
     
     if server.id == user_change.current_server and available_server:
         user_change.current_server = available_server.server_id
@@ -520,68 +518,10 @@ def delete_server_user(user, username, server_name):
     db_session.delete(userserver)
     db_session.commit()
 
-    return jsonify({'message': 'success'}), 200
-
-@contextlib.contextmanager
-def thread_start_pending(username):
-    res = None
-    count = 0
-    while (not res or 'ip' not in res or not res['ip']) and count < 100:
-        count += 1
-        try:
-            res = get_server(username)
-        except:
-            continue
-        if res and 'ip' in res and res['ip']:
-            user_change = User.query.filter_by(username=username).first()
-            user_change.state = 'running'
-            user_change.server_ip = res['ip']
-            db_session.commit()
-            break
-        time.sleep(1)
-    user_change = User.query.filter_by(username=username).first()
-    if not user_change.server_ip or user_change.server_ip == '':
-        user_change.state = 'offline'
-        db_session.commit()
-    return
-
-
-@contextlib.contextmanager
-def thread_stop_pending(username):
-    res = {'ip': 'available'}
-    count = 0
-    while res and 'ip' in res and res['ip'] and count < 100:
-        count += 1
-        try:
-            res = get_server(username)
-        except:
-            user_change = User.query.filter_by(username=username).first()
-            user_change.state = 'offline'
-            user_change.server_ip = ''
-            db_session.commit()
-            res['ip'] = None
-            break
-        if not res or not 'ip' in res or not res['ip']:
-            user_change = User.query.filter_by(username=username).first()
-            user_change.state = 'offline'
-            user_change.server_ip = ''
-            db_session.commit()
-            res['ip'] = None
-            break
-        time.sleep(1)
-    user_change = User.query.filter_by(username=username).first()
-    if user_change.server_ip and user_change.server_ip != '':
-        user_change.state = 'running'
-        db_session.commit()
-    else:
-        user_change = User.query.filter_by(username=username).first()
-        user_change.state = 'offline'
-        user_change.server_ip = ''
-        db_session.commit()
-    return
-
+    return web.json_response({"message": "success"}, status=200)
 
 def start_server_pipline(user, server):
+    username = user.username
     config = {
         'username': user.username,
         'cpu': server.cpu,
@@ -602,7 +542,7 @@ def start_server_pipline(user, server):
         try:
             create_folder(config)
         except:
-            return jsonify({'message': 'action create folder failed'}), 500
+            return web.json_response({'message': 'action create folder failed'}, status=500)
     try:
         res = get_pv(user.username)
     except:
@@ -610,7 +550,7 @@ def start_server_pipline(user, server):
     if not res:
         res = create_pv(config)
         if not res:
-            return jsonify({'message': 'action create persistent volume failed'}), 500
+            return web.json_response({'message': 'action create persistent volume failed'}, status=500)
     try:
         res = get_pvc(user.username)
     except:
@@ -618,7 +558,7 @@ def start_server_pipline(user, server):
     if not res:
         res = create_pvc(config)
         if not res:
-            return jsonify({'message': 'action create persistent volume claim failed'}), 500
+            return web.json_response({'message': 'action create persistent volume claim failed'}, status=500)
     try:
         res = get_server(user.username)
     except:
@@ -626,184 +566,138 @@ def start_server_pipline(user, server):
     if not res or not 'state' in res or res['state']['message'] == 'Idle':
         res = create_server(config)
         if not res:
-            return jsonify({'message': 'action create server failed'}), 500
+            return web.json_response({'message': 'action create server failed'}, status=500)
 
     user.state = 'pending_start'
     user.server_ip = ''
     db_session.commit()
     
-    x = threading.Thread(target=thread_start_pending, args=(user.username, ))
-    x.start()
+    async def thread_start_pending():
+        res = None
+        count = 0
+        while (not res or 'ip' not in res or not res['ip']) and count < 100:
+            count += 1
+            try:
+                res = get_server(username)
+            except:
+                continue
+            if res and 'ip' in res and res['ip']:
+                user_change = User.query.filter_by(username=username).first()
+                user_change.state = 'running'
+                user_change.server_ip = res['ip']
+                db_session.commit()
+                break
+            await asyncio.sleep(1)
+        user_change = User.query.filter_by(username=username).first()
+        if not user_change.server_ip or user_change.server_ip == '':
+            user_change.state = 'offline'
+            db_session.commit()
+        return
+    
+    loop = asyncio.get_event_loop()
+    loop.create_task(thread_start_pending())
 
-    return jsonify({'message': 'success'}), 200
-
+    return web.json_response({'message': 'success'}, status=200)
 
 def stop_server_pipline(user):
+    username = user.username
     try:
         res = delete_server(user.username)
     except:
-        return jsonify({'message': 'action failed'}), 500
+        return web.json_response({'message': 'action failed'}, status=500)
     if not res:
-        return jsonify({'message': 'action failed'}), 500
+        return web.json_response({'message': 'action failed'}, status=500)
     
     user.state = 'pending_stop'
     db_session.commit()
     
-    x = threading.Thread(target=thread_stop_pending, args=(user.username, ))
-    x.start()
+    async def thread_stop_pending():
+        res = {'ip': 'available'}
+        count = 0
+        while res and 'ip' in res and res['ip'] and count < 100:
+            count += 1
+            try:
+                res = get_server(username)
+            except:
+                user_change = User.query.filter_by(username=username).first()
+                user_change.state = 'offline'
+                user_change.server_ip = ''
+                db_session.commit()
+                res['ip'] = None
+                break
+            if not res or not 'ip' in res or not res['ip']:
+                user_change = User.query.filter_by(username=username).first()
+                user_change.state = 'offline'
+                user_change.server_ip = ''
+                db_session.commit()
+                res['ip'] = None
+                break
+            await asyncio.sleep(1)
+        user_change = User.query.filter_by(username=username).first()
+        if user_change.server_ip and user_change.server_ip != '':
+            user_change.state = 'running'
+            db_session.commit()
+        else:
+            user_change = User.query.filter_by(username=username).first()
+            user_change.state = 'offline'
+            user_change.server_ip = ''
+            db_session.commit()
+        return
+    
+    loop = asyncio.get_event_loop()
+    loop.create_task(thread_stop_pending())
 
-    return jsonify({'message': 'success'}), 200
+    return web.json_response({'message': 'success'}, status=200)
 
-
-@app.route('/start_server/<username>', methods=['GET', 'POST'])
 @auth.verify
-def start_server(user, username):
+async def start_server(user, request):
+    username = request.match_info.get('username', None)
     if not user:
-        return jsonify({"message": "no permission"}), 403
+        return web.json_response({"message": "no permission"}, status=403)
     if not user['role'] == "admin" and user['username'] != username:
-        return jsonify({"message": "no permission"}), 403
+        return web.json_response({"message": "no permission"}, status=403)
     if not user['is_accept']:
-        return jsonify({"message": "no permission"}), 403
+        return web.json_response({"message": "no permission"}, status=403)
     
     user_change = User.query.filter_by(username=username).first()
     if not user_change:
-        return jsonify({"message": "not found"}), 404
+        return web.json_response({"message": "not found"}, status=404)
     if not user_change.is_accept:
-        return jsonify({"message": "no permission"}), 403
+        return web.json_response({"message": "no permission"}, status=403)
     if not user_change.state == 'offline' and not user_change.state == 'pending_stop':
-        return jsonify({"message": "no permission"}), 403
+        return web.json_response({"message": "no permission"}, status=403)
     
     server = ServerOption.query.filter_by(id=user_change.current_server).first()
     if not server:
-        return jsonify({"message": "not found"}), 404
+        return web.json_response({"message": "not found"}, status=404)
 
     return start_server_pipline(user=user_change, server=server)
 
 
-@app.route('/stop_server/<username>', methods=['GET', 'POST'])
 @auth.verify
-def stop_server(user, username):
+async def stop_server(user, request):
+    username = request.match_info.get('username', None)
     if not user:
-        return jsonify({"message": "no permission"}), 403
+        return web.json_response({"message": "no permission"}, status=403)
     if not user['role'] == "admin" and user['username'] != username:
-        return jsonify({"message": "no permission"}), 403
+        return web.json_response({"message": "no permission"}, status=403)
     if not user['is_accept']:
-        return jsonify({"message": "no permission"}), 403
+        return web.json_response({"message": "no permission"}, status=403)
     
     user_change = User.query.filter_by(username=username).first()
     if not user_change:
-        return jsonify({"message": "not found"}), 404
+        return web.json_response({"message": "not found"}, status=404)
     if not user_change.is_accept:
-        return jsonify({"message": "no permission"}), 403
+        return web.json_response({"message": "no permission"}, status=403)
     if not user_change.state == 'running' and not user_change.state == 'pending_start':
-        return jsonify({"message": "no permission"}), 403
+        return web.json_response({"message": "no permission"}, status=403)
     
     return stop_server_pipline(user_change)
 
-@sock.route('/state_change/<username>', methods=['GET', 'HEAD', 'OPTIONS'])
-@auth.verify
-def handle_state_change(user, ws, username):
-    if not user:
-        return jsonify({"message": "no permission"}), 403
-    if not user['role'] == "admin" and user['username'] != username:
-        return jsonify({"message": "no permission"}), 403
-    if not user['is_accept']:
-        return jsonify({"message": "no permission"}), 403
-    
-    user_change = User.query.filter_by(username=username).first()
-    if not user_change:
-        return jsonify({"message": "not found"}), 404
-    if not user_change.is_accept:
-        return jsonify({"message": "no permission"}), 403
-    
-    listenState = threading.Thread(target=stage_change, args=(ws, username,))
-
-    listenState.start()
-
-    while listenState.is_alive() :
-        continue
-    
-    ws.close()
-    listenState.join()
-
-
-@sock.route('/user/<username>/<port>/', methods=['GET', 'HEAD', 'OPTIONS'])
-@sock.route('/user/<username>/<port>/<path:path>', methods=['GET', 'HEAD', 'OPTIONS'])
-# @auth.verify
-# def handle_socket(user, ws, username, path=None):
-def handle_socket(ws, port, username, path=None):
-    # if not user:
-    #     return jsonify({"message": "no permission"}), 403
-    # if not user['role'] == "admin" and user['username'] != username:
-    #     return jsonify({"message": "no permission"}), 403
-    # if not user['is_accept']:
-    #     return jsonify({"message": "no permission"}), 403
-    
-    user_change = User.query.filter_by(username=username).first()
-    # if not user_change:
-    #     return jsonify({"message": "not found"}), 404
-    # if not user_change.is_accept:
-    #     return jsonify({"message": "no permission"}), 403
-    # if not user_change.state == 'running':
-    #     return jsonify({"message": "no permission"}), 403
-    
-    params_str = '/?'
-    for key, value in request.args.items():
-        params_str += f'{key}={value}&'
-    params_str = params_str.rstrip('&')
-
-    headers = dict(request.headers)
-
-    if config_file['spawner'] == 'local' or config_file['spawner'] == 'k8s':
-        server_domain = user_change.server_ip
-    else:
-        server_domain = f'dohub-{username}'
-
-    port_str = str(config_file['defaultPort']) if port == 'main' else str(port)
-
-    try:
-        wss = create_connection('ws://' + server_domain + ":" + port_str + "/" +  (path if path else '') + params_str, cookie=headers['Cookie'])
-    except:
-        redirect(url_for('hub'))
-
-    receiveClient = threading.Thread(target=producer, args=(ws, wss, username + '-receiveClient',))
-    receiveServer = threading.Thread(target=consumer, args=(ws, wss, username + '-receiveServer',))
-    pub.subscribe(handle_send, username + '-receiveClient')
-    pub.subscribe(handle_send, username + '-receiveServer')
-
-    receiveClient.start()
-    receiveServer.start()
-
-    user_change.last_activity = time.time() * 1000
-    db_session.commit()
-
-    while receiveClient.is_alive() or receiveServer.is_alive():
-        continue
-    
-    ws.close()
-    receiveClient.join()
-    receiveServer.join()
-
-
-@app.route('/user/<username>/<port>/', methods=['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'HEAD'])
-@app.route('/user/<username>/<port>/<path:path>', methods=['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'HEAD'])
-# @auth.verify
-# def proxy(user, username, path=None):
-def proxy(port, username, path=None):
-    # if not user:
-    #     return jsonify({"message": "no permission"}), 403
-    # if not user['role'] == "admin" and user['username'] != username:
-    #     return jsonify({"message": "no permission"}), 403
-    # if not user['is_accept']:
-    #     return jsonify({"message": "no permission"}), 403
-    
-    # user_change = User.query.filter_by(username=username).first()
-    # if not user_change:
-    #     return jsonify({"message": "not found"}), 404
-    # if not user_change.is_accept:
-    #     return jsonify({"message": "no permission"}), 403
-    # if not user_change.state == 'running':
-    #     return jsonify({"message": "no permission"}), 403
+async def handler_proxy(req):
+    proxyPath = req.match_info.get('proxyPath','')
+    port_str = req.match_info.get('port', config_file['defaultPort'])
+    username = req.match_info.get('username', None)
 
     if config_file['spawner'] == 'local' or config_file['spawner'] == 'k8s':
         user_change = User.query.filter_by(username=username).first()
@@ -811,67 +705,75 @@ def proxy(port, username, path=None):
     else:
         server_domain = f'dohub-{username}'
 
-    port_str = str(config_file['defaultPort']) if port == 'main' else str(port)
-    
-    url = server_domain + ":" + port_str + "/" + (path if path else '')
+    port_str = str(config_file['defaultPort']) if port_str == 'main' else port_str
 
-    r = make_request(url, request.method, dict(request.headers), request.form)
-    headers = dict(r.raw.headers)
-    def generate():
-        for chunk in r.raw.stream(decode_content=False):
-            yield chunk
-    out = Response(generate(), headers=headers)
-    out.status_code = r.status_code
-    return out
+    reqH = req.headers.copy()
+    baseUrl = f'http://{server_domain}:{port_str}/{proxyPath}'
 
-def make_request(url, method, headers={}, data=None):
-    url = 'http://%s' % url
-    return requests.request(method, url, params=request.args, stream=True, headers=headers, allow_redirects=False, data=data, cookies=request.cookies)
+    if reqH['connection'] == 'Upgrade' and reqH['upgrade'] == 'websocket' and req.method == 'GET':
+      ws_server = web.WebSocketResponse()
+      await ws_server.prepare(req)
+      client_session = aiohttp.ClientSession(cookies=req.cookies)
+      async with client_session.ws_connect(
+        baseUrl,
+      ) as ws_client:
+        async def wsforward(ws_from,ws_to):
+          async for msg in ws_from:
+            mt = msg.type
+            md = msg.data
+            if mt == aiohttp.WSMsgType.TEXT:
+              await ws_to.send_str(md)
+            elif mt == aiohttp.WSMsgType.BINARY:
+              await ws_to.send_bytes(md)
+            elif mt == aiohttp.WSMsgType.PING:
+              await ws_to.ping()
+            elif mt == aiohttp.WSMsgType.PONG:
+              await ws_to.pong()
+            elif ws_to.closed:
+              await ws_to.close(code=ws_to.close_code,message=msg.extra)
+            else:
+              raise ValueError('unexpecte message type: %s',pprint.pformat(msg))
 
-def producer(ws, wss, topic):
-    while wss.connected and ws.connected:
-        try:
-            data = ws.receive()
-        except:
-            data = None
-        if data is None:
-            wss.close()
-            ws.close()
-            break
-        pub.sendMessage(topic, wss=wss, data=data)
-    return
+        finished, unfinished = await asyncio.wait([wsforward(ws_server,ws_client), wsforward(ws_client,ws_server)], return_when=asyncio.FIRST_COMPLETED)
 
-def stage_change(ws, username):
-    prev_state = get_server(username)['state']['message']
-    while ws.connected:
-        data = get_server(username)
-        if data is None:
-            ws.close()
-            break
-        if data['state']['message'] != prev_state:
-            if data['state']['message'] == 'Running':
-                ws.send('running')
-            if data['state']['message'] == 'Idle':
-                ws.send('offline')
-        prev_state = data['state']['message']
-        time.sleep(2)
-    return
+        return ws_server
+    else:
+      async with client.request(
+        method = req.method,
+        url = baseUrl,
+        headers = reqH,
+        params = req.query,
+        allow_redirects = False,
+        data = await req.read()
+      ) as res:
+        headers = res.headers.copy()
+        body = await res.read()
+        headers.pop('Transfer-Encoding', None)
+        headers.pop('Content-Encoding', None)
+        return web.Response(
+            headers = headers,
+            status = res.status,
+            body = body
+        )
 
-def handle_send(wss, data=None):
-    if wss.connected:
-        wss.send(data)
-    return
-
-def consumer(ws, wss, topic):
-    while wss.connected and ws.connected:
-        response = wss.recv()
-        if response is None:
-            wss.close()
-            ws.close()
-            break
-        pub.sendMessage(topic, wss=ws, data=response)
-    return
-
+app.router.add_route('*', '/github-callback', authorized, name='github-callback')
+app.router.add_route('*', '/login', login, name='login')
+app.router.add_route('*', '/logout', logout, name='logout')
+app.router.add_route('*', '/', index, name='index')
+app.router.add_route('*', '/hub', hub, name='hub')
+app.router.add_route('*', '/user_state', user_state, name='user-state')
+app.router.add_route('*', '/all_users', all_user, name='all-user')
+app.router.add_route('*', '/all_servers', all_server, name='all-servers')
+app.router.add_route('*', '/accept_user/{username}', accept_user)
+app.router.add_route('*', '/delete_user/{username}', delete_user)
+app.router.add_route('*', '/change_server/{username}/{server_name}', change_server)
+app.router.add_route('*', '/change_role/{username}/{role}', change_role)
+app.router.add_route('*', '/add_server_user/{username}/{server_name}', add_server_user)
+app.router.add_route('*', '/delete_server_user/{username}/{server_name}', delete_server_user)
+app.router.add_route('*', '/start_server/{username}', start_server)
+app.router.add_route('*', '/stop_server/{username}', stop_server)
+app.router.add_route('*', '/user/{username}/{port}/{proxyPath:.*}', handler_proxy)
+app.add_routes([web.static('/static', 'static')])
 
 def migrate():
     for server_option in config_file['initServerOptions']:
@@ -890,7 +792,7 @@ def migrate():
         db_session.add(server_option_entity)
         db_session.commit()
 
-if __name__ == '__main__': 
-    from waitress import serve
-    app.run("0.0.0.0", 5000, debug=False, ssl_context=("/etc/dohub/cert.pem", "/etc/dohub/key.pem"))
-    # serve(app, host="0.0.0.0", port=5000)
+if __name__ == "__main__":
+    ssl_context = ssl.create_default_context(ssl.Purpose.CLIENT_AUTH)
+    ssl_context.load_cert_chain("/etc/dohub/cert.pem", "/etc/dohub/key.pem")
+    web.run_app(app, port=5000, ssl_context=ssl_context)

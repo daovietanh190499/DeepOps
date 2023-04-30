@@ -11,30 +11,82 @@ from flask import Flask, render_template, request, abort, Response, redirect
 import requests
 import threading
 from flask_sock import Sock
-from websocket import create_connection
+from websocket import create_connection, WebSocketApp
+
+from pubsub import pub
 
 app = Flask(__name__.split('.')[0])
 CHUNK_SIZE = 1024
 sock = Sock(app)
 
 
-@app.route('/<path:url>', methods=["GET", "POST"])
-def root(url):
-    referer = request.headers.get('referer')
-    if not referer:
-        return Response("Relative URL sent without a a proxying request referal. Please specify a valid proxy host (/p/url)", 400)
-    proxy_ref = proxied_request_info(referer)
-    host = proxy_ref[0]
-    redirect_url = "/p/%s/%s%s" % (host, url, ("?" + request.query_string.decode('utf-8') if request.query_string else ""))
-    return redirect(redirect_url)
+@sock.route('/user/<username>/<port>/', methods=['GET', 'HEAD', 'OPTIONS'])
+@sock.route('/user/<username>/<port>/<path:path>', methods=['GET', 'HEAD', 'OPTIONS'])
+def handle_socket(ws, port, username, path=None):
+    
+    params_str = '/?'
+    for key, value in request.args.items():
+        params_str += f'{key}={value}&'
+    params_str = params_str.rstrip('&')
+
+    headers = dict(request.headers)
+
+    # if config_file['spawner'] == 'local' or config_file['spawner'] == 'k8s':
+    #     server_domain = user_change.server_ip
+    # else:
+    #     server_domain = f'dohub-{username}'
+    server_domain = "10.32.0.7"
+
+    port_str = str(port)
+
+    def on_message(wsss, message):
+        ws.send(message)
+
+    wss = WebSocketApp('ws://' + server_domain + ":" + port_str + "/" +  (path if path else '') + params_str, cookie=headers['Cookie'], on_message=on_message)
+    
+    run_wss = threading.Thread(target=wss.run_forever)
+
+    run_wss.start()
+    
+    while True:
+        message = ws.receive()
+        wss.send(message)
+
+    
+    # wss = create_connection('ws://' + server_domain + ":" + port_str + "/" +  (path if path else '') + params_str, cookie=headers['Cookie'])
+
+    # receiveClient = threading.Thread(target=producer, args=(ws, wss, username + '-receiveClient',))
+    # receiveServer = threading.Thread(target=consumer, args=(ws, wss, username + '-receiveServer',))
+    # pub.subscribe(handle_send, username + '-receiveClient')
+    # pub.subscribe(handle_send, username + '-receiveServer')
+
+    # receiveClient.start()
+    # receiveServer.start()
+
+    # while receiveClient.is_alive() or receiveServer.is_alive():
+    #     continue
+    
+    # ws.close()
+    # receiveClient.join()
+    # receiveServer.join()
 
 
-@app.route('/p/<path:url>')
-def proxy(url):
-    url_parts = urlparse('%s://%s' % (request.scheme, url))
-    if url_parts.path == "":
-        parts = urlparse(request.url)
-        return redirect(urlunparse(parts._replace(path=parts.path+'/')))
+@app.route('/user/<username>/<port>/', methods=['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'HEAD'])
+@app.route('/user/<username>/<port>/<path:path>', methods=['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'HEAD'])
+
+def proxy(port, username, path=None):
+
+    # if config_file['spawner'] == 'local' or config_file['spawner'] == 'k8s':
+    #     user_change = User.query.filter_by(username=username).first()
+    #     server_domain = user_change.server_ip
+    # else:
+    #     server_domain = f'dohub-{username}'
+
+    server_domain = "10.32.0.7"
+
+    port_str = str(port)
+    
+    url = server_domain + ":" + port_str + "/" + (path if path else '')
 
     r = make_request(url, request.method, dict(request.headers), request.form)
     headers = dict(r.raw.headers)
@@ -45,77 +97,37 @@ def proxy(url):
     out.status_code = r.status_code
     return out
 
-
 def make_request(url, method, headers={}, data=None):
     url = 'http://%s' % url
-
-    referer = request.headers.get('referer')
-    if referer:
-        proxy_ref = proxied_request_info(referer)
-        headers.update({ "referer" : "http://%s/%s" % (proxy_ref[0], proxy_ref[1])})
-    
     return requests.request(method, url, params=request.args, stream=True, headers=headers, allow_redirects=False, data=data, cookies=request.cookies)
 
-
-def proxied_request_info(proxy_url):
-    parts = urlparse(proxy_url)
-    if not parts.path:
-        return None
-    elif not parts.path.startswith('/p/'):
-        return None
-    matches = re.match('^/p/([^/]+)/?(.*)', parts.path)
-    proxied_host = matches.group(1)
-    proxied_path = matches.group(2) or '/'
-    proxied_tail = urlunparse(parts._replace(scheme="", netloc="", path=proxied_path))
-    return [proxied_host, proxied_tail]
-
-
-@sock.route('/p/<path:path>')
-def handle_socket(ws, path):
-    params_str = '/?'
-    for key, value in request.args.items():
-        params_str += f'{key}={value}&'
-    params_str = params_str.rstrip('&')
-
-    headers = dict(request.headers)
-
-    wss = create_connection('ws://' + path + params_str, cookie=headers['Cookie'])
-
-    p = threading.Thread(target=producer, args=(ws,wss))
-    c = threading.Thread(target=consumer, args=(ws,wss))
-
-    p.start()
-    c.start()
-
-    while p.is_alive() or c.is_alive():
-        continue
-    
-    ws.close()
-    p.join()
-    c.join()
-
-
-def producer(ws, wss):
+def producer(ws, wss, topic):
     while wss.connected and ws.connected:
-        data = ws.receive()
+        try:
+            data = ws.receive()
+        except:
+            data = None
         if data is None:
             wss.close()
             ws.close()
             break
+        pub.sendMessage(topic, wss=wss, data=data)
+    return
+
+def handle_send(wss, data=None):
+    if wss.connected:
         wss.send(data)
     return
 
-
-def consumer(ws, wss):
+def consumer(ws, wss, topic):
     while wss.connected and ws.connected:
         response = wss.recv()
         if response is None:
             wss.close()
             ws.close()
             break
-        ws.send(response)
+        pub.sendMessage(topic, wss=ws, data=response)
     return
 
-
 if __name__ == '__main__':
-    app.run(host="0.0.0.0", port=8080)
+    app.run(host="0.0.0.0", port=8000)
