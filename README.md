@@ -5,7 +5,7 @@
 Run [DeepOps Hub](https://github.com/daovietanh190499/DeepOps) on any cluster, system anywhere and
 access it in the browser.
 
-![Screenshot](./docs/assets/screenshot.png)
+![Screenshot](./docs/assets/screenshot-modified.png)
 
 ```shell
 cd spawners/k8s/dohub_k8s/
