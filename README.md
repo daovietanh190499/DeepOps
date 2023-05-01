@@ -7,6 +7,19 @@ access it in the browser.
 
 ![Screenshot](./docs/assets/screenshot-modified.png)
 
+## Highlights
+
+- Code on any device with a consistent development environment
+- Use cloud servers to speed up tests, compilations, downloads, and more
+- Make things more automatic
+
+## Requirements
+
+See [requirements](https://github.com.daovietanh190499/DeepOps) for minimum specs, as well as instructions
+on how to set up a Google VM on which you can install code-server.
+
+**TL;DR:** Linux machine with WebSockets enabled, 1 GB RAM, and 2 vCPUs
+
 ```shell
 cd spawners/k8s/dohub_k8s/
 ```
