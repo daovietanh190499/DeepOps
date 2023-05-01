@@ -1,6 +1,6 @@
 # DeepOpsHubs
 
-[!["GitHub Discussions"](https://img.shields.io/badge/%20GitHub-%20Discussions-gray.svg?longCache=true&logo=github&colorB=purple)](https://github.com/daovietanh190499/DeepOps/discussions) [!["Join us on Slack"](https://img.shields.io/badge/join-us%20on%20slack-gray.svg?longCache=true&logo=slack&colorB=brightgreen)](https://coder.com/community) [![Twitter Follow](https://img.shields.io/twitter/follow/daovietanh99?label=%40CoderHQ&style=social)](https://twitter.com/daovietanh99) [![See latest](https://img.shields.io/static/v1?label=Docs&message=see%20latest&color=blue)](https://github.com/daovietanh190499/DeepOps)
+[!["GitHub Discussions"](https://img.shields.io/badge/%20GitHub-%20Discussions-gray.svg?longCache=true&logo=github&colorB=purple)](https://github.com/daovietanh190499/DeepOps/discussions) [!["Join us on Slack"](https://img.shields.io/badge/join-us%20on%20slack-gray.svg?longCache=true&logo=slack&colorB=brightgreen)](https://dohub-workspace.slack.com/archives/C055MQTL258) [![Twitter Follow](https://img.shields.io/twitter/follow/daovietanh99?label=%40DOhub&style=social)](https://twitter.com/daovietanh99) [![See latest](https://img.shields.io/static/v1?label=Docs&message=see%20latest&color=blue)](https://github.com/daovietanh190499/DeepOps)
 
 Run [DeepOps Hub](https://github.com/daovietanh190499/DeepOps) on any cluster, system anywhere and
 access it in the browser.
