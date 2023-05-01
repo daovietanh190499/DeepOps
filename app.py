@@ -4,6 +4,7 @@ import aiohttp
 import asyncio
 import pprint
 import ssl
+import time
 
 import aiohttp_jinja2
 import jinja2
@@ -699,8 +700,8 @@ async def handler_proxy(req):
     port_str = req.match_info.get('port', config_file['defaultPort'])
     username = req.match_info.get('username', None)
 
+    user_change = User.query.filter_by(username=username).first()
     if config_file['spawner'] == 'local' or config_file['spawner'] == 'k8s':
-        user_change = User.query.filter_by(username=username).first()
         server_domain = user_change.server_ip
     else:
         server_domain = f'dohub-{username}'
@@ -738,6 +739,8 @@ async def handler_proxy(req):
 
         return ws_server
     else:
+      user_change.last_activity = time.time() * 1000
+      db_session.commit()
       async with client.request(
         method = req.method,
         url = baseUrl,
