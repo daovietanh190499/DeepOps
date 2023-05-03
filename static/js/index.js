@@ -270,6 +270,10 @@ const appVue = new Vue({
     },
     created () {
         this.getInfo()
+        const params = new Proxy(new URLSearchParams(window.location.search), {
+            get: (searchParams, prop) => searchParams.get(prop),
+        });
+        this.menu = params.tab ? params.tab : "home"
     },
     methods: {
         loginWithGithub() {
@@ -348,11 +352,7 @@ const appVue = new Vue({
                 })
         },
         changeMenu(menu) {
-            this.getInfo()
-            if(this.socket_change_state) {
-                this.socket_change_state.close()
-            }
-            this.menu = menu
+            window.location.replace("hub?tab=" + menu)
         },
         changeServer(server) {
             if(this.state=="offline") {
