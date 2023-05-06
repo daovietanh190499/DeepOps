@@ -755,7 +755,13 @@ async def handler_proxy(req):
         headers.pop('Transfer-Encoding', None)
         headers.pop('Content-Encoding', None)
         if res.status == 302:
-            headers['Location'] = f'/user/{username}/{port}' + headers['Location']
+            if headers['Location'][0] == '.':
+                location = headers['Location'][1:]
+            elif headers['Location'][0] == '/':
+                location = headers['Location']
+            else:
+                location = '/' + headers['Location']
+            headers['Location'] = f'/user/{username}/{port}' + location
         return web.Response(
             headers = headers,
             status = res.status,
