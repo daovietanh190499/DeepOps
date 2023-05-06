@@ -698,6 +698,7 @@ async def stop_server(user, request):
 async def handler_proxy(req):
     proxyPath = req.match_info.get('proxyPath','')
     port_str = req.match_info.get('port', config_file['defaultPort'])
+    port = req.match_info.get('port', config_file['defaultPort'])
     username = req.match_info.get('username', None)
 
     user_change = User.query.filter_by(username=username).first()
@@ -754,7 +755,7 @@ async def handler_proxy(req):
         headers.pop('Transfer-Encoding', None)
         headers.pop('Content-Encoding', None)
         if res.status == 302:
-            headers['Location'] = f'/user/{username}/{port_str}/{proxyPath}' + headers['Location']
+            headers['Location'] = f'/user/{username}/{port}/{proxyPath}' + headers['Location']
         return web.Response(
             headers = headers,
             status = res.status,
