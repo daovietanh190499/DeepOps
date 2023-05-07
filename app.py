@@ -709,6 +709,8 @@ async def handler_proxy(req):
 
     port_str = str(config_file['defaultPort']) if port_str == 'main' else port_str
 
+    if port_str == '8888':
+        proxyPath = f'user/{username}/{port}/{proxyPath}'
     reqH = req.headers.copy()
     baseUrl = f'http://{server_domain}:{port_str}/{proxyPath}'
 
@@ -754,6 +756,14 @@ async def handler_proxy(req):
         body = await res.read()
         headers.pop('Transfer-Encoding', None)
         headers.pop('Content-Encoding', None)
+        if res.status == 302:
+            if headers['Location'][0] == '.':
+                location = headers['Location'][1:]
+            elif headers['Location'][0] == '/':
+                location = headers['Location']
+            else:
+                location = '/' + headers['Location']
+            headers['Location'] = f'/user/{username}/{port}' + location
         return web.Response(
             headers = headers,
             status = res.status,

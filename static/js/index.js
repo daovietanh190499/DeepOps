@@ -284,8 +284,8 @@ const appVue = new Vue({
         },
         async getInfo() {
             await this.getAllServers()
-            await this.getAllUsers()
             await this.getCurrentUserState()
+            await this.getAllUsers()
         },
         setupSocket() {
             if(this.socket_change_state) {
