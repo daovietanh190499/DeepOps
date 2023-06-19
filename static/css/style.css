@@ -221,7 +221,7 @@ html {
 }
 
 .item-block {
-    width: calc((100% - 3rem -4rem)/3);
+    width: calc((100% - 3rem - 4rem)/3);
     padding: 1rem 0 1rem 1rem;
     border-radius: .3rem;
     background-color: #f0f0f0;
@@ -667,7 +667,7 @@ input[type="range"]::-webkit-slider-runnable-track {
 }
 
 .item-block-add {
-    width: calc((100% - 3rem -4rem)/3);
+    width: calc((100% - 3rem - 4rem)/3);
     padding: 1rem 0 1rem 1rem;
     border-radius: .3rem;
     color: #f0f0f0;
@@ -675,7 +675,7 @@ input[type="range"]::-webkit-slider-runnable-track {
 }
 
 .item-block-add {
-    width: calc((100% - 3rem -4rem)/3);
+    width: calc((100% - 3rem - 4rem)/3);
     padding: 1rem 0 1rem 1rem;
     border-radius: .3rem;
     background-color: white;
