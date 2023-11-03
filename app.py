@@ -36,7 +36,7 @@ DEBUG = True
 GITHUB_CLIENT_ID = config_file['githubOauth']['GITHUB_CLIENT_ID']
 GITHUB_CLIENT_SECRET = config_file['githubOauth']['GITHUB_CLIENT_SECRET']
 
-app = web.Application()
+app = web.Application(client_max_size=200*1024**2)
 
 aiohttp_jinja2.setup(app, loader=jinja2.FileSystemLoader('templates'))
 
@@ -711,15 +711,17 @@ async def handler_proxy(req):
 
     if port_str == '8888':
         proxyPath = f'user/{username}/{port}/{proxyPath}'
+    
     reqH = req.headers.copy()
     baseUrl = f'http://{server_domain}:{port_str}/{proxyPath}'
 
     if reqH['connection'] == 'Upgrade' and reqH['upgrade'] == 'websocket' and req.method == 'GET':
-      ws_server = web.WebSocketResponse()
+      ws_server = web.WebSocketResponse(max_msg_size=0)
       await ws_server.prepare(req)
       client_session = aiohttp.ClientSession(cookies=req.cookies)
       async with client_session.ws_connect(
         baseUrl,
+        max_msg_size=0
       ) as ws_client:
         async def wsforward(ws_from,ws_to):
           async for msg in ws_from:
