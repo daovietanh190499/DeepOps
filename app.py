@@ -709,7 +709,7 @@ async def handler_proxy(req):
 
     port_str = str(config_file['defaultPort']) if port_str == 'main' else port_str
 
-    if port_str == '8888':
+    if port_str == '1337':
         proxyPath = f'user/{username}/{port}/{proxyPath}'
     
     reqH = req.headers.copy()
