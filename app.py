@@ -712,8 +712,8 @@ async def handler_proxy(req):
 
     port_str = str(config_file['defaultPort']) if port_str == 'main' else port_str
 
-    # if port_str == '1337':
-    #     proxyPath = f'user/{username}/{port}/{proxyPath}'
+    if f'user/{username}/{port}/' in proxyPath:
+        proxyPath = proxyPath[len(f'user/{username}/{port}/'):]
     
     reqH = req.headers.copy()
     baseUrl = f'http://{server_domain}:{port_str}/{proxyPath}'
