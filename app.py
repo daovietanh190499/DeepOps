@@ -696,6 +696,7 @@ async def stop_server(user, request):
     return stop_server_pipline(user_change)
 
 async def handler_proxy(req):
+    timeout = aiohttp.ClientTimeout()
     proxyPath = req.match_info.get('proxyPath','')
     port_str = req.match_info.get('port', config_file['defaultPort'])
     port = req.match_info.get('port', config_file['defaultPort'])
@@ -709,8 +710,8 @@ async def handler_proxy(req):
 
     port_str = str(config_file['defaultPort']) if port_str == 'main' else port_str
 
-    if port_str == '1337':
-        proxyPath = f'user/{username}/{port}/{proxyPath}'
+    # if port_str == '1337':
+    #     proxyPath = f'user/{username}/{port}/{proxyPath}'
     
     reqH = req.headers.copy()
     baseUrl = f'http://{server_domain}:{port_str}/{proxyPath}'
@@ -718,7 +719,7 @@ async def handler_proxy(req):
     if reqH['connection'] == 'Upgrade' and reqH['upgrade'] == 'websocket' and req.method == 'GET':
       ws_server = web.WebSocketResponse(max_msg_size=0)
       await ws_server.prepare(req)
-      client_session = aiohttp.ClientSession(cookies=req.cookies)
+      client_session = aiohttp.ClientSession(cookies=req.cookies, timeout=timeout)
       async with client_session.ws_connect(
         baseUrl,
         max_msg_size=0
