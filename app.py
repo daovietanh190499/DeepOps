@@ -665,8 +665,9 @@ async def start_server(user, request):
         return web.json_response({"message": "not found"}, status=404)
     if not user_change.is_accept:
         return web.json_response({"message": "no permission"}, status=403)
-    if not user_change.state == 'offline' and not user_change.state == 'pending_stop' and not user['role'] == "admin":
-        return web.json_response({"message": "no permission"}, status=403)
+    if not user['role'] == "admin":
+        if not (user_change.state == 'running' and user_change.state == 'pending_start'):
+            return web.json_response({"message": "no permission"}, status=403)
     
     server = ServerOption.query.filter_by(id=user_change.current_server).first()
     if not server:
@@ -690,8 +691,9 @@ async def stop_server(user, request):
         return web.json_response({"message": "not found"}, status=404)
     if not user_change.is_accept:
         return web.json_response({"message": "no permission"}, status=403)
-    if not user_change.state == 'running' and not user_change.state == 'pending_start' and not user['role'] == "admin":
-        return web.json_response({"message": "no permission"}, status=403)
+    if not user['role'] == "admin":
+        if not (user_change.state == 'running' or user_change.state == 'pending_start'):
+            return web.json_response({"message": "no permission"}, status=403)
     
     return stop_server_pipline(user_change)
 
