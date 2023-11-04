@@ -666,7 +666,7 @@ async def start_server(user, request):
     if not user_change.is_accept:
         return web.json_response({"message": "no permission"}, status=403)
     if not user['role'] == "admin":
-        if not (user_change.state == 'running' and user_change.state == 'pending_start'):
+        if not (user_change.state == 'offline' and user_change.state == 'pending_stop'):
             return web.json_response({"message": "no permission"}, status=403)
     
     server = ServerOption.query.filter_by(id=user_change.current_server).first()
