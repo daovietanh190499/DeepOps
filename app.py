@@ -792,6 +792,7 @@ app.router.add_route('*', '/delete_server_user/{username}/{server_name}', delete
 app.router.add_route('*', '/start_server/{username}', start_server)
 app.router.add_route('*', '/stop_server/{username}', stop_server)
 app.router.add_route('*', '/user/{username}/{port}/{proxyPath:.*}', handler_proxy)
+app.router.add_route('*', '/user/{username}/{port}', handler_proxy)
 app.add_routes([web.static('/static', 'static')])
 
 def migrate():
