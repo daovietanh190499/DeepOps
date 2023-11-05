@@ -39,6 +39,10 @@ RUN apt-get update --yes && \
     openssh-client \
     vim.tiny \
     lsb-release \
+    postgresql \
+    postgresql-contrib \
+    net-tools \
+    tmux \
     # python3-opencv \
     # - tini is installed as a helpful container entrypoint that reaps zombie
     #   processes and such of the actual executable we want to start, see
