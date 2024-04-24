@@ -32,9 +32,9 @@ spec:
           - name: ADMIN_USERS
             value: {{ .Values.dohub.adminUsers }}
           - name: DEFAULT_PORT
-            value: {{ .Values.dohub.defaultPort | 8443 }}
+            value: {{ .Values.dohub.defaultPort }}
           - name: SPAWNER
-            value: {{ .Values.dohub.defaultSpawner | 'k8s' }}
+            value: {{ .Values.dohub.defaultSpawner }}
           ports:
           - containerPort: 5000
           securityContext:
