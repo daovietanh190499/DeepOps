@@ -28,10 +28,10 @@ spec:
     secretName: {{ .Release.Name }}-dohub-tls
   rules:
   - http:
-    paths:
-    - pathType: Prefix
-      path: "/"
-      backend:
-        service:
-          name: {{ .Release.Name }}-dohub-service
-          port: dohub-main-port
+      paths:
+      - pathType: Prefix
+        path: "/"
+        backend:
+          service:
+            name: {{ .Release.Name }}-dohub-service
+            port: dohub-main-port

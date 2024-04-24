@@ -6,8 +6,6 @@ dohub:
   image: dohub:latest
   githubClientId: 875f81ac086ccc9507e9
   githubClientSecret: 2cf7511dd8f2b9366d0a1b956c5bf962a51fc7e0
-  adminUsers:
-  - daovietanh190499
-  - ngdangha
+  adminUsers: "daovietanh190499 ngdangha"
   defaultPort: 8443
   defaultSpawner: "k8s"
