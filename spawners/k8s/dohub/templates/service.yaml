@@ -36,7 +36,7 @@ metadata:
 spec:
   tls:
   - hosts:
-    - https-example.foo.com
+    - {{ .Values.dohub.domain }}
     secretName: {{ .Release.Name }}-dohub-tls
   rules:
   - http:

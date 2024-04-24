@@ -4,6 +4,7 @@ global:
   caKey: ""
 dohub:
   replicas: 1
+  domain: "vkist-hub.com"
   image: dohub:latest
   githubClientId: abc
   githubClientSecret: def
