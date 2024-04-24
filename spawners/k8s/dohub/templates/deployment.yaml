@@ -21,16 +21,9 @@ spec:
     spec:
       serviceAccountName: {{ .Release.Name }}-dohub-schedule
       containers:
-        - name: {{ .Release.Name }}-dohub-nginx
-          image: nginx:alpine
-          ports:
-          - containerPort: 80
-          volumeMounts:
-            - name: {{ .Release.Name }}-dohub-config
-              mountPath: /etc/nginx/nginx.conf
-              subPath: nginx.conf
         - name: {{ .Release.Name }}-dohub-main-container
           image: {{ .Values.global.imageRegistry }}/{{ .Values.dohub.image }}
+          imagePullPolicy: Always
           env:
           - name: GITHUB_CLIENT_ID
             value: {{ .Values.dohub.githubClientId }}
