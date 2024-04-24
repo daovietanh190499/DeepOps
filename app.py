@@ -5,6 +5,7 @@ import asyncio
 import pprint
 import ssl
 import time
+import os
 
 import aiohttp_jinja2
 import jinja2
@@ -33,8 +34,11 @@ SECRET_KEY = 'dohub'
 DEBUG = True
 
 # Set these values
-GITHUB_CLIENT_ID = config_file['githubOauth']['GITHUB_CLIENT_ID']
-GITHUB_CLIENT_SECRET = config_file['githubOauth']['GITHUB_CLIENT_SECRET']
+GITHUB_CLIENT_ID = os.environ.get('GITHUB_CLIENT_ID', '')
+GITHUB_CLIENT_SECRET = os.environ.get('GITHUB_CLIENT_SECRET', '')
+ADMIN_USERS = os.environ.get('ADMIN_USERS', '')
+DEFAULT_SPAWNER = os.environ.get('SPAWNER', 'k8s')
+DEFAULT_PORT = os.environ.get('DEFAULT_PORT', 8443)
 
 app = web.Application(client_max_size=200*1024**2)
 
@@ -252,14 +256,14 @@ async def authorized(user, request):
         user_ = User(
             username=user['login'], 
             image=user['avatar_url'], 
-            role=("admin" if user['login'] in config_file['admin'] else 'normal_user'), 
-            is_accept=user['login'] in config_file['admin'],
+            role=("admin" if user['login'] in ADMIN_USERS else 'normal_user'), 
+            is_accept=user['login'] in ADMIN_USERS,
             access_password = user['login'] + '-' + str(uuid.uuid4()).split('-')[0]
         )
         db_session.add(user_)
         db_session.commit()
 
-        if user['login'] in config_file['admin']:
+        if user['login'] in ADMIN_USERS:
             server_ids = db_session.query(ServerOption.id).all()
             for server_id in server_ids:
                 userserver = UserServer(user_id=user_.id, server_id=server_id[0])
@@ -537,9 +541,9 @@ def start_server_pipline(user, server):
         'file_server': config_file['nasAddresses'][config_file['nasIndex']],
         'file_server_index': config_file['nasIndex'],
         'password': user.access_password,
-        'defaultPort': config_file['defaultPort']
+        'defaultPort': DEFAULT_PORT
     }
-    if config_file['spawner'] == 'k8s':
+    if DEFAULT_SPAWNER == 'k8s':
         try:
             create_folder(config)
         except:
@@ -700,17 +704,17 @@ async def stop_server(user, request):
 async def handler_proxy(req):
     timeout = aiohttp.ClientTimeout()
     proxyPath = req.match_info.get('proxyPath','')
-    port_str = req.match_info.get('port', config_file['defaultPort'])
-    port = req.match_info.get('port', config_file['defaultPort'])
+    port_str = req.match_info.get('port', DEFAULT_PORT)
+    port = req.match_info.get('port', DEFAULT_PORT)
     username = req.match_info.get('username', None)
 
     user_change = User.query.filter_by(username=username).first()
-    if config_file['spawner'] == 'local' or config_file['spawner'] == 'k8s':
+    if DEFAULT_SPAWNER == 'local' or DEFAULT_SPAWNER == 'k8s':
         server_domain = user_change.server_ip
     else:
         server_domain = f'dohub-{username}'
 
-    port_str = str(config_file['defaultPort']) if port_str == 'main' else port_str
+    port_str = str(DEFAULT_PORT) if port_str == 'main' else port_str
 
     if f'user/{username}/{port}/' in proxyPath:
         proxyPath = proxyPath[len(f'user/{username}/{port}/'):]
@@ -791,8 +795,11 @@ app.router.add_route('*', '/add_server_user/{username}/{server_name}', add_serve
 app.router.add_route('*', '/delete_server_user/{username}/{server_name}', delete_server_user)
 app.router.add_route('*', '/start_server/{username}', start_server)
 app.router.add_route('*', '/stop_server/{username}', stop_server)
-app.router.add_route('*', '/user/{username}/{port}/{proxyPath:.*}', handler_proxy)
-app.router.add_route('*', '/user/{username}/{port}', handler_proxy)
+
+## Proxy
+# app.router.add_route('*', '/user/{username}/{port}/{proxyPath:.*}', handler_proxy)
+# app.router.add_route('*', '/user/{username}/{port}', handler_proxy)
+
 app.add_routes([web.static('/static', 'static')])
 
 def migrate():
@@ -801,9 +808,9 @@ def migrate():
         if server:
             continue
         server_option_entity = ServerOption(
-                    name = server_option['name'], 
-                    image = server_option['image'], 
-                    docker_image = server_option['docker_image'], 
+                    name = server_option['name'],
+                    image = server_option['image'],
+                    docker_image = server_option['docker_image'],
                     cpu = server_option['cpu'],
                     ram = server_option['ram'],
                     drive = server_option['drive'],
@@ -813,6 +820,9 @@ def migrate():
         db_session.commit()
 
 if __name__ == "__main__":
-    ssl_context = ssl.create_default_context(ssl.Purpose.CLIENT_AUTH)
-    ssl_context.load_cert_chain("/etc/dohub/cert.pem", "/etc/dohub/key.pem")
-    web.run_app(app, port=5000, ssl_context=ssl_context)
+    if os.path.exist("/etc/dohub/cert.pem") and s.path.exist("/etc/dohub/key.pem"):
+        ssl_context = ssl.create_default_context(ssl.Purpose.CLIENT_AUTH)
+        ssl_context.load_cert_chain("/etc/dohub/cert.pem", "/etc/dohub/key.pem")
+        web.run_app(app, port=5000, ssl_context=ssl_context)
+    else:
+        web.run_app(app, port=5000)

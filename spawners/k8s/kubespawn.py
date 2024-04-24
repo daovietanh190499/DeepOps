@@ -1,10 +1,9 @@
 import yaml
 from kubernetes import client, config, utils
 
-with open("/etc/dohub/config.yaml", 'r') as stream:
-    config_file = yaml.safe_load(stream)
+DEFAULT_SPAWNER = os.environ.get('SPAWNER', 'k8s')
 
-if config_file['spawner'] == 'local':
+if DEFAULT_SPAWNER == 'local':
     config.load_config()
 else:
     config.load_incluster_config()

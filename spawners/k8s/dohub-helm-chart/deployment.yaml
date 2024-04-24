@@ -1,0 +1,68 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .Release.Name }}-dohub
+  namespace: {{ .Release.Name }}
+  labels:
+    app: dohub
+    release: {{ .Release.Name }}-dohub-main
+spec:
+  selector:
+    matchLabels:
+      app: dohub
+  replicas: {{ .Values.dohub.replicas }}
+  template:
+    metadata:
+      name: {{ .Release.Name }}-dohub
+      namespace: {{ .Release.Name }}
+      labels:
+        app: dohub
+        release: dohub-main-pod
+    spec:
+      serviceAccountName: {{ .Release.Name }}-dohub-schedule
+      containers:
+        - name: {{ .Release.Name }}-dohub-nginx
+          image: nginx:alpine
+          ports:
+          - containerPort: 80
+          volumeMounts:
+            - name: {{ .Release.Name }}-dohub-config
+              mountPath: /etc/nginx/nginx.conf
+              subPath: nginx.conf
+        - name: {{ .Release.Name }}-dohub-main-container
+          image: {{ .Values.global.imageRegistry }}/{{ .Values.dohub.image }}
+          env:
+          - name: GITHUB_CLIENT_ID
+            value: {{ .Values.dohub.github_client_id }}
+          - name: GITHUB_CLIENT_SECRET
+            value: {{ .Values.dohub.github_client_secret }}
+          - name: ADMIN_USERS
+            value: {{ .Values.dohub.admin_users }}
+          - name: DEFAULT_PORT
+            value: {{ .Values.dohub.default_port | 8443 }}
+          - name: SPAWNER
+            value: {{ .Values.dohub.default_spawner | 'k8s' }}
+          ports:
+          - containerPort: 5000
+          securityContext:
+            capabilities:
+              add: ['SYS_ADMIN']
+            allowPrivilegeEscalation: true
+          volumeMounts:
+            - name: {{ .Release.Name }}-dohub-config
+              mountPath: /etc/dohub/config.yaml
+              subPath: config.yaml
+            - mountPath: /mnt/database/
+              name: volume-dohub
+            - mountPath: /mnt/nas0/
+              name: volume-dohub-server
+      volumes:
+        - name: {{ .Release.Name }}-dohub-config
+          configMap:
+            name: {{ .Release.Name }}-dohub-config
+        - name: volume-dohub
+          persistentVolumeClaim:
+            claimName: claim-dohub-main
+        - name: volume-dohub-server
+          persistentVolumeClaim:
+            claimName: claim-dohub-server

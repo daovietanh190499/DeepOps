@@ -1,0 +1,53 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ .Release.Name }}-dohub-config
+  namespace: {{ .Release.Name }}
+data:
+  config.yaml: |
+    nasAddresses:
+      - 10.1.8.99
+      - 10.1.8.100
+    nasPath: '/data/nas/dohub'
+    nasIndex: 0
+    initServerOptions:
+      - name: 'Lollipop'
+        image: 'lollipop.png'
+        docker_image: "daovietanh99/deepops"
+        cpu: 2
+        ram: '4G'
+        drive: '30TB'
+        gpu: ''
+        color: 'violet'
+      - name: 'Oreo' 
+        image: 'oreo.png' 
+        docker_image: "daovietanh99/deepops" 
+        cpu: 4
+        ram: '8G'
+        drive: '30TB'
+        gpu: 'mig-2g.10gb'
+        color: '#1e88d2'
+      - name: 'Popeyes' 
+        image: 'popeyes.png' 
+        docker_image: "daovietanh99/deepops" 
+        cpu: 8
+        ram: '16G'
+        drive: '30TB'
+        gpu: 'mig-3g.20gb'
+        color: '#f27802'
+      - name: 'Pizza' 
+        image: 'pizza.png' 
+        docker_image: "daovietanh99/deepops" 
+        cpu: 8
+        ram: '32G'
+        drive: '30TB'
+        gpu: 'gpu'
+        color: '#fcca37'
+      - name: 'Spagetti' 
+        image: 'spagetti.png'
+        docker_image: "daovietanh99/deepops" 
+        cpu: 16
+        ram: '64G'
+        drive: '30TB'
+        gpu: 'gpu:2'
+        color: '#fcb040'
