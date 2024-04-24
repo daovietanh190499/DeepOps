@@ -33,15 +33,15 @@ spec:
           image: {{ .Values.global.imageRegistry }}/{{ .Values.dohub.image }}
           env:
           - name: GITHUB_CLIENT_ID
-            value: {{ .Values.dohub.github_client_id }}
+            value: {{ .Values.dohub.githubClientId }}
           - name: GITHUB_CLIENT_SECRET
-            value: {{ .Values.dohub.github_client_secret }}
+            value: {{ .Values.dohub.githubClientSecret }}
           - name: ADMIN_USERS
-            value: {{ .Values.dohub.admin_users }}
+            value: {{ .Values.dohub.adminUsers }}
           - name: DEFAULT_PORT
-            value: {{ .Values.dohub.default_port | 8443 }}
+            value: {{ .Values.dohub.defaultPort | 8443 }}
           - name: SPAWNER
-            value: {{ .Values.dohub.default_spawner | 'k8s' }}
+            value: {{ .Values.dohub.defaultSpawner | 'k8s' }}
           ports:
           - containerPort: 5000
           securityContext:
