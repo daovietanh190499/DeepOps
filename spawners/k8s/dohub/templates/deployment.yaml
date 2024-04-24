@@ -36,7 +36,7 @@ spec:
           - name: SPAWNER
             value: {{ .Values.dohub.defaultSpawner }}
           ports:
-          - containerPort: 5000
+          - containerPort: "5000"
           securityContext:
             capabilities:
               add: ['SYS_ADMIN']
