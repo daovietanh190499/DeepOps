@@ -34,4 +34,5 @@ spec:
         backend:
           service:
             name: {{ .Release.Name }}-dohub-service
-            port: dohub-main-port
+            port:
+              number: 5000
