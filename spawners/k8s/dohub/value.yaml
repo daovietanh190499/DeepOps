@@ -10,5 +10,6 @@ dohub:
   githubClientSecret: def
   adminUsers:
   - daovietanh190499
+  - ngdangha
   defaultPort: 8443
   defaultSpawner: "k8s"

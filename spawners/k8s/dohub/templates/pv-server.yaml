@@ -1,0 +1,14 @@
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: volume-dohub-server
+  namespace: dohub
+spec:
+  storageClassName: volume-dohub-server
+  capacity:
+    storage: 20Gi
+  accessModes:
+    - ReadWriteOnce
+  nfs:
+    path: "/data/nas/dohub/"
+    server: "10.1.8.99"
