@@ -4,8 +4,6 @@ USER root
 
 WORKDIR /home/dohub
 
-COPY . .
-
 RUN apt-get update --yes && \
     # - apt-get upgrade is run to patch known vulnerabilities in apt-get packages as
     #   the ubuntu base image is rebuilt too seldom sometimes (less than once a month)
@@ -15,6 +13,8 @@ RUN apt-get update --yes && \
     python3-pip
 
 RUN pip3 install -r requirement.txt
+
+COPY . .
 
 USER root
 ENV USER=root
