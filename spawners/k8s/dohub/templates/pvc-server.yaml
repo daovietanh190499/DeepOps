@@ -2,7 +2,7 @@ apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
   name: claim-dohub-server
-  namespace: dohub
+  namespace: {{ .Release.Name }}
 spec:
   storageClassName: volume-dohub-server
   accessModes:
