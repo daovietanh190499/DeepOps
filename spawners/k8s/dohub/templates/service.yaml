@@ -16,18 +16,6 @@ spec:
 
 ---
 
-apiVersion: v1
-kind: Secret
-metadata:
-  name: {{ .Release.Name }}-dohub-tls
-  namespace: {{ .Release.Name }}
-data:
-  tls.crt: {{ .Values.global.caCrt }}
-  tls.key: {{ .Values.global.caKey }}
-type: kubernetes.io/tls
-
----
-
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
