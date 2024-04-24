@@ -12,6 +12,8 @@ RUN apt-get update --yes && \
     dumb-init \
     python3-pip
 
+COPY ./requirement.txt ./requirement.txt
+
 RUN pip3 install -r requirement.txt
 
 COPY . .
