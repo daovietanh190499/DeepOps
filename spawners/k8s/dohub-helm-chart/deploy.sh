@@ -1,4 +1,4 @@
 helm install \
     --set foo=bar \
     --set foo=newbar \
-    vkist ./
+    vkist dohub-helm-chart/
