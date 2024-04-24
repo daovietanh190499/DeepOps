@@ -1,0 +1,13 @@
+global:
+  imageRegistry: "daovietanh99"
+  caCrt: ""
+  caKey: ""
+dohub:
+  replicas: 1
+  image: dohub:latest
+  githubClientId: abc
+  githubClientSecret: def
+  adminUsers:
+  - daovietanh190499
+  defaultPort: 8443
+  defaultSpawner: "k8s"
