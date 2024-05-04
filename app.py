@@ -820,7 +820,7 @@ def migrate():
         db_session.commit()
 
 if __name__ == "__main__":
-    if os.path.exist("/etc/dohub/cert.pem") and s.path.exist("/etc/dohub/key.pem"):
+    if os.path.exist("/etc/dohub/cert.pem") and os.path.exist("/etc/dohub/key.pem"):
         ssl_context = ssl.create_default_context(ssl.Purpose.CLIENT_AUTH)
         ssl_context.load_cert_chain("/etc/dohub/cert.pem", "/etc/dohub/key.pem")
         web.run_app(app, port=5000, ssl_context=ssl_context)
