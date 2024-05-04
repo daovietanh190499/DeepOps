@@ -31,7 +31,7 @@ service:
   port: 5000
 
 ingress:
-  enabled: false
+  enabled: true
   className: ""
   annotations: {}
     # kubernetes.io/ingress.class: nginx
