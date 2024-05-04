@@ -43,8 +43,8 @@ ingress:
           pathType: Prefix
   tls:
   - secretName: tls-dohub-secret
-      hosts:
-      - vkist-hub.com
+    hosts:
+    - vkist-hub.com
 
 # resources:
   # limits:
