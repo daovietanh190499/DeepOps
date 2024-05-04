@@ -1,61 +1,71 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: {{ .Release.Name }}-dohub
-  namespace: {{ .Release.Name }}
+  name: {{ include "dohub.fullname" . }}
   labels:
-    app: dohub
-    release: {{ .Release.Name }}-dohub-main
+    {{- include "dohub.labels" . | nindent 4 }}
 spec:
+  {{- if not .Values.autoscaling.enabled }}
+  replicas: {{ .Values.replicaCount }}
+  {{- end }}
   selector:
     matchLabels:
-      app: dohub
-  replicas: {{ .Values.dohub.replicas }}
+      {{- include "dohub.selectorLabels" . | nindent 6 }}
   template:
     metadata:
-      name: {{ .Release.Name }}-dohub
-      namespace: {{ .Release.Name }}
+      {{- with .Values.podAnnotations }}
+      annotations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
       labels:
-        app: dohub
-        release: dohub-main-pod
+        {{- include "dohub.labels" . | nindent 8 }}
+        {{- with .Values.podLabels }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
     spec:
-      serviceAccountName: {{ .Release.Name }}-dohub-schedule
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      serviceAccountName: {{ include "dohub.serviceAccountName" . }}
+      securityContext:
+        {{- toYaml .Values.podSecurityContext | nindent 8 }}
       containers:
-        - name: {{ .Release.Name }}-dohub-main-container
-          image: {{ .Values.global.imageRegistry }}/{{ .Values.dohub.image }}
-          imagePullPolicy: Always
-          env:
-          - name: GITHUB_CLIENT_ID
-            value: {{ .Values.dohub.githubClientId }}
-          - name: GITHUB_CLIENT_SECRET
-            value: {{ .Values.dohub.githubClientSecret }}
-          - name: ADMIN_USERS
-            value: {{ .Values.dohub.adminUsers }}
-          - name: DEFAULT_PORT
-            value: {{ .Values.dohub.defaultPort }}
-          - name: SPAWNER
-            value: {{ .Values.dohub.defaultSpawner }}
-          ports:
-          - containerPort: "5000"
+        - name: {{ .Chart.Name }}
           securityContext:
-            capabilities:
-              add: ['SYS_ADMIN']
-            allowPrivilegeEscalation: true
+            {{- toYaml .Values.securityContext | nindent 12 }}
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          envFrom:
+          - secretRef:
+              name: {{ .Values.secret.name }}
+          ports:
+            - name: http
+              containerPort: {{ .Values.service.port }}
+              protocol: TCP
+          livenessProbe:
+            {{- toYaml .Values.livenessProbe | nindent 12 }}
+          readinessProbe:
+            {{- toYaml .Values.readinessProbe | nindent 12 }}
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+          {{- with .Values.volumeMounts }}
           volumeMounts:
-            - name: {{ .Release.Name }}-dohub-config
-              mountPath: /etc/dohub/config.yaml
-              subPath: config.yaml
-            - mountPath: /mnt/database/
-              name: volume-dohub
-            - mountPath: /mnt/nas0/
-              name: volume-dohub-server
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+      {{- with .Values.volumes }}
       volumes:
-        - name: {{ .Release.Name }}-dohub-config
-          configMap:
-            name: {{ .Release.Name }}-dohub-config
-        - name: volume-dohub
-          persistentVolumeClaim:
-            claimName: claim-dohub-main
-        - name: volume-dohub-server
-          persistentVolumeClaim:
-            claimName: claim-dohub-server
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}

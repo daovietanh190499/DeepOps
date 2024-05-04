@@ -1,5 +1,6 @@
 import yaml
 from kubernetes import client, config, utils
+import os
 
 DEFAULT_SPAWNER = os.environ.get('SPAWNER', 'k8s')
 

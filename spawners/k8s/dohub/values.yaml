@@ -1,0 +1,113 @@
+replicaCount: 1
+
+image:
+  repository: daovietanh99/dohub
+  pullPolicy: Always
+  tag: "latest"
+
+# imagePullSecrets: []
+# nameOverride: ""
+# fullnameOverride: ""
+
+serviceAccount:
+  create: true
+  automount: true
+  # annotations: {}
+  name: "dohub-service-account"
+
+# podAnnotations: {}
+# podLabels: {}
+
+podSecurityContext:
+  fsGroup: 2000
+
+securityContext:
+  capabilities:
+    add: ['SYS_ADMIN']
+  allowPrivilegeEscalation: true
+
+service:
+  type: ClusterIP
+  port: 5000
+
+ingress:
+  enabled: false
+  className: ""
+  annotations: {}
+    # kubernetes.io/ingress.class: nginx
+    # kubernetes.io/tls-acme: "true"
+  hosts:
+    - host: vkist-hub.com
+      paths:
+        - path: /
+          pathType: Prefix
+  tls:
+  - secretName: tls-dohub-secret
+      hosts:
+      - vkist-hub.com
+
+# resources:
+  # limits:
+  #   cpu: 100m
+  #   memory: 128Mi
+  # requests:
+  #   cpu: 100m
+  #   memory: 128Mi
+
+livenessProbe:
+  httpGet:
+    path: /
+    port: http
+readinessProbe:
+  httpGet:
+    path: /
+    port: http
+
+autoscaling:
+  enabled: false
+  minReplicas: 1
+  maxReplicas: 100
+  targetCPUUtilizationPercentage: 80
+  # targetMemoryUtilizationPercentage: 80
+
+# Additional volumes on the output Deployment definition.
+volumes:
+- name: dohub-configmap
+  configMap:
+    name: dohub-configmap
+- name: volume-dohub
+  persistentVolumeClaim:
+    claimName: claim-dohub-main
+- name: volume-dohub-server
+  persistentVolumeClaim:
+    claimName: claim-dohub-server
+
+# Additional volumeMounts on the output Deployment definition.
+volumeMounts:
+- name: dohub-configmap
+  mountPath: /etc/dohub/config.yaml
+  subPath: config.yaml
+- mountPath: /mnt/database/
+  name: volume-dohub
+- mountPath: /mnt/nas0/
+  name: volume-dohub-server
+
+# nodeSelector: {}
+
+# tolerations: []
+
+# affinity: {}
+
+configmap:
+  name: dohub-configmap
+
+secret:
+  name: dohub-secret
+
+env:
+  secret:
+    GITHUB_CLIENT_Id: "875f81ac086ccc9507e9"
+    GITHUB_CLIENT_SECRET: "2cf7511dd8f2b9366d0a1b956c5bf962a51fc7e0"
+    ADMIN_USERS: "daovietanh190499 ngdangha"
+    DEFAULT_PORT: "8443"
+    SPAWNER: "k8s"
