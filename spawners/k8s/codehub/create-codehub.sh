@@ -6,7 +6,7 @@ helm upgrade --install --create-namespace -n dohub \
     --set "serviceAccount.automount=false" \
     --set "serviceAccount.name=default" \
     --set "podSecurityContext.fsGroup=100" \
-    --set "securityContext.capabilities.add={'SYS_ADMIN'}" \
+    --set "securityContext.capabilities.add={SYS_ADMIN}" \
     --set "securityContext.allowPrivilegeEscalation=true" \
     --set "securityContext.runAsUser=0" \
     --set "service.type=ClusterIP" \
