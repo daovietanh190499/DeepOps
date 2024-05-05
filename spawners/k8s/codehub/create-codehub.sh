@@ -16,7 +16,7 @@ helm upgrade --install --create-namespace -n dohub \
     --set "ingress.hosts[0].host=exampleuser.vkist-hub.com" \
     --set "ingress.hosts[0].paths[0].path=/" \
     --set "ingress.hosts[0].paths[0].pathType=Prefix" \
-    --set "ingress.tls[0].secretName=chart-example-tls" \
+    --set "ingress.tls[0].secretName=tls-dohub-secret" \
     --set "ingress.tls[0].hosts[0]=exampleuser.vkist-hub.com" \
     --set "mainVolume.claimName=claim-dohub-exampleuser" \
     --set "mainVolume.dataPath='/data/nas/dohub/dohub-daovietanh190499'" \
