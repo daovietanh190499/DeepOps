@@ -2,7 +2,7 @@ helm upgrade --install --create-namespace -n dohub \
     --set "image.repository=daovietanh99/deepops" \
     --set "image.pullPolicy=Always" \
     --set "image.tag=latest" \
-    --set "podLabels.dohub.username=exampleuser" \
+    --set "podLabels.dohub-username=exampleuser" \
     --set "serviceAccount.enable=false" \
     --set "serviceAccount.automount=false" \
     --set "serviceAccount.name=default" \
