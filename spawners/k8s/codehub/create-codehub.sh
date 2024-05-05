@@ -31,9 +31,8 @@ helm upgrade --install --create-namespace -n dohub \
     --set "volumeMounts[1].name=volume-exampleuser" \
     --set "resources.limits.cpu=1" \
     --set "resources.limits.memory=17179869184" \
+    --set "resources.limits.nvidia.com/gpu=1" \
     --set "resources.requests.cpu=1" \
     --set "resources.requests.memory=8589934592" \
+    --set "resources.requests.nvidia.com/gpu=1" \
     dohub-exampleuser spawners/k8s/codehub
-
-# --set "resources.limits.nvidia.com/mig-2g.10gb=1" \
-# --set "resources.requests.nvidia.com/mig-2g.10gb=1" \
