@@ -18,7 +18,7 @@ helm upgrade --install --create-namespace -n dohub \
     --set "ingress.tls[0].secretName=chart-example-tls" \
     --set "ingress.tls[0].hosts[0]=exampleuser.vkist-hub.com" \
     --set "mainVolume.claimName=claim-dohub-exampleuser" \
-    --set "mainVolume.dataPath='/data/nas/dohub/dohub-exampleuser'" \
+    --set "mainVolume.dataPath='/data/nas/dohub/dohub-daovietanh190499'" \
     --set "volumes[0].name=shm-volume" \
     --set "volumes[0].emptyDir.medium=Memory" \
     --set "volumes[1].name=volume-exampleuser" \
