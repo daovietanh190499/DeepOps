@@ -1,5 +1,5 @@
 helm upgrade --install --create-namespace -n dohub \
-    --set "image.repository=daovieanh99/deepops" \
+    --set "image.repository=daovietanh99/deepops" \
     --set "image.pullPolicy=Always" \
     --set "image.tag=latest" \
     --set "serviceAccount.enable=false" \
