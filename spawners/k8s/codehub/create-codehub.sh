@@ -11,7 +11,7 @@ helm upgrade --install --create-namespace -n dohub \
     --set "securityContext.runAsUser=0" \
     --set "service.type=ClusterIP" \
     --set "service.port=8443" \
-    --set "ingress.enable=true" \
+    --set "ingress.enabled=true" \
     --set "ingress.hosts[0].host=exampleuser.vkist-hub.com" \
     --set "ingress.hosts[0].paths[0].path=/" \
     --set "ingress.hosts[0].paths[0].pathType=Prefix" \
