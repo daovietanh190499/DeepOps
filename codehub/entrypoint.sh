@@ -23,4 +23,4 @@ fi
 #   echo -e "bind-addr: 0.0.0.0:8443\nauth: password\npassword: $PASSWORD\ncert: false" > ~/.config/code-server/config.yaml
 # fi
 
-sudo dumb-init /usr/bin/code-server "$@"
+sudo /usr/bin/code-server "$@"

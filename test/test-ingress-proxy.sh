@@ -1,0 +1,1 @@
+curl <worker-external-ip>:<node-port> -H 'Host: web.example.com'
