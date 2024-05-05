@@ -34,7 +34,7 @@ spec:
       enableServiceLinks: true
       preemptionPolicy: PreemptLowerPriority
       priority: 0
-      restartPolicy: OnFailure
+      restartPolicy: Always
       containers:
         - name: {{ .Chart.Name }}
           securityContext:
