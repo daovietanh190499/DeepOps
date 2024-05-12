@@ -23,7 +23,7 @@ from functools import wraps
 
 import traceback
 
-from spawners.k8s.kubespawn import delete_pv, delete_pvc, delete_server, create_pv, create_pvc, create_server, get_server, get_pv, get_pvc, get_servers
+from spawners.k8s.kubespawn import remove_codehub, create_codehub, get_codehub
 from fileserver.controller import create_folder
 
 with open("/etc/dohub/config.yaml", 'r') as stream:
@@ -316,7 +316,7 @@ async def user_state(user, request):
     all_servers = [db[0] for db in all_servers]
     user['server_list'] = all_servers
     user['current_server'] = current_server[0]
-    user['server_log'] = get_server(user['username'])
+    user['server_log'] = get_codehub(user['username'])['items'][0]['status']['phase']
     return web.json_response({"result": user}, status=200)
 
 @auth.verify
@@ -350,7 +350,7 @@ def all_user(user, request):
         user.append(all_servers)
         for i, field in enumerate(fields):
             user_dict[field] = user[i]
-        user_dict['server_log'] = get_server(user[1])
+        user_dict['server_log'] = get_codehub(user[1])['items'][0]['status']['phase']
         result_list.append(user_dict)
     
     return web.json_response({"result": result_list}, status=200)
@@ -548,110 +548,29 @@ def start_server_pipline(user, server):
             create_folder(config)
         except:
             return web.json_response({'message': 'action create folder failed'}, status=500)
-    try:
-        res = get_pv(user.username)
-    except:
-        res = None
-    if not res:
-        res = create_pv(config)
-        if not res:
-            return web.json_response({'message': 'action create persistent volume failed'}, status=500)
-    try:
-        res = get_pvc(user.username)
-    except:
-        res = None
-    if not res:
-        res = create_pvc(config)
-        if not res:
-            return web.json_response({'message': 'action create persistent volume claim failed'}, status=500)
-    try:
-        res = get_server(user.username)
-    except:
-        res = None
-    if not res or not 'state' in res or res['state']['message'] == 'Idle':
-        res = create_server(config)
-        if not res:
-            return web.json_response({'message': 'action create server failed'}, status=500)
-
-    user.state = 'pending_start'
-    user.server_ip = ''
+    
+    create_codehub(config)
+  
+    user_change = User.query.filter_by(username=username).first()
+    user_change.state = 'running'
+    user_change.server_ip = 'any'
     db_session.commit()
-    
-    async def thread_start_pending():
-        res = None
-        count = 0
-        while (not res or 'ip' not in res or not res['ip']) and count < 100:
-            count += 1
-            try:
-                res = get_server(username)
-            except:
-                continue
-            if res and 'ip' in res and res['ip']:
-                user_change = User.query.filter_by(username=username).first()
-                user_change.state = 'running'
-                user_change.server_ip = res['ip']
-                db_session.commit()
-                break
-            await asyncio.sleep(1)
-        user_change = User.query.filter_by(username=username).first()
-        if not user_change.server_ip or user_change.server_ip == '':
-            user_change.state = 'offline'
-            db_session.commit()
-        return
-    
-    loop = asyncio.get_event_loop()
-    loop.create_task(thread_start_pending())
 
     return web.json_response({'message': 'success'}, status=200)
 
 def stop_server_pipline(user):
     username = user.username
+    config = {
+        'username': user.username,
+    }
     try:
-        res = delete_server(user.username)
+        remove_codehub(config)
+        user_change = User.query.filter_by(username=username).first()
+        user_change.state = 'offline'
+        user_change.server_ip = ''
+        db_session.commit()
     except:
         return web.json_response({'message': 'action failed'}, status=500)
-    if not res:
-        return web.json_response({'message': 'action failed'}, status=500)
-    
-    user.state = 'pending_stop'
-    db_session.commit()
-    
-    async def thread_stop_pending():
-        res = {'ip': 'available'}
-        count = 0
-        while res and 'ip' in res and res['ip'] and count < 100:
-            count += 1
-            try:
-                res = get_server(username)
-            except:
-                user_change = User.query.filter_by(username=username).first()
-                user_change.state = 'offline'
-                user_change.server_ip = ''
-                db_session.commit()
-                res['ip'] = None
-                break
-            if not res or not 'ip' in res or not res['ip']:
-                user_change = User.query.filter_by(username=username).first()
-                user_change.state = 'offline'
-                user_change.server_ip = ''
-                db_session.commit()
-                res['ip'] = None
-                break
-            await asyncio.sleep(1)
-        user_change = User.query.filter_by(username=username).first()
-        if user_change.server_ip and user_change.server_ip != '':
-            user_change.state = 'running'
-            db_session.commit()
-        else:
-            user_change = User.query.filter_by(username=username).first()
-            user_change.state = 'offline'
-            user_change.server_ip = ''
-            db_session.commit()
-        return
-    
-    loop = asyncio.get_event_loop()
-    loop.create_task(thread_stop_pending())
-
     return web.json_response({'message': 'success'}, status=200)
 
 @auth.verify
