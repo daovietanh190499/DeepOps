@@ -3,6 +3,12 @@ apiVersion: rbac.authorization.k8s.io/v1
 metadata:
   name: {{ .Release.Name }}-dohub-clusterroles
 rules:
+- apiGroups: ["apps"]
+  resources: ["deployments"]
+  verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+- apiGroups: ["networking.k8s.io"]
+  resources: ["ingresses"]
+  verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
 - apiGroups: [""]
   resources: ["pods/status"]
   verbs: ["patch", "update"]
@@ -10,8 +16,5 @@ rules:
   resources: ["pods/binding"]
   verbs: ["create"]
 - apiGroups: [""]
-  resources: ["pods", "persistentvolumeclaims", "persistentvolumes"]
+  resources: ["pods", "persistentvolumeclaims", "persistentvolumes", "secrets", "configmaps", "services", "namespaces"]
   verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
-- apiGroups: [""]
-  resources: ["services", "namespaces"]
-  verbs: ["get", "list", "watch"]

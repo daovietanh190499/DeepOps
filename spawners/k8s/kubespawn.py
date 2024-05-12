@@ -6,7 +6,7 @@ DEFAULT_SPAWNER = os.environ.get('SPAWNER', 'k8s')
 NAMESPACE = os.environ.get('NAMESPACE', 'dohub')
 
 def create_codehub(config):
-    subprocess.run([
+    output = subprocess.run([
             'helm upgrade --install --create-namespace -n {}'.format(NAMESPACE), \
             '--set "image.repository={}"'.format(config['image']), \
             '--set "image.pullPolicy=Always"', \
@@ -48,6 +48,7 @@ def create_codehub(config):
             '--set "resources.requests.{}={}"'.format(config['gpu_type'].replace('.', '\.'), config['gpu_quantity']), \
             '{}-{} spawners/k8s/codehub'.format(NAMESPACE, config['username']) \
         ], shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+    print(output.stdout)
 
 def remove_codehub(config):
     os.system(f"""helm uninstall -n {NAMESPACE} {NAMESPACE}-{config['username']} spawners/k8s/codehub""")
