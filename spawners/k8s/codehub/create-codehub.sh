@@ -3,11 +3,13 @@ helm upgrade --install --create-namespace -n dohub \
     --set "image.pullPolicy=Always" \
     --set "image.tag=latest" \
     --set "podLabels.dohub-username=exampleuser" \
+    --set "secret.name=exampleuser-secret" \
+    --set "env.secret.PASSWORD=exampleuser" \
     --set "serviceAccount.enable=false" \
     --set "serviceAccount.automount=false" \
     --set "serviceAccount.name=default" \
     --set "podSecurityContext.fsGroup=100" \
-    --set "securityContext.capabilities.add={SYS_ADMIN}" \
+    --set "securityContext.capabilities.add[0]=SYS_ADMIN" \
     --set "securityContext.allowPrivilegeEscalation=true" \
     --set "securityContext.runAsUser=0" \
     --set "service.type=ClusterIP" \
