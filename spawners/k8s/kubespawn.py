@@ -6,7 +6,6 @@ DEFAULT_SPAWNER = os.environ.get('SPAWNER', 'k8s')
 NAMESPACE = os.environ.get('NAMESPACE', 'dohub')
 
 def create_codehub(config):
-    backslash = os.linesep
     subprocess.run([
             'helm upgrade --install --create-namespace -n {}'.format(NAMESPACE), \
             '--set "image.repository={}"'.format(config['image']), \
@@ -32,7 +31,7 @@ def create_codehub(config):
             '--set "ingress.tls[0].secretName=tls-{}-secret"'.format(NAMESPACE), \
             '--set "ingress.tls[0].hosts[0]={}.vkist-hub.com"'.format(config['username']), \
             '--set "mainVolume.claimName=claim-{}-{}"'.format(NAMESPACE, config['username']), \
-            '--set "mainVolume.dataPath='{}'"'.format(config['path'] + '/dohub-' + config['username']), \
+            '''--set "mainVolume.dataPath='{}'"'''.format(config['path'] + '/dohub-' + config['username']), \
             '--set "volumes[0].name=shm-volume"', \
             '--set "volumes[0].emptyDir.medium=Memory"', \
             '--set "volumes[1].name=volume-{}"'.format(config['username']), \
