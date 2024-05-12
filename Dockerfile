@@ -21,7 +21,7 @@ RUN apt-get update --yes && \
     wget \
     jq \
     gettext \
-    openssh \
+    openssh-server \
     git \
     python3-pip
 
