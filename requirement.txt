@@ -3,7 +3,6 @@ aiohttp_jinja2
 jinja2
 furl
 sqlalchemy<2.0
-kubernetes
 PyYAML
 uuid
 requests
