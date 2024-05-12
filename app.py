@@ -549,14 +549,14 @@ def start_server_pipline(user, server):
         except:
             return web.json_response({'message': 'action create folder failed'}, status=500)
     
-    create_codehub(config)
+    logs = create_codehub(config)
   
     user_change = User.query.filter_by(username=username).first()
     user_change.state = 'running'
     user_change.server_ip = 'any'
     db_session.commit()
 
-    return web.json_response({'message': 'success'}, status=200)
+    return web.json_response({'message': 'success', "logs": logs}, status=200)
 
 def stop_server_pipline(user):
     username = user.username
