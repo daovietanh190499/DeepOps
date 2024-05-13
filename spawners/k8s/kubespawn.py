@@ -11,7 +11,7 @@ def create_codehub(config):
             --set "resources.limits.{gpu_type}={config['gpu_quantity']}" \
             --set "resources.requests.{gpu_type}={config['gpu_quantity']}"
     """
-    output = subprocess.run( f"""helm upgrade --install --create-namespace -n {NAMESPACE} \
+    command = f"""helm upgrade --install --create-namespace -n {NAMESPACE} \
             --set "image.repository={config['image']}" \
             --set "image.pullPolicy=Always" \
             --set "image.tag=latest" \
@@ -49,8 +49,9 @@ def create_codehub(config):
             --set "resources.requests.cpu={config['cpu']}" \
             --set "resources.requests.memory={config['ram']}" \
             {gpu_config if not config["not_use_gpu"] else ""} \
-            {NAMESPACE}-{config['username']} spawners/k8s/codehub""".split(), capture_output = True, text=True, universal_newlines=True)
-    return output.stdout
+            {NAMESPACE}-{config['username']} spawners/k8s/codehub"""
+    output = subprocess.run(command.split(), capture_output = True, text=True, universal_newlines=True)
+    return command, output.stdout
 
 def remove_codehub(config):
     os.system(f"""helm uninstall -n {NAMESPACE} {NAMESPACE}-{config['username']} spawners/k8s/codehub""")
