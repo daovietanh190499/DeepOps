@@ -6,48 +6,50 @@ DEFAULT_SPAWNER = os.environ.get('SPAWNER', 'k8s')
 NAMESPACE = os.environ.get('NAMESPACE', 'dohub')
 
 def create_codehub(config):
-    output = subprocess.run([
-            'helm upgrade --install --create-namespace -n {}'.format(NAMESPACE), \
-            '--set "image.repository={}"'.format(config['image']), \
-            '--set "image.pullPolicy=Always"', \
-            '--set "image.tag=latest"', \
-            '--set "podLabels.{}-username={}"'.format(NAMESPACE, config['username']), \
-            '--set "secret.name={}-secret"'.format(config['username']), \
-            '--set "env.secret.PASSWORD={}"'.format(config['password']), \
-            '--set "serviceAccount.enable=false"', \
-            '--set "serviceAccount.automount=false"', \
-            '--set "serviceAccount.name=default"', \
-            '--set "podSecurityContext.fsGroup=100"', \
-            '--set "securityContext.capabilities.add[0]=SYS_ADMIN"', \
-            '--set "securityContext.allowPrivilegeEscalation=true"', \
-            '--set "securityContext.runAsUser=0"', \
-            '--set "service.type=ClusterIP"', \
-            '--set "service.port={}"'.format(config['defaultPort']), \
-            '--set "ingress.enabled=true"', \
-            '--set "ingress.className=nginx"', \
-            '--set "ingress.hosts[0].host={}.vkist-hub.com"'.format(config['username']), \
-            '--set "ingress.hosts[0].paths[0].path=/"', \
-            '--set "ingress.hosts[0].paths[0].pathType=Prefix"', \
-            '--set "ingress.tls[0].secretName=tls-{}-secret"'.format(NAMESPACE), \
-            '--set "ingress.tls[0].hosts[0]={}.vkist-hub.com"'.format(config['username']), \
-            '--set "mainVolume.claimName=claim-{}-{}"'.format(NAMESPACE, config['username']), \
-            '''--set "mainVolume.dataPath='{}'"'''.format(config['path'] + '/dohub-' + config['username']), \
-            '--set "volumes[0].name=shm-volume"', \
-            '--set "volumes[0].emptyDir.medium=Memory"', \
-            '--set "volumes[1].name=volume-{}"'.format(config['username']), \
-            '--set "volumes[1].persistentVolumeClaim.claimName=claim-{}-{}"'.format(NAMESPACE, config['username']), \
-            '--set "volumeMounts[0].mountPath=/dev/shm"', \
-            '--set "volumeMounts[0].name=shm-volume"', \
-            '--set "volumeMounts[1].mountPath=/home/coder"', \
-            '--set "volumeMounts[1].name=volume-{}"'.format(config['username']), \
-            '--set "resources.limits.cpu={}"'.format(config['max_cpu']), \
-            '--set "resources.limits.memory={}"'.format(config['max_ram']), \
-            '--set "resources.limits.{}={}"'.format(config['gpu_type'].replace('.', '\.'), config['gpu_quantity']), \
-            '--set "resources.requests.cpu={}"'.format(config['cpu']), \
-            '--set "resources.requests.memory={}"'.format(config['ram']), \
-            '--set "resources.requests.{}={}"'.format(config['gpu_type'].replace('.', '\.'), config['gpu_quantity']), \
-            '{}-{} spawners/k8s/codehub'.format(NAMESPACE, config['username']) \
-        ], shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+    gpu_type = config['gpu_type'].replace('.', '\.')
+    gpu_config = f"""
+            --set "resources.limits.{gpu_type}={config['gpu_quantity']}" \
+            --set "resources.requests.{gpu_type}={config['gpu_quantity']}"
+    """
+    output = subprocess.run( f"""helm upgrade --install --create-namespace -n {NAMESPACE} \
+            --set "image.repository={config['image']}" \
+            --set "image.pullPolicy=Always" \
+            --set "image.tag=latest" \
+            --set "podLabels.{NAMESPACE}-username={config['username']}" \
+            --set "secret.name={config['username']}-secret" \
+            --set "env.secret.PASSWORD={config['password']}" \
+            --set "serviceAccount.enable=false" \
+            --set "serviceAccount.automount=false" \
+            --set "serviceAccount.name=default" \
+            --set "podSecurityContext.fsGroup=100" \
+            --set "securityContext.capabilities.add[0]=SYS_ADMIN" \
+            --set "securityContext.allowPrivilegeEscalation=true" \
+            --set "securityContext.runAsUser=0" \
+            --set "service.type=ClusterIP" \
+            --set "service.port={config['defaultPort']}" \
+            --set "ingress.enabled=true" \
+            --set "ingress.className=nginx" \
+            --set "ingress.hosts[0].host={config['username']}.vkist-hub.com" \
+            --set "ingress.hosts[0].paths[0].path=/" \
+            --set "ingress.hosts[0].paths[0].pathType=Prefix" \
+            --set "ingress.tls[0].secretName=tls-{NAMESPACE}-secret" \
+            --set "ingress.tls[0].hosts[0]={config['username']}.vkist-hub.com" \
+            --set "mainVolume.claimName=claim-{NAMESPACE}-{config['username']}" \
+            --set "mainVolume.dataPath='{config['path'] + '/dohub-' + config['username']}'" \
+            --set "volumes[0].name=shm-volume" \
+            --set "volumes[0].emptyDir.medium=Memory" \
+            --set "volumes[1].name=volume-{config['username']}" \
+            --set "volumes[1].persistentVolumeClaim.claimName=claim-{NAMESPACE}-{config['username']}" \
+            --set "volumeMounts[0].mountPath=/dev/shm" \
+            --set "volumeMounts[0].name=shm-volume" \
+            --set "volumeMounts[1].mountPath=/home/coder" \
+            --set "volumeMounts[1].name=volume-{config['username']}" \
+            --set "resources.limits.cpu={config['max_cpu']}" \
+            --set "resources.limits.memory={config['max_ram']}" \
+            --set "resources.requests.cpu={config['cpu']}" \
+            --set "resources.requests.memory={config['ram']}" \
+            {gpu_config if not config["not_use_gpu"] else ""} \
+            {NAMESPACE}-{config['username']} spawners/k8s/codehub""".split(), capture_output = True, text=True, universal_newlines=True)
     return output.stdout
 
 def remove_codehub(config):
