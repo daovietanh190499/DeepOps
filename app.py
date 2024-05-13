@@ -316,7 +316,7 @@ async def user_state(user, request):
     all_servers = [db[0] for db in all_servers]
     user['server_list'] = all_servers
     user['current_server'] = current_server[0]
-    user['server_log'] = get_codehub(user['username'])['items'][0]['status']['phase']
+    user['server_log'] = get_codehub(user['username'])
     return web.json_response({"result": user}, status=200)
 
 @auth.verify
@@ -350,7 +350,7 @@ def all_user(user, request):
         user.append(all_servers)
         for i, field in enumerate(fields):
             user_dict[field] = user[i]
-        user_dict['server_log'] = get_codehub(user[1])['items'][0]['status']['phase']
+        user_dict['server_log'] = get_codehub(user[1])
         result_list.append(user_dict)
     
     return web.json_response({"result": result_list}, status=200)
