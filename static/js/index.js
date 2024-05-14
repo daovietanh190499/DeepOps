@@ -352,7 +352,7 @@ const appVue = new Vue({
                 })
         },
         changeMenu(menu) {
-            window.location.replace("hub?tab=" + menu)
+            window.location.replace("/?tab=" + menu)
         },
         changeServer(server) {
             if(this.state=="offline") {
