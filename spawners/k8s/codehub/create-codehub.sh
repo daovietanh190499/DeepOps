@@ -18,9 +18,9 @@ helm upgrade --install --create-namespace -n dohub \
     --set "service.port=8080" \
     --set "ingress.enabled=true" \
     --set "ingress.className=nginx" \
-    --set "ingress.annotations.nginx\.ingress\.kubernetes\.io/proxy-body-size = 0" \
-    --set "ingress.annotations.nginx\.ingress\.kubernetes\.io/proxy-read-timeout = 600" \
-    --set "ingress.annotations.nginx\.ingress\.kubernetes\.io/proxy-send-timeout = 600" \
+    --set "ingress.annotations.nginx\.ingress\.kubernetes\.io/proxy-body-size='0'" \
+    --set "ingress.annotations.nginx\.ingress\.kubernetes\.io/proxy-read-timeout='600'" \
+    --set "ingress.annotations.nginx\.ingress\.kubernetes\.io/proxy-send-timeout='600'" \
     --set "ingress.hosts[0].host=exampleuser.vkist-hub.com" \
     --set "ingress.hosts[0].paths[0].path=/" \
     --set "ingress.hosts[0].paths[0].pathType=Prefix" \
