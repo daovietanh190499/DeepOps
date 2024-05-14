@@ -28,6 +28,9 @@ def create_codehub(config):
             --set service.type=ClusterIP \
             --set service.port={config['defaultPort']} \
             --set ingress.enabled=true \
+            --set "ingress.annotation.nginx\.ingress\.kubernetes\.io/proxy-body-size = 0" \
+            --set "ingress.annotation.nginx\.ingress\.kubernetes\.io/proxy-read-timeout = 600" \
+            --set "ingress.annotation.nginx\.ingress\.kubernetes\.io/proxy-send-timeout = 600" \
             --set ingress.className=nginx \
             --set ingress.hosts[0].host={config['username']}.vkist-hub.com \
             --set ingress.hosts[0].paths[0].path=/ \
