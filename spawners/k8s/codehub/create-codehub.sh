@@ -5,8 +5,8 @@ helm upgrade --install --create-namespace -n dohub \
     --set "podLabels.dohub-username=exampleuser" \
     --set "secret.name=exampleuser-secret" \
     --set "env.secret.PASSWORD=exampleuser" \
-    --set container.command[0]='/bin/sh -c' \
-    --set container.args[0]='/usr/bin/code-server --bind-addr 0.0.0.0:8443 --disable-telemetry .' \
+    # --set container.command[0]='/bin/sh -c' \
+    # --set container.args[0]='/usr/bin/code-server --bind-addr 0.0.0.0:8443 --disable-telemetry .' \
     --set "serviceAccount.enable=false" \
     --set "serviceAccount.automount=false" \
     --set "serviceAccount.name=default" \
@@ -15,7 +15,7 @@ helm upgrade --install --create-namespace -n dohub \
     --set "securityContext.allowPrivilegeEscalation=true" \
     --set "securityContext.runAsUser=0" \
     --set "service.type=ClusterIP" \
-    --set "service.port=8443" \
+    --set "service.port=8080" \
     --set "ingress.enabled=true" \
     --set "ingress.className=nginx" \
     --set "ingress.hosts[0].host=exampleuser.vkist-hub.com" \

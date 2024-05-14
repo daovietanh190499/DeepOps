@@ -38,7 +38,7 @@ GITHUB_CLIENT_ID = os.environ.get('GITHUB_CLIENT_ID', '')
 GITHUB_CLIENT_SECRET = os.environ.get('GITHUB_CLIENT_SECRET', '')
 ADMIN_USERS = os.environ.get('ADMIN_USERS', '')
 DEFAULT_SPAWNER = os.environ.get('SPAWNER', 'k8s')
-DEFAULT_PORT = os.environ.get('DEFAULT_PORT', 8443)
+DEFAULT_PORT = os.environ.get('DEFAULT_PORT', 8080)
 
 app = web.Application(client_max_size=200*1024**2)
 

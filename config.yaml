@@ -4,7 +4,7 @@ githubOauth:
 admin:
   - daovietanh190499
 spawner: 'local'
-defaultPort: 8443
+defaultPort: 8080
 nasAddresses:
   - 10.1.8.99
   - 10.1.8.100

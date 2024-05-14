@@ -18,8 +18,6 @@ def create_codehub(config):
             --set podLabels.{NAMESPACE}-username={config['username']} \
             --set secret.name={config['username']}-secret \
             --set env.secret.PASSWORD={config['password']} \
-            --set container.command[0]='/bin/sh -c' \
-            --set container.args[0]='/usr/bin/code-server --bind-addr 0.0.0.0:8443 --disable-telemetry .' \
             --set serviceAccount.enable=false \
             --set serviceAccount.automount=false \
             --set serviceAccount.name=default \

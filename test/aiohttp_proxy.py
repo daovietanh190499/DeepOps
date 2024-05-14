@@ -12,7 +12,7 @@ logger = logging.getLogger(__name__)
 async def handler(req):
     proxyPath = req.match_info.get('proxyPath','no proxyPath placeholder defined')
     server_domain = "10.32.0.7"
-    port_str = req.match_info.get('port','8443')
+    port_str = req.match_info.get('port','8080')
     username = req.match_info.get('username','no Username placeholder defined')
     reqH = req.headers.copy()
     baseUrl = f'http://{server_domain}:{port_str}/{proxyPath}'
