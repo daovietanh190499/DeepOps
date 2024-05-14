@@ -44,14 +44,18 @@ spec:
           envFrom:
           - secretRef:
               name: {{ .Values.secret.name }}
-          {{- if .Values.container}}
+          {{- if .Values.container }}
           {{- if .Values.container.command }}
+          {{- with .Values.container.command }}
           command:
             {{- toYaml . | nindent 12 }}
           {{- end }}
+          {{- end }}
           {{- if .Values.container.args }}
+          {{- with .Values.container.args }}
           args:
             {{- toYaml . | nindent 12 }}
+          {{- end }}
           {{- end }}
           {{- end }}
           ports:
