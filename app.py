@@ -290,14 +290,6 @@ async def login(user, request):
 async def logout(request):
     return auth.logout_user(request)
 
-@auth.verify
-async def index(user, request):
-    if user and user['state'] == 'running':
-        raise web.HTTPFound(location="/user/" + user["username"] + "/main/")
-    else:
-        location = request.app.router['hub'].url_for()
-        raise web.HTTPFound(location=location)
-
 @aiohttp_jinja2.template('index.html') 
 @auth.verify
 async def hub(user, request):
@@ -701,8 +693,7 @@ async def handler_proxy(req):
 app.router.add_route('*', '/github-callback', authorized, name='github-callback')
 app.router.add_route('*', '/login', login, name='login')
 app.router.add_route('*', '/logout', logout, name='logout')
-app.router.add_route('*', '/', index, name='index')
-app.router.add_route('*', '/hub', hub, name='hub')
+app.router.add_route('*', '/', hub, name='index')
 app.router.add_route('*', '/user_state', user_state, name='user-state')
 app.router.add_route('*', '/all_users', all_user, name='all-user')
 app.router.add_route('*', '/all_servers', all_server, name='all-servers')
