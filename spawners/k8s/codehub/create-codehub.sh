@@ -1,12 +1,12 @@
 helm upgrade --install --create-namespace -n dohub \
-    --set "image.repository=daovietanh99/deepops" \
-    --set "image.pullPolicy=Always" \
-    --set "image.tag=latest" \
+    --set "image.repository=codercom/code-server" \
+    --set "image.pullPolicy=IfNotPresent" \
+    --set "image.tag=4.89.0-ubuntu" \
     --set "podLabels.dohub-username=exampleuser" \
     --set "secret.name=exampleuser-secret" \
     --set "env.secret.PASSWORD=exampleuser" \
-    --set container.command=["/bin/sh", "-c"] \
-    --set container.args=["/usr/bin/code-server --bind-addr 0.0.0.0:8443 --disable-telemetry ."] \
+    --set container.command[0]='/bin/sh -c' \
+    --set container.args[0]='/usr/bin/code-server --bind-addr 0.0.0.0:8443 --disable-telemetry .' \
     --set "serviceAccount.enable=false" \
     --set "serviceAccount.automount=false" \
     --set "serviceAccount.name=default" \

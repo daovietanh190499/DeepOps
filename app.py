@@ -81,7 +81,7 @@ class ServerOption(Base):
     id = Column(Integer, primary_key=True)
     name = Column(String(255), unique=True)
     image = Column(String(255), default='logo.png')
-    docker_image = Column(String(255), default="daovietanh99/deepops")
+    docker_image = Column(String(255), default="codercom/code-server")
     cpu = Column(Integer)
     ram = Column(String(255))
     drive = Column(String(255))

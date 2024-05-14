@@ -240,7 +240,7 @@ const appVue = new Vue({
             'Lollipop': {
                 name: 'Default',
                 image: 'logo.png',
-                docker_image: "daovietanh99/deepops",
+                docker_image: "codercom/code-server",
                 cpu: 2,
                 ram: '2G',
                 drive: '20GB',
