@@ -5,6 +5,8 @@ helm upgrade --install --create-namespace -n dohub \
     --set "podLabels.dohub-username=exampleuser" \
     --set "secret.name=exampleuser-secret" \
     --set "env.secret.PASSWORD=exampleuser" \
+    --set container.command=["/bin/sh", "-c"] \
+    --set container.args=["/usr/bin/code-server --bind-addr 0.0.0.0:8443 --disable-telemetry ."] \
     --set "serviceAccount.enable=false" \
     --set "serviceAccount.automount=false" \
     --set "serviceAccount.name=default" \

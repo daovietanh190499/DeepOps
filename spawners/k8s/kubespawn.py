@@ -13,11 +13,13 @@ def create_codehub(config):
     """
     command = f"""helm upgrade --install --create-namespace -n {NAMESPACE} \
             --set image.repository={config['image']} \
-            --set image.pullPolicy=Always \
+            --set image.pullPolicy=IfNotPresent \
             --set image.tag=latest \
             --set podLabels.{NAMESPACE}-username={config['username']} \
             --set secret.name={config['username']}-secret \
             --set env.secret.PASSWORD={config['password']} \
+            --set container.command=["/bin/sh", "-c"] \
+            --set container.args=["/usr/bin/code-server --bind-addr 0.0.0.0:8443 --disable-telemetry ."] \
             --set serviceAccount.enable=false \
             --set serviceAccount.automount=false \
             --set serviceAccount.name=default \
