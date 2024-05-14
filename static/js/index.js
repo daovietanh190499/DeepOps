@@ -448,7 +448,7 @@ const appVue = new Vue({
         },
         accessServer() {
             if(this.current_user == this.current_spawn_user || (this.current_user != this.current_spawn_user && this.is_admin)) {
-                window.location = `${winow.location.protocol}//${this.current_spawn_user}.${winow.location.host}`
+                window.location = `${window.location.protocol}//${this.current_spawn_user}.${window.location.host}`
                 this.state = "running"
             }
         }
