@@ -26,19 +26,20 @@ import traceback
 from spawners.k8s.kubespawn import remove_codehub, create_codehub, get_codehub
 from fileserver.controller import create_folder
 
-with open("/etc/dohub/config.yaml", 'r') as stream:
-    config_file = yaml.safe_load(stream)
-
-DATABASE_URI = 'sqlite:////mnt/database/dohub.db'
-SECRET_KEY = 'dohub'
-DEBUG = True
-
 # Set these values
 GITHUB_CLIENT_ID = os.environ.get('GITHUB_CLIENT_ID', '')
 GITHUB_CLIENT_SECRET = os.environ.get('GITHUB_CLIENT_SECRET', '')
 ADMIN_USERS = os.environ.get('ADMIN_USERS', '')
 DEFAULT_SPAWNER = os.environ.get('SPAWNER', 'k8s')
 DEFAULT_PORT = os.environ.get('DEFAULT_PORT', 8080)
+DATABASE_HOST = os.environ.get('DATABASE_HOST', '/mnt/database/dohub.db')
+CONFIG_PATH = os.environ.get('CONFIG_PATH', '/etc/dohub/config.yaml')
+
+with open(CONFIG_PATH, 'r') as stream:
+    config_file = yaml.safe_load(stream)
+
+DATABASE_URI = f'sqlite:///{DATABASE_HOST}'
+SECRET_KEY = 'dohub'
 
 app = web.Application(client_max_size=200*1024**2)
 
@@ -529,6 +530,7 @@ def start_server_pipline(user, server):
         'gpu_quantity': int(server.gpu.split(':')[1]) if ':' in server.gpu else 1,
         'not_use_gpu': not server.gpu or server.gpu == '' or server.gpu == 'null' or server.gpu == "",
         'image': server.docker_image,
+        'image_tag': '4.89.0-ubuntu',
         'path': config_file['nasPath'],
         'file_server': config_file['nasAddresses'][config_file['nasIndex']],
         'file_server_index': config_file['nasIndex'],

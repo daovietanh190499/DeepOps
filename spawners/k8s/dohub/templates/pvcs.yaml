@@ -1,0 +1,16 @@
+{{ range .Values.pvcs }}
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ .name }}
+  labels:
+    {{- include "dohub.labels" $ | nindent 4 }}
+spec:
+  storageClassName: {{ .storageClassName }}
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: {{ .size }}
+{{ end }}

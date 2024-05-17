@@ -43,6 +43,3 @@ ENV USER=root
 ENV HOME=/home/dohub
 
 WORKDIR /home/dohub
-
-EXPOSE 5000
-ENTRYPOINT ["dumb-init", "python3", "app.py"]

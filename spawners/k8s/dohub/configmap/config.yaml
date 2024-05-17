@@ -1,15 +1,8 @@
-githubOauth:
-  GITHUB_CLIENT_ID: '<YOUR_GITHUB_CLIENT_ID>'
-  GITHUB_CLIENT_SECRET: '<YOUR_GITHUB_CLIENT_SECRET>'
-admin:
-  - daovietanh190499
-spawner: 'local'
-defaultPort: 8080
 nasAddresses:
   - 10.1.8.99
   - 10.1.8.100
-nasIndex: 0
 nasPath: '/data/nas/dohub'
+nasIndex: 0
 initServerOptions:
   - name: 'Lollipop'
     image: 'lollipop.png'
@@ -44,7 +37,7 @@ initServerOptions:
     gpu: 'gpu'
     color: '#fcca37'
   - name: 'Spagetti' 
-    image: 'spagetti.png' 
+    image: 'spagetti.png'
     docker_image: "codercom/code-server" 
     cpu: 16
     ram: '64G'

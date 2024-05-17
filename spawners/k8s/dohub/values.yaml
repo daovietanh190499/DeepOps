@@ -18,6 +18,10 @@ serviceAccount:
 # podAnnotations: {}
 # podLabels: {}
 
+container:
+  command: ['/bin/bash', '-c']
+  args: [set -a && source .env && set +a && python3 app.py]
+
 podSecurityContext:
   fsGroup: 2000
 
@@ -72,47 +76,69 @@ autoscaling:
   targetCPUUtilizationPercentage: 80
   # targetMemoryUtilizationPercentage: 80
 
-# Additional volumes on the output Deployment definition.
-volumes:
-- name: dohub-configmap
-  configMap:
-    name: dohub-configmap
-- name: volume-dohub
-  persistentVolumeClaim:
-    claimName: claim-dohub-main
-- name: volume-dohub-server
-  persistentVolumeClaim:
-    claimName: claim-dohub-server
-
-# Additional volumeMounts on the output Deployment definition.
-volumeMounts:
-- name: dohub-configmap
-  mountPath: /etc/dohub/config.yaml
-  subPath: config.yaml
-- mountPath: /mnt/database/
-  name: volume-dohub
-- mountPath: /mnt/nas0/
-  name: volume-dohub-server
-
 # nodeSelector: {}
 
 # tolerations: []
 
 # affinity: {}
 
+volumes:
+- name: dohub-configmap
+  configMap:
+    name: dohub-configmap
+- name: dohub-environment
+  secret:
+    secretName: dohub-secret
+- name: volume-dohub-main
+  persistentVolumeClaim:
+    claimName: claim-dohub-main
+- name: volume-dohub-server
+  persistentVolumeClaim:
+    claimName: claim-dohub-server
+
+volumeMounts:
+- name: dohub-configmap
+  mountPath: /etc/dohub/config.yaml
+  subPath: config.yaml
+- mountPath: /mnt/database/
+  name: volume-dohub-main
+- mountPath: /mnt/nas0/
+  name: volume-dohub-server
+- mountPath: /home/dohub/.env
+  name: dohub-environment
+  subPath: .env
+
 configmap:
+  path: "configmap/*"
   name: dohub-configmap
 
 secret:
+  path: "secrets/*"
   name: dohub-secret
 
 tlssecret:
   name: tls-dohub-secret
 
-env:
-  secret:
-    GITHUB_CLIENT_ID: "875f81ac086ccc9507e9"
-    GITHUB_CLIENT_SECRET: "2cf7511dd8f2b9366d0a1b956c5bf962a51fc7e0"
-    ADMIN_USERS: "daovietanh190499 ngdangha"
-    DEFAULT_PORT: "8080"
-    SPAWNER: "k8s"
+pvs:
+- name: volume-dohub-server
+  storageClassName: volume-dohub-server
+  size: 20Gi
+  config:
+    nfs:
+      path: "/data/nas/dohub/"
+      server: "10.1.8.99"
+- name: volume-dohub-main
+  storageClassName: volume-dohub-main
+  size: 20Gi
+  config:
+    nfs:
+      path: "/data/nas/dohub/"
+      server: "10.1.8.99"
+
+pvcs:
+- name: claim-dohub-server
+  storageClassName: volume-dohub-server
+  size: 20Gi
+- name: claim-dohub-main
+  storageClassName: volume-dohub-main
+  size: 20Gi

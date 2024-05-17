@@ -4,6 +4,7 @@ import subprocess
 
 DEFAULT_SPAWNER = os.environ.get('SPAWNER', 'k8s')
 NAMESPACE = os.environ.get('NAMESPACE', 'dohub')
+DOMAIN_NAME = os.environ.get('DOMAIN_NAME', 'dohub.com')
 
 def create_codehub(config):
     gpu_type = config['gpu_type'].replace('.', '\.')
@@ -14,7 +15,7 @@ def create_codehub(config):
     command = f"""helm upgrade --install --create-namespace -n {NAMESPACE} \
             --set image.repository={config['image']} \
             --set image.pullPolicy=IfNotPresent \
-            --set image.tag=4.89.0-ubuntu \
+            --set image.tag={config['image_tag']} \
             --set podLabels.{NAMESPACE}-username={config['username']} \
             --set secret.name={config['username']}-secret \
             --set env.secret.PASSWORD={config['password']} \
@@ -32,11 +33,11 @@ def create_codehub(config):
             --set ingress.annotations.nginx\.ingress\.kubernetes\.io/proxy-read-timeout='600' \
             --set ingress.annotations.nginx\.ingress\.kubernetes\.io/proxy-send-timeout='600' \
             --set ingress.className=nginx \
-            --set ingress.hosts[0].host={config['username']}.vkist-hub.com \
+            --set ingress.hosts[0].host={config['username']}.{DOMAIN_NAME} \
             --set ingress.hosts[0].paths[0].path=/ \
             --set ingress.hosts[0].paths[0].pathType=Prefix \
             --set ingress.tls[0].secretName=tls-{NAMESPACE}-secret \
-            --set ingress.tls[0].hosts[0]={config['username']}.vkist-hub.com \
+            --set ingress.tls[0].hosts[0]={config['username']}.{DOMAIN_NAME} \
             --set mainVolume.claimName=claim-{NAMESPACE}-{config['username']} \
             --set mainVolume.dataPath='{config['path'] + '/dohub-' + config['username']}' \
             --set volumes[0].name=shm-volume \
