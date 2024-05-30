@@ -1,0 +1,7 @@
+django
+django-admin
+django-rest-framework
+django_filter
+drf-spectacular
+drf-spectacular-sidecar
+environ

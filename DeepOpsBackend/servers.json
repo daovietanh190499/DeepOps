@@ -1,0 +1,11 @@
+{
+    "name": "Lollipop",
+    "image": "lollipop.png",
+    "docker_image": "codercom/code-server",
+    "docker_tag": "latest",
+    "cpu": "2",
+    "ram": "4G",
+    "drive": "30TB",
+    "gpu": "none",
+    "color": "violet"
+}
