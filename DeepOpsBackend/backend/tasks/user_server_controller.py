@@ -11,20 +11,20 @@ DEFAULT_PORT = os.environ.get('DEFAULT_PORT', 8080)
 DEFAULT_PATH = os.environ.get('DEFAULT_PATH', '/mnt/nas0')
 
 @shared_task
-def create_server_task(user: UserSerializer, server: ServerSerializer):
+def create_server_task(user: UserSerializer):
     if user.data['state'] == 'terminated':
         gpu_config = ""
-        if server.data['gpu'] != 'none':
-            gpu_type = server.data['gpu'].split(":")[0].replace('.', '\.')
-            gpu_quantity = server.data['gpu'].split(":")[1]
+        if user['inferencing_server']['gpu'] != 'none':
+            gpu_type = user['inferencing_server']['gpu'].split(":")[0].replace('.', '\.')
+            gpu_quantity = user['inferencing_server']['gpu'].split(":")[1]
             gpu_config = f"""
                     --set resources.limits.{gpu_type}={gpu_quantity} \
                     --set resources.requests.{gpu_type}={gpu_quantity}
             """
         command = f"""helm upgrade --install --create-namespace -n {NAMESPACE} \
-                --set image.repository={server.data['docker_image']} \
+                --set image.repository={user['inferencing_server']['docker_image']} \
                 --set image.pullPolicy=IfNotPresent \
-                --set image.tag={server.data['docker_tag']} \
+                --set image.tag={user['inferencing_server']['docker_tag']} \
                 --set podLabels.{NAMESPACE}-username={user.data['username']} \
                 --set secret.name={user.data['username']}-secret \
                 --set env.secret.PASSWORD={user.data['password']} \
@@ -57,14 +57,14 @@ def create_server_task(user: UserSerializer, server: ServerSerializer):
                 --set volumeMounts[0].name=shm-volume \
                 --set volumeMounts[1].mountPath=/home/coder \
                 --set volumeMounts[1].name=volume-{user.data['username']} \
-                --set resources.limits.cpu={server.data['cpu']} \
-                --set resources.limits.memory={server.data['ram']} \
-                --set resources.requests.cpu={server.data['cpu']} \
-                --set resources.requests.memory={server.data['ram']} \
+                --set resources.limits.cpu={user['inferencing_server']['cpu']} \
+                --set resources.limits.memory={user['inferencing_server']['ram']} \
+                --set resources.requests.cpu={user['inferencing_server']['cpu']} \
+                --set resources.requests.memory={user['inferencing_server']['ram']} \
                 {gpu_config} \
                 {NAMESPACE}-{user.data['username']} spawners/k8s/codehub"""
         output = subprocess.run(command.split(), capture_output = True, text=True, universal_newlines=True)
 
 @shared_task
-def terminate_server_task(user: UserSerializer, server: ServerSerializer):
+def terminate_server_task(user: UserSerializer):
     os.system(f"""helm uninstall -n {NAMESPACE} {NAMESPACE}-{user.data['username']} spawners/k8s/codehub""")

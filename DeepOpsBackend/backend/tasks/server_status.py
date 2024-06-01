@@ -6,7 +6,8 @@ from backend.serializers import UserSerializer, ServerSerializer
 
 NAMESPACE = os.environ.get('NAMESPACE', 'dohub')
 
-def get_server_status(user: UserSerializer):
-    result = os.popen(f"kubectl get pod -l={NAMESPACE}-username={user.data['username']} -n {NAMESPACE} -o json").read()
+def get_server_status():
+    # result = os.popen(f"kubectl get pod -l={NAMESPACE}-username={user.data['username']} -n {NAMESPACE} -o json").read()
+    result = os.popen(f"kubectl get pod -n {NAMESPACE} -o json").read()
     result = json.loads(result)
     return result
