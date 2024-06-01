@@ -11,6 +11,8 @@ https://docs.djangoproject.com/en/2.2/ref/settings/
 """
 
 import os
+from celery.schedules import crontab
+
 
 # Build paths inside the project like this: os.path.join(BASE_DIR, ...)
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -95,6 +97,15 @@ SPECTACULAR_SETTINGS = {
     'SWAGGER_UI_FAVICON_HREF': 'SIDECAR',
     'REDOC_DIST': 'SIDECAR',
     # OTHER SETTINGS
+}
+
+CELERY_BROKER_URL = 'amqp://guest:guest@rabbitmq:5672//'
+
+CELERY_BEAT_SCHEDULE = {
+    'check_server_status': {
+        'task': 'backend.tasks.check_server_status',
+        'schedule': crontab(minute='*/1'),  # Schedule the task to run every minute
+    },
 }
 
 

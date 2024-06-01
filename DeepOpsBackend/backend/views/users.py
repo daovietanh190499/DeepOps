@@ -18,10 +18,10 @@ class UserView(viewsets.ModelViewSet):
     def create_server(self, request, pk=None) -> Response:
         user = get_object_or_404(User, pk=pk)
         user_serializer = UserSerializer(user)
-        create_server_task(user_serializer)
+        task = create_server_task.delay(user_serializer)
 
     @action(detail=True, url_name="terminate_server", methods=['post'])
     def terminate_server(self, request, pk=None) -> Response:
         user = get_object_or_404(User, pk=pk)
         user_serializer = UserSerializer(user)
-        terminate_server_task(user_serializer)
+        task = terminate_server_task.delay(user_serializer)
