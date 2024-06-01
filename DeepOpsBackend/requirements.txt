@@ -5,3 +5,4 @@ django_filter
 drf-spectacular
 drf-spectacular-sidecar
 environ
+celery

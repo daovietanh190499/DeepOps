@@ -2,7 +2,7 @@ from django.db import models
 
 class Server(models.Model):
     name = models.CharField(max_length=50)
-    image = models.CharField(max_length=50)
+    avatar = models.CharField(max_length=50)
     docker_image = models.CharField(max_length=50)
     docker_tag = models.CharField(max_length=50)
     cpu = models.CharField(max_length=50)
