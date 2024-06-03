@@ -83,7 +83,7 @@ DATABASES = {
 REST_FRAMEWORK = {
     'DEFAULT_PAGINATION_CLASS': 'backend.paginations.CustomPagination',
     'PAGE_SIZE': 100,
-    'DEFAULT_FILTER_BACKENDS': ('django_filters.rest_framework.DjangoFilterBackend', 'backend.filters.OrderingFilter'),
+    'DEFAULT_FILTER_BACKENDS': ('django_filters.rest_framework.DjangoFilterBackend',), #'backend.filters.OrderingFilter'),
     'UNAUTHENTICATED_USER': None, # Needed once you disable django.contrib.auth
     'DEFAULT_SCHEMA_CLASS': 'drf_spectacular.openapi.AutoSchema',
 }
@@ -99,7 +99,7 @@ SPECTACULAR_SETTINGS = {
     # OTHER SETTINGS
 }
 
-CELERY_BROKER_URL = 'amqp://guest:guest@rabbitmq:5672//'
+CELERY_BROKER_URL = 'amqp://dohub:dohub@0.0.0.0:5672//'
 
 CELERY_BEAT_SCHEDULE = {
     'check_server_status': {

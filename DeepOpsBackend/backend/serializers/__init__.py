@@ -1,2 +1,2 @@
 from .servers import ServerSerializer
-from .users import UserSerializer, UserResponseSerializer
+from .users import UserSerializer, UserResponseSerializer, UserRequestSerializer

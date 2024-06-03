@@ -19,7 +19,7 @@ class User(models.Model):
     username = models.CharField(max_length=50)
     avatar = models.CharField(max_length=200)
     is_accept = models.BooleanField(default=False)
-    inferencing_server = models.ForeignKey(to=Server, on_delete=models.CASCADE, related_name="inferencing_server")
+    inferencing_server = models.ForeignKey(to=Server, on_delete=models.CASCADE, related_name="inferencing_server", null=True)
     servers = models.ManyToManyField(to=Server, related_name="server_set")
     role = models.CharField(max_length=10, choices=ROLE_CHOICES, default='normal')
     state = models.CharField(max_length=50, choices=STATES, default='terminated')
