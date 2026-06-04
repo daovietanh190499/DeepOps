@@ -1,6 +1,7 @@
 from django.urls import path
 
 from backend import views
+from backend.views import cluster as cluster_views
 from backend.views import drives as drive_views
 from backend.views import workspaces as ws_views
 
@@ -17,7 +18,10 @@ urlpatterns = [
 
     path('drives', drive_views.my_drives, name='my-drives'),
     path('drives/create', drive_views.drive_create, name='drive-create'),
+    path('drives/bulk_create', drive_views.drive_bulk_create, name='drive-bulk-create'),
     path('drives/<uuid:drive_id>', drive_views.drive_delete, name='drive-delete'),
+    path('admin/cluster/overview', cluster_views.admin_cluster_overview, name='admin-cluster-overview'),
+    path('admin/cluster/join-command', cluster_views.admin_cluster_join_command, name='admin-cluster-join'),
     path('admin/drives', drive_views.admin_drives, name='admin-drives'),
 
     path('docker_images', ws_views.docker_images_list, name='docker-images'),

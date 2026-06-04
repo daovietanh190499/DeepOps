@@ -26,11 +26,18 @@
             <p v-if="is_login" class="hidden min-w-0 flex-1 truncate text-center text-sm text-slate-500 md:block">
                 Welcome, <span class="font-semibold text-slate-800" v-text="current_user"></span>
             </p>
-            <div class="flex shrink-0 items-center gap-2 sm:gap-3">
+            <div class="flex shrink-0 flex-col items-end gap-2 sm:flex-row sm:items-center sm:gap-3">
                 <nav v-if="is_login" class="flex flex-wrap justify-end rounded-lg bg-slate-100 p-1 gap-0.5">
-                    <button type="button" v-for="tab in visibleTabs" :key="tab.id"
+                    <button type="button" v-for="tab in userTabs" :key="tab.id"
                             @click="changeMenu(tab.id)"
                             :class="menu===tab.id ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-600 hover:text-slate-900'"
+                            class="rounded-md px-2.5 py-1.5 text-xs font-semibold transition sm:px-3 sm:text-sm"
+                            v-text="tab.label"></button>
+                </nav>
+                <nav v-if="is_login && is_admin" class="flex flex-wrap justify-end rounded-lg border border-indigo-200/70 bg-indigo-50 p-1 gap-0.5">
+                    <button type="button" v-for="tab in adminTabs" :key="tab.id"
+                            @click="changeMenu(tab.id)"
+                            :class="menu===tab.id ? 'bg-white text-indigo-700 shadow-sm ring-1 ring-indigo-200' : 'text-indigo-800/80 hover:text-indigo-900'"
                             class="rounded-md px-2.5 py-1.5 text-xs font-semibold transition sm:px-3 sm:text-sm"
                             v-text="tab.label"></button>
                 </nav>
@@ -197,11 +204,12 @@
                 <p v-if="bulkFileName" class="mt-2 text-xs font-mono text-blue-600" v-text="'Loaded: ' + bulkFileName"></p>
             </div>
             <p class="text-xs text-slate-500" v-if="bulkMode==='json'">
-                Or paste JSON array. Example:
-                <code class="block mt-1 rounded bg-slate-100 p-2 text-[10px] overflow-x-auto">[{"name":"ws1","cpu":2,"ram":"4G","drive":"20Gi","env_vars":{"PASSWORD":"secret"}}]</code>
+                Or paste JSON array. Each server needs a drive:
+                <code class="block mt-1 rounded bg-slate-100 p-2 text-[10px] overflow-x-auto">[{"name":"ws1","cpu":2,"ram":"4G","drive_id":"&lt;uuid&gt;","mount_path":"/home/coder","docker_repository":"codercom/code-server","docker_tag":"4.89.0-ubuntu","env_vars":{"PASSWORD":"secret"}}]</code>
+                Use <code class="text-[10px]">drive_name</code> or <code class="text-[10px]">drive_slug</code> instead of <code class="text-[10px]">drive_id</code> if you prefer.
             </p>
             <p class="text-xs text-slate-500" v-else>
-                Or paste CSV. Header: name,cpu,ram,drive_id,mount_path,gpu,ports,…
+                Or paste CSV. Header: name,cpu,ram,drive_id,drive_name,mount_path,gpu,docker_repository,docker_tag,ports,command,env_json
             </p>
             <textarea v-model="bulkText" rows="5" class="w-full rounded-lg border px-3 py-2 text-xs font-mono"
                       :placeholder="bulkMode==='json' ? '[{...}]' : 'name,cpu,ram,...'"></textarea>
@@ -217,30 +225,75 @@
                 <span v-if="bulkLoading">Processing…</span>
                 <span v-else>Bulk create</span>
             </button>
-            <div v-if="bulkSummary" class="rounded-lg bg-slate-50 px-3 py-2 text-xs text-slate-700" v-text="bulkSummary"></div>
+            <div v-if="bulkSummary" class="rounded-lg bg-slate-50 px-3 py-2 text-xs text-slate-700 whitespace-pre-wrap" v-text="bulkSummary"></div>
         </section>
         </div>
 
         <!-- My drives -->
         <section v-if="is_login && menu==='drives'" class="space-y-4">
-            <div class="flex flex-wrap items-center justify-between gap-3">
-                <h2 class="text-lg font-bold text-slate-900">My drives</h2>
-                <button type="button" @click="showCreateDrive=true"
-                        class="rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700">Create drive</button>
-            </div>
-            <div v-if="showCreateDrive" class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm space-y-3 max-w-md">
-                <h3 class="font-semibold text-slate-800">New DirectPV drive</h3>
-                <input v-model="newDrive.name" placeholder="Drive name" class="w-full rounded-lg border px-3 py-2 text-sm">
-                <select v-model="newDrive.size" class="w-full rounded-lg border px-3 py-2 text-sm">
-                    <option v-for="s in driveSizeOptions" :key="s" :value="s" v-text="s"></option>
-                </select>
-                <div class="flex gap-2">
+            <h2 class="text-lg font-bold text-slate-900">My drives</h2>
+
+            <div class="grid gap-4 lg:grid-cols-2 lg:items-start">
+                <!-- Single drive create -->
+                <section class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm space-y-4 h-full">
+                    <h3 class="text-lg font-bold text-slate-900">Create drive</h3>
+                    <p class="text-xs text-slate-500">Provision one DirectPV volume.</p>
+                    <label class="block text-sm font-medium text-slate-700">Name</label>
+                    <input v-model="newDrive.name" placeholder="Drive name" class="w-full rounded-lg border px-3 py-2 text-sm">
+                    <label class="block text-sm font-medium text-slate-700">Size</label>
+                    <select v-model="newDrive.size" class="w-full rounded-lg border px-3 py-2 text-sm">
+                        <option v-for="s in driveSizeOptions" :key="s" :value="s" v-text="s"></option>
+                    </select>
                     <button type="button" @click="createDrive" :disabled="driveCreateLoading"
-                            class="rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50">Create</button>
-                    <button type="button" @click="showCreateDrive=false" class="rounded-lg border px-4 py-2 text-sm">Cancel</button>
-                </div>
+                            class="w-full rounded-xl bg-blue-600 px-6 py-2.5 text-sm font-bold text-white hover:bg-blue-700 disabled:opacity-50">
+                        <span v-if="driveCreateLoading">Creating…</span>
+                        <span v-else>Create drive</span>
+                    </button>
+                </section>
+
+                <!-- Bulk drive create -->
+                <section class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm space-y-4 h-full">
+                    <h3 class="text-lg font-bold text-slate-900">Bulk create</h3>
+                    <p class="text-xs text-slate-500">Import many drives from JSON or CSV.</p>
+                    <div class="flex flex-wrap items-center gap-2">
+                        <button type="button" @click="driveBulkMode='json'"
+                                :class="driveBulkMode==='json' ? 'bg-blue-600 text-white' : 'bg-slate-100 text-slate-700'"
+                                class="rounded-lg px-3 py-1.5 text-sm font-semibold">JSON</button>
+                        <button type="button" @click="driveBulkMode='csv'"
+                                :class="driveBulkMode==='csv' ? 'bg-blue-600 text-white' : 'bg-slate-100 text-slate-700'"
+                                class="rounded-lg px-3 py-1.5 text-sm font-semibold">CSV</button>
+                    </div>
+                    <div class="rounded-xl border-2 border-dashed border-slate-200 bg-slate-50/80 p-4 text-center">
+                        <input ref="driveBulkFileInput" type="file" accept=".json,.csv,application/json,text/csv" class="hidden"
+                               @change="onBulkFileSelected($event, 'drives')">
+                        <p class="text-sm text-slate-600 mb-2">Upload <strong>.json</strong> or <strong>.csv</strong></p>
+                        <button type="button" @click="$refs.driveBulkFileInput.click()"
+                                class="inline-flex items-center gap-2 rounded-lg bg-white border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700 shadow-sm hover:bg-slate-50">
+                            <i class="fa fa-upload"></i> Choose file
+                        </button>
+                        <p v-if="driveBulkFileName" class="mt-2 text-xs font-mono text-blue-600" v-text="'Loaded: ' + driveBulkFileName"></p>
+                    </div>
+                    <p class="text-xs text-slate-500" v-if="driveBulkMode==='json'">
+                        Example:
+                        <code class="block mt-1 rounded bg-slate-100 p-2 text-[10px] overflow-x-auto">[{"name":"data-a","size":"20Gi"},{"name":"data-b","size":"50Gi"}]</code>
+                    </p>
+                    <p class="text-xs text-slate-500" v-else>CSV header: name,size</p>
+                    <textarea v-model="driveBulkText" rows="4" class="w-full rounded-lg border px-3 py-2 text-xs font-mono"
+                              :placeholder="driveBulkMode==='json' ? '[{...}]' : 'name,size'"></textarea>
+                    <div class="flex flex-wrap items-center justify-between gap-2">
+                        <button type="button" @click="clearDriveBulk" class="text-sm text-slate-500 hover:text-slate-800">Clear</button>
+                        <button type="button" @click="runDriveBulkCreate" :disabled="driveBulkLoading"
+                                class="rounded-xl bg-indigo-600 px-6 py-2.5 text-sm font-bold text-white hover:bg-indigo-700 disabled:opacity-50">
+                            <span v-if="driveBulkLoading">Processing…</span>
+                            <span v-else>Bulk create</span>
+                        </button>
+                    </div>
+                    <div v-if="driveBulkSummary" class="rounded-lg bg-slate-50 px-3 py-2 text-xs text-slate-700 whitespace-pre-wrap" v-text="driveBulkSummary"></div>
+                </section>
             </div>
-            <p v-if="myDrives.length===0 && !showCreateDrive" class="text-sm text-slate-500">No drives yet. Create a DirectPV volume before running a server.</p>
+
+            <p v-if="myDrives.length===0" class="text-sm text-slate-500">No drives yet. Create a DirectPV volume before running a server.</p>
+
             <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
                 <div v-for="d in myDrives" :key="d.id"
                      class="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
@@ -257,6 +310,138 @@
                             :title="d.in_use ? 'Stop servers using this drive first' : 'Delete'">Delete drive</button>
                 </div>
             </div>
+        </section>
+
+        <!-- Admin overall -->
+        <section v-if="is_login && menu==='admin-overall' && is_admin" class="space-y-6">
+            <div class="flex flex-wrap items-center justify-between gap-3">
+                <h2 class="text-lg font-bold text-slate-900">Cluster overall</h2>
+                <button type="button" @click="loadClusterOverview" :disabled="clusterLoading"
+                        class="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-sm font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-50">
+                    <span v-if="clusterLoading">Refreshing…</span>
+                    <span v-else>Refresh</span>
+                </button>
+            </div>
+
+            <section class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm space-y-4">
+                <h3 class="font-bold text-slate-900">Cluster information</h3>
+                <p v-if="clusterLoading && !clusterOverview" class="text-sm text-slate-500">Loading cluster data…</p>
+                <template v-else-if="clusterOverview">
+                    <div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-4 text-sm">
+                        <div class="rounded-xl bg-slate-50 px-4 py-3">
+                            <p class="text-xs text-slate-500">Server version</p>
+                            <p class="font-semibold font-mono text-slate-800" v-text="clusterOverview.cluster.server_version || '—'"></p>
+                        </div>
+                        <div class="rounded-xl bg-slate-50 px-4 py-3">
+                            <p class="text-xs text-slate-500">Client version</p>
+                            <p class="font-semibold font-mono text-slate-800" v-text="clusterOverview.cluster.client_version || '—'"></p>
+                        </div>
+                        <div class="rounded-xl bg-slate-50 px-4 py-3">
+                            <p class="text-xs text-slate-500">Nodes</p>
+                            <p class="font-semibold text-slate-800"
+                               v-text="clusterOverview.cluster.node_count + ' total · ' + clusterOverview.cluster.nodes_ready + ' ready'"></p>
+                        </div>
+                        <div class="rounded-xl bg-slate-50 px-4 py-3">
+                            <p class="text-xs text-slate-500">Namespaces</p>
+                            <p class="font-semibold text-slate-800" v-text="clusterOverview.cluster.namespace_count"></p>
+                        </div>
+                    </div>
+                    <pre v-if="clusterOverview.cluster.cluster_info"
+                         class="overflow-x-auto rounded-lg bg-slate-900 p-3 text-xs text-slate-100"
+                         v-text="clusterOverview.cluster.cluster_info"></pre>
+                    <p class="text-xs text-slate-400" v-if="clusterOverview.cluster.fetched_at"
+                       v-text="'Updated ' + clusterOverview.cluster.fetched_at"></p>
+                </template>
+
+                <div class="border-t border-slate-100 pt-4">
+                    <h4 class="text-sm font-semibold text-slate-800 mb-2">Join new node</h4>
+                    <p class="text-xs text-slate-500 mb-3">Runs <code class="rounded bg-slate-100 px-1">microk8s add-node</code> on the host where this hub can reach the microk8s CLI.</p>
+                    <button type="button" @click="fetchJoinCommand" :disabled="joinCommandLoading"
+                            class="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-700 disabled:opacity-50">
+                        <span v-if="joinCommandLoading">Fetching…</span>
+                        <span v-else>Get join command</span>
+                    </button>
+                    <p v-if="joinCommandError" class="mt-2 text-sm text-rose-600" v-text="joinCommandError"></p>
+                    <div v-if="joinCommand" class="mt-3 flex flex-wrap items-start gap-2">
+                        <pre class="flex-1 min-w-0 overflow-x-auto rounded-lg bg-slate-900 p-3 text-xs text-emerald-200" v-text="joinCommand"></pre>
+                        <button type="button" @click="copyJoinCommand"
+                                class="shrink-0 rounded-lg border border-slate-200 px-3 py-2 text-xs font-semibold hover:bg-slate-50">Copy</button>
+                    </div>
+                    <pre v-if="joinCommandRaw && !joinCommand" class="mt-3 overflow-x-auto rounded-lg bg-slate-50 p-3 text-xs text-slate-600 whitespace-pre-wrap" v-text="joinCommandRaw"></pre>
+                </div>
+            </section>
+
+            <section class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm space-y-3">
+                <h3 class="font-bold text-slate-900">Kubernetes nodes</h3>
+                <p v-if="clusterOverview && clusterOverview.nodes.error" class="text-sm text-rose-600" v-text="clusterOverview.nodes.error"></p>
+                <div v-else-if="clusterOverview && clusterOverview.nodes.nodes.length" class="overflow-x-auto">
+                    <table class="w-full min-w-[640px] text-sm text-left">
+                        <thead>
+                            <tr class="border-b border-slate-200 text-xs uppercase text-slate-500">
+                                <th class="py-2 pr-3">Name</th>
+                                <th class="py-2 pr-3">Status</th>
+                                <th class="py-2 pr-3">Roles</th>
+                                <th class="py-2 pr-3">Internal IP</th>
+                                <th class="py-2 pr-3">External IP</th>
+                                <th class="py-2 pr-3">Version</th>
+                                <th class="py-2 pr-3">OS</th>
+                                <th class="py-2 pr-3">CPU</th>
+                                <th class="py-2 pr-3">Memory</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr v-for="n in clusterOverview.nodes.nodes" :key="n.name" class="border-b border-slate-100">
+                                <td class="py-2 pr-3 font-mono text-xs font-semibold" v-text="n.name"></td>
+                                <td class="py-2 pr-3">
+                                    <span class="rounded-full px-2 py-0.5 text-xs font-bold"
+                                          :class="n.ready==='True' ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'"
+                                          v-text="n.ready==='True' ? 'Ready' : 'NotReady'"></span>
+                                </td>
+                                <td class="py-2 pr-3 text-xs" v-text="(n.roles || []).join(', ')"></td>
+                                <td class="py-2 pr-3 font-mono text-xs" v-text="n.internal_ip || '—'"></td>
+                                <td class="py-2 pr-3 font-mono text-xs" v-text="n.external_ip || '—'"></td>
+                                <td class="py-2 pr-3 font-mono text-xs" v-text="n.kubelet_version || '—'"></td>
+                                <td class="py-2 pr-3 text-xs max-w-[12rem] truncate" :title="n.os_image" v-text="n.os_image || '—'"></td>
+                                <td class="py-2 pr-3 text-xs" v-text="n.cpu_capacity || '—'"></td>
+                                <td class="py-2 pr-3 text-xs" v-text="n.memory_capacity || '—'"></td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+                <p v-else class="text-sm text-slate-500">No nodes reported.</p>
+            </section>
+
+            <section class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm space-y-3">
+                <h3 class="font-bold text-slate-900">DirectPV drives</h3>
+                <p class="text-xs text-slate-500">From <code class="rounded bg-slate-100 px-1">kubectl directpv list drives</code></p>
+                <p v-if="clusterOverview && clusterOverview.directpv.error" class="text-sm text-rose-600" v-text="clusterOverview.directpv.error"></p>
+                <div v-else-if="clusterOverview && clusterOverview.directpv.drives.length" class="overflow-x-auto">
+                    <table class="w-full min-w-[720px] text-sm text-left">
+                        <thead>
+                            <tr class="border-b border-slate-200 text-xs uppercase tracking-wide text-slate-500">
+                                <th v-for="col in directpvColumns" :key="col.key" class="py-2 pr-3 whitespace-nowrap" v-text="col.label"></th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr v-for="(row, idx) in clusterOverview.directpv.drives" :key="row.drive_id || idx" class="border-b border-slate-100 hover:bg-slate-50/80">
+                                <td v-for="col in directpvColumns" :key="col.key" class="py-2 pr-3 text-xs align-top"
+                                    :class="col.key === 'drive_id' || col.key === 'make' ? 'font-mono max-w-[14rem] truncate' : ''"
+                                    :title="row[col.key] || ''">
+                                    <span v-if="col.key === 'status'"
+                                          class="inline-block rounded-full px-2 py-0.5 font-semibold"
+                                          :class="(row.status || '').toLowerCase() === 'ready' ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'"
+                                          v-text="row[col.key] || '—'"></span>
+                                    <span v-else v-text="row[col.key] || '—'"></span>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+                <pre v-else-if="clusterOverview && clusterOverview.directpv.raw"
+                     class="overflow-x-auto rounded-lg bg-slate-50 p-3 text-xs text-slate-700 whitespace-pre-wrap"
+                     v-text="clusterOverview.directpv.raw"></pre>
+                <p v-else class="text-sm text-slate-500">No DirectPV drives listed.</p>
+            </section>
         </section>
 
         <!-- Admin drives -->

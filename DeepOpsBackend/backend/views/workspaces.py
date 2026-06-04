@@ -8,11 +8,11 @@ from django.views.decorators.http import require_http_methods
 
 from backend.models import DockerImage, User, UserDrive, Workspace
 from backend.services.github_auth import auth
-from backend.services.k8s import (
-    build_spawn_config,
-    create_codehub,
-    get_codehub_workspace,
-    remove_codehub,
+from backend.services.k8s import get_codehub_workspace, remove_codehub
+from backend.services.bulk import (
+    bulk_workspace_result,
+    resolve_user_drive,
+    spawn_workspace,
 )
 from backend.services.k8s_status import live_workspace_state, workspace_is_active
 
@@ -68,16 +68,6 @@ def _parse_body(request) -> dict:
     return json.loads(request.body.decode('utf-8'))
 
 
-def _resolve_user_drive(user: User, data: dict) -> UserDrive | None:
-    drive_id = data.get('drive_id') or data.get('user_drive_id')
-    if not drive_id:
-        return None
-    drive = UserDrive.objects.filter(id=drive_id, user=user).first()
-    if not drive and user.role == User.ROLE_ADMIN:
-        drive = UserDrive.objects.filter(id=drive_id).first()
-    return drive
-
-
 def _apply_workspace_fields(ws: Workspace, data: dict, owner: User | None = None):
     owner = owner or ws.user
     for field in ('name', 'cpu', 'ram', 'gpu', 'docker_repository', 'docker_tag'):
@@ -85,7 +75,7 @@ def _apply_workspace_fields(ws: Workspace, data: dict, owner: User | None = None
             setattr(ws, field, data[field])
     if 'mount_path' in data and data['mount_path']:
         ws.mount_path = str(data['mount_path']).strip()[:256] or '/home/coder'
-    drive = _resolve_user_drive(owner, data)
+    drive = resolve_user_drive(owner, data)
     if drive:
         ws.user_drive = drive
     if 'env_vars' in data and isinstance(data['env_vars'], dict):
@@ -207,20 +197,9 @@ def workspace_export(request, user, workspace_id):
 def _start_workspace(ws: Workspace):
     if not ws.user_drive_id:
         return JsonResponse({'message': 'select a drive to mount'}, status=400)
-    try:
-        if settings.DEFAULT_SPAWNER == 'k8s':
-            config = build_spawn_config(ws)
-    except ValueError as exc:
-        return JsonResponse({'message': str(exc)}, status=400)
-    if settings.DEFAULT_SPAWNER == 'k8s':
-        command, logs, exit_code = create_codehub(config)
-        if exit_code != 0:
-            return JsonResponse({
-                'message': 'helm spawn failed',
-                'logs': logs,
-                'command': command,
-                'exit_code': exit_code,
-            }, status=500)
+    spawn_err = spawn_workspace(ws)
+    if spawn_err:
+        return JsonResponse({'message': spawn_err.get('error', 'spawn failed'), **spawn_err}, status=500)
     return JsonResponse({'message': 'success', 'result': _workspace_payload(ws)})
 
 
@@ -309,30 +288,30 @@ def workspace_bulk_run(request, user):
         if not isinstance(item, dict):
             results.append({'index': i, 'ok': False, 'error': 'invalid item'})
             continue
+
         name = (item.get('name') or f'Workspace {i + 1}').strip()[:128]
         ws = Workspace(user=user, name=name)
         _apply_workspace_fields(ws, item, owner=user)
+
         if not ws.user_drive_id:
-            results.append({'index': i, 'ok': False, 'error': 'drive_id required'})
+            drive_ref = item.get('drive_id') or item.get('drive_name') or item.get('drive_slug')
+            err = 'drive_id, drive_name, or drive_slug required'
+            if drive_ref:
+                err = f'drive not found: {drive_ref}'
+            results.append({'index': i, 'ok': False, 'error': err})
             continue
+
         ws.save()
-        entry = {'index': i, 'ok': True, 'id': str(ws.id), 'name': ws.name, 'slug': ws.slug}
+        entry = bulk_workspace_result(ws, i, auto_start=auto_start)
+
         if auto_start:
-            try:
-                if settings.DEFAULT_SPAWNER == 'k8s':
-                    config = build_spawn_config(ws)
-            except ValueError as exc:
-                results.append({'index': i, 'ok': False, 'error': str(exc)})
-                continue
-            if settings.DEFAULT_SPAWNER == 'k8s':
-                command, logs, exit_code = create_codehub(config)
-                if exit_code != 0:
-                    entry['ok'] = False
-                    entry['error'] = 'helm spawn failed'
-                    entry['logs'] = logs
-                    results.append(entry)
-                    continue
-            entry['state'] = live_workspace_state(ws)
+            spawn_err = spawn_workspace(ws)
+            if spawn_err:
+                entry['ok'] = False
+                entry.update(spawn_err)
+            else:
+                entry['state'] = live_workspace_state(ws)
+
         results.append(entry)
 
     ok_count = sum(1 for r in results if r.get('ok'))

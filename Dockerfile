@@ -34,6 +34,8 @@ RUN pip3 install --no-cache-dir -r requirements.txt
 
 COPY DeepOpsBackend /app
 COPY charts/codehub /charts/codehub
+COPY ./kubectl-directpv /usr/local/bin/kubectl-directpv
+RUN chmod +x /usr/local/bin/kubectl-directpv
 
 ENV CODEHUB_CHART_PATH=/charts/codehub
 ENV PYTHONUNBUFFERED=1

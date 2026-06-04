@@ -184,10 +184,26 @@ function formPayload(form) {
     }
 }
 
+function formatBulkSummary(data, total) {
+    let summary = `Done: ${data.ok} ok, ${data.failed} failed (${total} total)`
+    const failed = (data.results || []).filter((r) => !r.ok)
+    if (failed.length) {
+        summary += '\n' + failed.map((r) => `#${r.index + 1}: ${r.error || 'failed'}`).join('\n')
+    }
+    return summary
+}
+
 function normalizeBulkItem(raw) {
     const item = { ...raw }
     if (item.gpu === 'none') item.gpu = ''
     if (item.user_drive_id) item.drive_id = item.user_drive_id
+    if (item.drive && !item.drive_id && !item.drive_name && !item.drive_slug) {
+        if (/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(String(item.drive))) {
+            item.drive_id = item.drive
+        } else {
+            item.drive_name = String(item.drive)
+        }
+    }
     if (!item.mount_path) item.mount_path = '/home/coder'
     if (typeof item.ports === 'string') item.exposed_ports = parsePorts(item.ports)
     else if (item.ports_text) item.exposed_ports = parsePorts(item.ports_text)
@@ -198,7 +214,7 @@ function normalizeBulkItem(raw) {
     return item
 }
 
-function parseCsvBulk(text) {
+function parseCsvRows(text, rowMapper) {
     const lines = text.trim().split(/\r?\n/).filter((l) => l.trim())
     if (lines.length < 2) throw new Error('CSV needs header + at least one row')
     const headers = lines[0].split(',').map((h) => h.trim())
@@ -206,19 +222,37 @@ function parseCsvBulk(text) {
     for (let i = 1; i < lines.length; i++) {
         const cols = lines[i].split(',').map((c) => c.trim().replace(/^"|"$/g, ''))
         const row = {}
+        headers.forEach((h, j) => { row[h] = cols[j] ?? '' })
+        items.push(rowMapper(row))
+    }
+    return items
+}
+
+function parseCsvBulk(text) {
+    return parseCsvRows(text, (row) => {
         const env_vars = {}
-        headers.forEach((h, j) => {
-            const val = cols[j] ?? ''
+        const item = {}
+        Object.keys(row).forEach((h) => {
+            const val = row[h]
             if (h.startsWith('env_')) env_vars[h.slice(4)] = val
             else if (h === 'env_json') {
                 try { Object.assign(env_vars, JSON.parse(val || '{}')) } catch (_) { /* skip */ }
-            } else row[h] = val
+            } else item[h] = val
         })
-        if (Object.keys(env_vars).length) row.env_vars = env_vars
-        if (row.cpu) row.cpu = parseInt(row.cpu, 10)
-        items.push(normalizeBulkItem(row))
-    }
-    return items
+        if (Object.keys(env_vars).length) item.env_vars = env_vars
+        if (item.cpu) item.cpu = parseInt(item.cpu, 10)
+        return normalizeBulkItem(item)
+    })
+}
+
+function normalizeDriveBulkItem(raw) {
+    const item = { ...raw }
+    if (!item.size) item.size = '20Gi'
+    return item
+}
+
+function parseDriveCsvBulk(text) {
+    return parseCsvRows(text, (row) => normalizeDriveBulkItem(row))
 }
 
 function downloadJson(obj, filename) {
@@ -243,7 +277,6 @@ const appVue = new Vue({
         adminDrives: [],
         adminDrivePagination: { page: 1, pages: 1, total: 0, per_page: 12 },
         adminDriveFilter: '',
-        showCreateDrive: false,
         newDrive: { name: 'My drive', size: '20Gi' },
         driveCreateLoading: false,
         deleteModalDrive: null,
@@ -260,6 +293,11 @@ const appVue = new Vue({
         bulkAutoStart: true,
         bulkLoading: false,
         bulkSummary: '',
+        driveBulkMode: 'json',
+        driveBulkText: '',
+        driveBulkFileName: '',
+        driveBulkLoading: false,
+        driveBulkSummary: '',
         dockerImages: [],
         myWorkspaces: [],
         adminWorkspaces: [],
@@ -267,6 +305,12 @@ const appVue = new Vue({
         adminServerFilter: '',
         adminDockerImages: [],
         newImage: { label: '', repository: '', default_tag: 'latest' },
+        clusterOverview: null,
+        clusterLoading: false,
+        joinCommand: '',
+        joinCommandRaw: '',
+        joinCommandLoading: false,
+        joinCommandError: '',
         userList: [],
         is_login: typeof is_login !== 'undefined' ? is_login : 0,
         menu: 'home',
@@ -294,19 +338,28 @@ const appVue = new Vue({
             const d = this.myDrives.find((x) => x.id === this.form.drive_id)
             return d ? d.name + ' (' + d.size + ')' : '—'
         },
-        visibleTabs() {
-            const tabs = [
+        userTabs() {
+            return [
                 { id: 'home', label: 'Home' },
                 { id: 'drives', label: 'Drives' },
                 { id: 'servers', label: 'My servers' },
             ]
-            if (this.is_admin) {
-                tabs.push({ id: 'admin-users', label: 'Users' })
-                tabs.push({ id: 'admin-drives', label: 'All drives' })
-                tabs.push({ id: 'admin-servers', label: 'Servers' })
-                tabs.push({ id: 'admin-images', label: 'Images' })
-            }
-            return tabs
+        },
+        adminTabs() {
+            return [
+                { id: 'admin-overall', label: 'Overall' },
+                { id: 'admin-users', label: 'Users' },
+                { id: 'admin-drives', label: 'All drives' },
+                { id: 'admin-servers', label: 'Servers' },
+                { id: 'admin-images', label: 'Images' },
+            ]
+        },
+        directpvColumns() {
+            const dp = this.clusterOverview && this.clusterOverview.directpv
+            if (dp && dp.columns && dp.columns.length) return dp.columns
+            const drives = (dp && dp.drives) || []
+            if (!drives.length) return []
+            return Object.keys(drives[0]).map((k) => ({ key: k, label: k.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase()) }))
         },
         envKeysSorted() {
             return Object.keys(this.form.env_vars || {}).sort()
@@ -342,6 +395,7 @@ const appVue = new Vue({
             if (m === 'servers' || m === 'home') await this.loadMyWorkspaces()
             if (m === 'admin-drives') await this.loadAdminDrives(this.adminDrivePagination.page)
             if (m === 'admin-servers') await this.loadAdminWorkspaces(this.adminPagination.page)
+            if (m === 'admin-overall') await this.loadClusterOverview()
         },
         loginWithGithub() { window.location = 'login' },
         logout() { window.location = 'logout' },
@@ -415,11 +469,12 @@ const appVue = new Vue({
             window.history.replaceState({}, '', '/?tab=' + menu)
             if (menu === 'drives') this.loadMyDrives()
             if (menu === 'servers') this.loadMyWorkspaces()
+            if (menu === 'admin-overall') this.loadClusterOverview()
             if (menu === 'admin-drives') this.loadAdminDrives(1)
             if (menu === 'admin-servers') this.loadAdminWorkspaces(1)
             if (menu === 'admin-users') this.getAllUsers()
             if (menu === 'admin-images') this.loadAdminDockerImages()
-            if (['home', 'drives', 'servers', 'admin-drives', 'admin-servers'].includes(menu)) {
+            if (['home', 'drives', 'servers', 'admin-drives', 'admin-servers', 'admin-overall'].includes(menu)) {
                 this.startStatusPolling()
             }
         },
@@ -433,8 +488,51 @@ const appVue = new Vue({
                 await this.getAllUsers()
                 await this.loadAdminDockerImages()
             }
-            if (['home', 'drives', 'servers', 'admin-drives', 'admin-servers'].includes(this.menu)) {
+            if (this.menu === 'admin-overall') await this.loadClusterOverview()
+            if (['home', 'drives', 'servers', 'admin-drives', 'admin-servers', 'admin-overall'].includes(this.menu)) {
                 this.startStatusPolling()
+            }
+        },
+        async loadClusterOverview() {
+            this.clusterLoading = true
+            try {
+                const res = await fetch('admin/cluster/overview')
+                if (res.status !== 200) return
+                const data = await res.json()
+                this.clusterOverview = data.result || null
+            } finally {
+                this.clusterLoading = false
+            }
+        },
+        async fetchJoinCommand() {
+            this.joinCommandLoading = true
+            this.joinCommandError = ''
+            this.joinCommand = ''
+            this.joinCommandRaw = ''
+            try {
+                const res = await fetch('admin/cluster/join-command', { method: 'POST' })
+                const data = await res.json().catch(() => ({}))
+                const result = data.result || {}
+                this.joinCommandRaw = result.raw || ''
+                if (result.ok && result.command) {
+                    this.joinCommand = result.command
+                } else {
+                    this.joinCommandError = result.error || data.message || 'Could not get join command'
+                    if (this.joinCommandRaw) this.joinCommandError += ' (see output below)'
+                }
+            } catch (e) {
+                this.joinCommandError = e.message || String(e)
+            } finally {
+                this.joinCommandLoading = false
+            }
+        },
+        async copyJoinCommand() {
+            if (!this.joinCommand) return
+            try {
+                await navigator.clipboard.writeText(this.joinCommand)
+                this.showToast('Join command copied')
+            } catch {
+                this.showToast('Copy failed')
             }
         },
         async getCurrentUserState() {
@@ -494,12 +592,17 @@ const appVue = new Vue({
         exportFormConfig() {
             downloadJson(formPayload(this.form), 'dohub-workspace-config.json')
         },
-        onBulkFileSelected(event) {
+        onBulkFileSelected(event, target) {
+            const kind = target || 'servers'
             const file = event.target.files && event.target.files[0]
             if (!file) return
             const ext = (file.name.split('.').pop() || '').toLowerCase()
-            if (ext === 'csv') this.bulkMode = 'csv'
-            else if (ext === 'json') this.bulkMode = 'json'
+            const modeKey = kind === 'drives' ? 'driveBulkMode' : 'bulkMode'
+            const textKey = kind === 'drives' ? 'driveBulkText' : 'bulkText'
+            const fileKey = kind === 'drives' ? 'driveBulkFileName' : 'bulkFileName'
+            const summaryKey = kind === 'drives' ? 'driveBulkSummary' : 'bulkSummary'
+            if (ext === 'csv') this[modeKey] = 'csv'
+            else if (ext === 'json') this[modeKey] = 'json'
             else {
                 this.showToast('Use .json or .csv file')
                 event.target.value = ''
@@ -507,9 +610,9 @@ const appVue = new Vue({
             }
             const reader = new FileReader()
             reader.onload = (ev) => {
-                this.bulkText = ev.target.result || ''
-                this.bulkFileName = file.name
-                this.bulkSummary = ''
+                this[textKey] = ev.target.result || ''
+                this[fileKey] = file.name
+                this[summaryKey] = ''
             }
             reader.onerror = () => this.showToast('Could not read file')
             reader.readAsText(file)
@@ -519,6 +622,11 @@ const appVue = new Vue({
             this.bulkText = ''
             this.bulkFileName = ''
             this.bulkSummary = ''
+        },
+        clearDriveBulk() {
+            this.driveBulkText = ''
+            this.driveBulkFileName = ''
+            this.driveBulkSummary = ''
         },
         parseBulkItems() {
             const text = (this.bulkText || '').trim()
@@ -545,12 +653,47 @@ const appVue = new Vue({
                     this.bulkSummary = data.message || 'Bulk create failed'
                     return
                 }
-                this.bulkSummary = `Done: ${data.ok} ok, ${data.failed} failed (${items.length} total)`
+                this.bulkSummary = formatBulkSummary(data, items.length)
                 await this.loadMyWorkspaces()
+                await this.loadMyDrives()
             } catch (e) {
                 this.bulkSummary = e.message || String(e)
             } finally {
                 this.bulkLoading = false
+            }
+        },
+        parseDriveBulkItems() {
+            const text = (this.driveBulkText || '').trim()
+            if (!text) throw new Error('Upload a file or paste JSON/CSV content')
+            if (this.driveBulkMode === 'json') {
+                const parsed = JSON.parse(text)
+                const arr = Array.isArray(parsed) ? parsed : [parsed]
+                return arr.map(normalizeDriveBulkItem)
+            }
+            return parseDriveCsvBulk(text)
+        },
+        async runDriveBulkCreate() {
+            this.driveBulkLoading = true
+            this.driveBulkSummary = ''
+            try {
+                const items = this.parseDriveBulkItems()
+                const res = await fetch('drives/bulk_create', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ items }),
+                })
+                const data = await res.json().catch(() => ({}))
+                if (res.status !== 200) {
+                    this.driveBulkSummary = data.message || 'Bulk create failed'
+                    return
+                }
+                this.driveBulkSummary = formatBulkSummary(data, items.length)
+                await this.loadMyDrives()
+                if (this.is_admin) await this.loadAdminDrives(this.adminDrivePagination.page)
+            } catch (e) {
+                this.driveBulkSummary = e.message || String(e)
+            } finally {
+                this.driveBulkLoading = false
             }
         },
         async loadMyDrives() {
@@ -583,7 +726,6 @@ const appVue = new Vue({
                 this.showToast(data.message || 'Create failed')
                 return
             }
-            this.showCreateDrive = false
             this.newDrive = { name: 'My drive', size: '20Gi' }
             await this.loadMyDrives()
             this.showToast('Drive created')

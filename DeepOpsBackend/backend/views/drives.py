@@ -6,12 +6,8 @@ from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_http_methods
 
 from backend.models import User, UserDrive, Workspace
-from backend.services.drives_k8s import (
-    create_drive_pvc,
-    delete_drive_pvc,
-    get_pvc_phase,
-    normalize_size,
-)
+from backend.services.drives_k8s import delete_drive_pvc, get_pvc_phase, normalize_size
+from backend.services.bulk import bulk_drive_result, provision_user_drive
 from backend.services.k8s_status import drive_is_in_use, live_drive_status
 from backend.services.github_auth import auth
 
@@ -73,15 +69,62 @@ def drive_create(request, user):
     name = (data.get('name') or 'My drive').strip()[:128]
     size = normalize_size(data.get('size') or '20Gi')
 
-    drive = UserDrive(user=user, name=name, size=size)
-    drive.save()
-
-    logs, code = create_drive_pvc(drive.claim_name, size, user.username, str(drive.id))
-    if code != 0:
-        drive.delete()
-        return JsonResponse({'message': 'pvc create failed', 'logs': logs}, status=500)
+    drive, err, logs = provision_user_drive(user, name, size)
+    if err:
+        return JsonResponse({'message': err, 'logs': logs}, status=500)
 
     return JsonResponse({'result': _drive_payload(drive)}, status=201)
+
+
+@auth.verify
+@csrf_exempt
+@require_http_methods(['POST'])
+def drive_bulk_create(request, user):
+    """Create multiple DirectPV drives from JSON/CSV import."""
+    denied = _require_accepted(user)
+    if denied:
+        return denied
+    try:
+        data = _parse_body(request)
+    except json.JSONDecodeError:
+        return JsonResponse({'message': 'invalid json'}, status=400)
+
+    items = data.get('items') or []
+    if not isinstance(items, list) or not items:
+        return JsonResponse({'message': 'items required'}, status=400)
+
+    results = []
+    for i, item in enumerate(items):
+        if not isinstance(item, dict):
+            results.append({'index': i, 'ok': False, 'error': 'invalid item'})
+            continue
+
+        name = (item.get('name') or f'Drive {i + 1}').strip()[:128]
+        if not name:
+            results.append({'index': i, 'ok': False, 'error': 'name required'})
+            continue
+
+        size = normalize_size(item.get('size') or '20Gi')
+        drive, err, logs = provision_user_drive(user, name, size)
+        if err:
+            results.append({
+                'index': i,
+                'ok': False,
+                'error': err,
+                'name': name,
+                'logs': logs,
+            })
+            continue
+
+        results.append(bulk_drive_result(drive, i))
+
+    ok_count = sum(1 for r in results if r.get('ok'))
+    return JsonResponse({
+        'message': 'success',
+        'ok': ok_count,
+        'failed': len(results) - ok_count,
+        'results': results,
+    })
 
 
 @auth.verify
