@@ -1,0 +1,19 @@
+{{- if .Values.persistence.enabled }}
+{{- $claimName := .Values.persistence.claimName | default .Values.mainVolume.claimName }}
+{{- if $claimName }}
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ $claimName }}
+  labels:
+    {{- include "codehub.labels" . | nindent 4 }}
+spec:
+  volumeMode: {{ .Values.persistence.volumeMode }}
+  storageClassName: {{ .Values.persistence.storageClassName }}
+  accessModes:
+    {{- toYaml .Values.persistence.accessModes | nindent 4 }}
+  resources:
+    requests:
+      storage: {{ .Values.persistence.size }}
+{{- end }}
+{{- end }}

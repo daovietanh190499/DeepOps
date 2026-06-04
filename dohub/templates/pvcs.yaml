@@ -1,0 +1,17 @@
+{{- range .Values.persistence.claims }}
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ .name }}
+  labels:
+    {{- include "dohub.labels" $ | nindent 4 }}
+spec:
+  volumeMode: {{ $.Values.persistence.volumeMode }}
+  storageClassName: {{ $.Values.persistence.storageClassName }}
+  accessModes:
+    {{- toYaml $.Values.persistence.accessModes | nindent 4 }}
+  resources:
+    requests:
+      storage: {{ .size }}
+{{- end }}

@@ -1,0 +1,171 @@
+# Default values for jenkins chart.
+
+replicaCount: 1
+
+nameOverride: ""
+fullnameOverride: ""
+
+image:
+  repository: jenkins/jenkins
+  tag: "lts-jdk17"
+  pullPolicy: IfNotPresent
+
+imagePullSecrets: []
+
+serviceAccount:
+  create: true
+  automount: true
+  name: ""
+
+rbac:
+  create: true
+
+podAnnotations: {}
+podLabels: {}
+
+podSecurityContext:
+  fsGroup: 1000
+  runAsUser: 1000
+  runAsNonRoot: true
+
+securityContext:
+  allowPrivilegeEscalation: false
+  readOnlyRootFilesystem: false
+
+controller:
+  # Jenkins UI port inside the container
+  httpPort: 8080
+  # Agent JNLP port
+  agentListenerPort: 50000
+  adminUser: admin
+  # Leave empty to auto-generate on first install (see NOTES.txt)
+  adminPassword: ""
+  existingSecret: ""
+  existingSecretUserKey: jenkins-admin-user
+  existingSecretPasswordKey: jenkins-admin-password
+  jenkinsOpts: "--sessionTimeout=1440"
+  javaOpts: "-Xmx2048m -Xms512m -Djenkins.install.runSetupWizard=false"
+  resources:
+    requests:
+      cpu: "500m"
+      memory: "1Gi"
+    limits:
+      cpu: "2"
+      memory: "4Gi"
+  # Executors on controller (0 = only agents run builds)
+  numExecutors: 0
+
+persistence:
+  enabled: true
+  storageClass: directpv-min-io
+  volumeMode: Filesystem
+  accessMode: ReadWriteOnce
+  size: 20Gi
+  existingClaim: ""
+
+service:
+  type: ClusterIP
+  httpPort: 8080
+  agentListenerPort: 50000
+  annotations: {}
+
+ingress:
+  enabled: true
+  className: nginx
+  annotations:
+    nginx.ingress.kubernetes.io/proxy-body-size: "0"
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "600"
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "600"
+  hosts:
+    - host: jenkins.example.com
+      paths:
+        - path: /
+          pathType: Prefix
+  tls: []
+  #  - secretName: jenkins-tls
+  #    hosts:
+  #      - jenkins.example.com
+
+# Plugins installed on first boot (/usr/share/jenkins/ref/plugins.txt)
+# Format: "plugin-id" or "plugin-id:version"
+plugins:
+  - kubernetes
+  - workflow-aggregator
+  - git
+  - configuration-as-code
+  - credentials-binding
+  - pipeline-stage-view
+  - docker-workflow
+  - blueocean
+  - job-dsl
+  - matrix-auth
+  - authorize-project
+  - build-timeout
+  - timestamper
+  - ws-cleanup
+  - ant
+  - gradle
+  - email-ext
+  - mailer
+  - github-branch-source
+  - pipeline-model-definition
+  - ssh-slaves
+
+# Jenkins Configuration as Code
+configurationAsCode:
+  enabled: true
+  # Public URL of Jenkins (used by K8s cloud and location)
+  jenkinsUrl: ""
+  # Allow anonymous read (not recommended for production)
+  allowAnonymousRead: false
+
+kubernetesAgent:
+  enabled: true
+  # Namespace where build pods are created (empty = release namespace)
+  namespace: ""
+  jenkinsTunnel: ""
+  jenkinsUrl: ""
+  # Pod template defaults for dynamic agents
+  defaultsProviderTemplate: "default"
+  templates:
+    - name: "default"
+      label: "jenkins-agent"
+      nodeUsageMode: NORMAL
+      containers:
+        - name: jnlp
+          image: "jenkins/inbound-agent:latest-jdk17"
+          alwaysPullImage: true
+          workingDir: "/home/jenkins/agent"
+          resourceRequestCpu: "512m"
+          resourceRequestMemory: "512Mi"
+          resourceLimitCpu: "2"
+          resourceLimitMemory: "2Gi"
+
+agent:
+  image: jenkins/inbound-agent
+  tag: latest-jdk17
+
+livenessProbe:
+  httpGet:
+    path: /login
+    port: http
+  initialDelaySeconds: 90
+  periodSeconds: 10
+  timeoutSeconds: 5
+  failureThreshold: 12
+
+readinessProbe:
+  httpGet:
+    path: /login
+    port: http
+  initialDelaySeconds: 60
+  periodSeconds: 10
+  timeoutSeconds: 5
+  failureThreshold: 3
+
+autoscaling:
+  enabled: false
+
+nodeSelector: {}
+tolerations: []
+affinity: {}

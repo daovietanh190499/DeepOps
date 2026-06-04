@@ -1,0 +1,138 @@
+replicaCount: 1
+
+image:
+  repository: daovietanh99/dohub
+  pullPolicy: Always
+  tag: "latest"
+
+# imagePullSecrets: []
+# nameOverride: ""
+# fullnameOverride: ""
+
+serviceAccount:
+  create: true
+  automount: true
+  # annotations: {}
+  name: "dohub-service-account"
+
+# podAnnotations: {}
+# podLabels: {}
+
+container:
+  command: ['/bin/bash', '-c']
+  args:
+    - >-
+      set -a && source /home/dohub/.env && set +a &&
+      export CODEHUB_CHART_PATH=/charts/codehub &&
+      export DATABASE_HOST=${DATABASE_HOST:-/mnt/database/dohub.db} &&
+      cd /app &&
+      python3 manage.py migrate --noinput &&
+      gunicorn DeepOpsBackend.wsgi:application --bind 0.0.0.0:5000 --workers 2 --timeout 120
+
+extraEnv:
+  - name: CODEHUB_CHART_PATH
+    value: /charts/codehub
+  - name: CONFIG_PATH
+    value: /etc/dohub/config.yaml
+
+podSecurityContext:
+  fsGroup: 2000
+
+securityContext:
+  capabilities:
+    add: ['SYS_ADMIN']
+  allowPrivilegeEscalation: true
+
+service:
+  type: ClusterIP
+  port: 5000
+
+ingress:
+  enabled: true
+  className: "nginx"
+  annotations:
+    nginx.ingress.kubernetes.io/proxy-body-size: "0"
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "600"
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "600"
+  # kubernetes.io/tls-acme: "true"
+  hosts:
+    - host: iai-hub.uet.vnu.edu.vn
+      paths:
+        - path: /
+          pathType: Prefix
+  tls:
+  - secretName: tls-dohub-secret
+    hosts:
+    - iai-hub.uet.vnu.edu.vn
+
+# resources:
+  # limits:
+  #   cpu: 100m
+  #   memory: 128Mi
+  # requests:
+  #   cpu: 100m
+  #   memory: 128Mi
+
+livenessProbe:
+  httpGet:
+    path: /
+    port: http
+readinessProbe:
+  httpGet:
+    path: /
+    port: http
+
+autoscaling:
+  enabled: false
+  minReplicas: 1
+  maxReplicas: 100
+  targetCPUUtilizationPercentage: 80
+  # targetMemoryUtilizationPercentage: 80
+
+# nodeSelector: {}
+
+# tolerations: []
+
+# affinity: {}
+
+# DirectPV — PVC binds when pod schedules (WaitForFirstConsumer)
+persistence:
+  volumeMode: Filesystem
+  storageClassName: directpv-min-io
+  accessModes:
+    - ReadWriteOnce
+  claims:
+    - name: claim-dohub-main
+      size: 5Gi
+
+volumes:
+- name: dohub-configmap
+  configMap:
+    name: dohub-configmap
+- name: dohub-environment
+  secret:
+    secretName: dohub-secret
+- name: volume-dohub-main
+  persistentVolumeClaim:
+    claimName: claim-dohub-main
+
+volumeMounts:
+- name: dohub-configmap
+  mountPath: /etc/dohub/config.yaml
+  subPath: config.yaml
+- mountPath: /mnt/database/
+  name: volume-dohub-main
+- mountPath: /home/dohub/.env
+  name: dohub-environment
+  subPath: .env
+
+configmap:
+  path: "configmap/*"
+  name: dohub-configmap
+
+secret:
+  path: "secrets/*"
+  name: dohub-secret
+
+tlssecret:
+  name: tls-dohub-secret

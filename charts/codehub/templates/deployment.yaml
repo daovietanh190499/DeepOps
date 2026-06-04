@@ -1,0 +1,127 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "codehub.fullname" . }}
+  labels:
+    {{- include "codehub.labels" . | nindent 4 }}
+spec:
+  replicas: {{ .Values.replicaCount }}
+  selector:
+    matchLabels:
+      {{- include "codehub.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      {{- with .Values.podAnnotations }}
+      annotations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      labels:
+        {{- include "codehub.labels" . | nindent 8 }}
+        {{- with .Values.podLabels }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+    spec:
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      serviceAccountName: {{ include "codehub.serviceAccountName" . }}
+      terminationGracePeriodSeconds: 30
+      securityContext:
+        {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      {{- if and .Values.auth.resetConfigOnDeploy .Values.env.secret }}
+      {{- if or .Values.env.secret.PASSWORD .Values.env.secret.HASHED_PASSWORD }}
+      initContainers:
+        - name: reset-auth-config
+          image: busybox:1.36
+          command:
+            - sh
+            - -c
+            - |
+              CFG=/home/coder/.config/code-server/config.yaml
+              if [ -f "$CFG" ]; then
+                rm -f "$CFG"
+                echo "reset code-server auth config"
+              fi
+          {{- if .Values.persistence.enabled }}
+          volumeMounts:
+            - name: workspace-volume
+              mountPath: /home/coder
+          {{- end }}
+      {{- end }}
+      {{- end }}
+      containers:
+        - name: {{ .Chart.Name }}
+          securityContext:
+            {{- toYaml .Values.securityContext | nindent 12 }}
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          {{- if .Values.env.secret }}
+          envFrom:
+            - secretRef:
+                name: {{ .Values.secret.name }}
+          {{- end }}
+          {{- with .Values.extraEnv }}
+          env:
+            {{- range . }}
+            - name: {{ .name }}
+              value: {{ .value | quote }}
+            {{- end }}
+          {{- end }}
+          {{- if .Values.container }}
+          {{- with .Values.container.command }}
+          command:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          {{- with .Values.container.args }}
+          args:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          {{- else if .Values.trustProxy }}
+          args:
+            - --trust-proxy
+          {{- end }}
+          {{- end }}
+          ports:
+            - name: http
+              containerPort: {{ .Values.service.port }}
+              protocol: TCP
+            {{- range .Values.service.extraPorts }}
+            - name: {{ .name }}
+              containerPort: {{ .port }}
+              protocol: TCP
+            {{- end }}
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+          volumeMounts:
+            {{- if .Values.persistence.enabled }}
+            - name: workspace-volume
+              mountPath: /home/coder
+            {{- end }}
+            {{- with .Values.volumeMounts }}
+            {{- toYaml . | nindent 12 }}
+            {{- end }}
+      volumes:
+        {{- if .Values.persistence.enabled }}
+        {{- $claimName := .Values.persistence.claimName | default .Values.mainVolume.claimName }}
+        {{- if $claimName }}
+        - name: workspace-volume
+          persistentVolumeClaim:
+            claimName: {{ $claimName }}
+        {{- end }}
+        {{- end }}
+        {{- with .Values.volumes }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}

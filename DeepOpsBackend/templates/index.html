@@ -1,0 +1,373 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dohub</title>
+    <link rel="icon" href="/static/img/logo.png">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css">
+    <link rel="stylesheet" href="/static/css/style.css">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = { theme: { extend: { fontFamily: { sans: ['DM Sans', 'system-ui', 'sans-serif'] } } } }
+    </script>
+</head>
+<body class="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50/30 to-slate-100 font-sans text-slate-800 antialiased">
+
+<div id="root" class="flex min-h-screen flex-col">
+    <header class="sticky top-0 z-30 border-b border-slate-200/80 bg-white/95 backdrop-blur-md">
+        <div class="mx-auto flex h-14 max-w-[1600px] items-center justify-between gap-4 px-4 sm:px-6 lg:px-8">
+            <a href="/" class="flex shrink-0 items-center gap-2.5 no-underline">
+                <img src="/static/img/logo.png" alt="Dohub" class="h-8 w-8 object-contain sm:h-9 sm:w-9">
+                <span class="text-lg font-bold tracking-tight text-slate-900 sm:text-xl">Dohub</span>
+            </a>
+            <p v-if="is_login" class="hidden min-w-0 flex-1 truncate text-center text-sm text-slate-500 md:block">
+                Welcome, <span class="font-semibold text-slate-800" v-text="current_user"></span>
+            </p>
+            <div class="flex shrink-0 items-center gap-2 sm:gap-3">
+                <nav v-if="is_login" class="flex flex-wrap justify-end rounded-lg bg-slate-100 p-1 gap-0.5">
+                    <button type="button" v-for="tab in visibleTabs" :key="tab.id"
+                            @click="changeMenu(tab.id)"
+                            :class="menu===tab.id ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-600 hover:text-slate-900'"
+                            class="rounded-md px-2.5 py-1.5 text-xs font-semibold transition sm:px-3 sm:text-sm"
+                            v-text="tab.label"></button>
+                </nav>
+                <button v-if="!is_login" @click="loginWithGithub()"
+                        class="inline-flex items-center gap-2 rounded-lg bg-slate-900 px-3 py-2 text-sm font-semibold text-white hover:bg-slate-800">
+                    <img src="/static/img/github.png" class="h-4 w-4 invert" alt="">
+                    <span class="hidden sm:inline">Login with GitHub</span>
+                </button>
+                <button v-if="is_login" @click="logout()"
+                        class="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50">
+                    <i class="fa fa-sign-out"></i>
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <main class="mx-auto w-full max-w-[1600px] flex-1 px-4 py-6 sm:px-6 lg:px-8">
+        <!-- Login prompt -->
+        <section v-if="!is_login" class="flex min-h-[50vh] items-center justify-center">
+            <div class="w-full max-w-md rounded-2xl border border-slate-200 bg-white p-8 text-center shadow-sm">
+                <img src="/static/img/logo.png" alt="Dohub" class="mx-auto mb-5 h-12 w-12">
+                <h2 class="text-xl font-bold text-slate-900">Please login to continue</h2>
+                <p class="mt-3 text-sm text-slate-500">Sign in with GitHub to create and run codehub workspaces on Kubernetes.</p>
+                <button @click="loginWithGithub()" class="mt-8 rounded-xl bg-slate-900 px-6 py-3 text-sm font-semibold text-white hover:bg-slate-800">Login with GitHub</button>
+            </div>
+        </section>
+
+        <!-- Home: configure & run -->
+        <div v-if="is_login && menu==='home'" class="space-y-6">
+        <div class="grid gap-6 xl:grid-cols-2">
+            <div class="space-y-6">
+                <section class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+                    <h2 class="mb-3 text-lg font-bold text-slate-900">Quick templates</h2>
+                    <p class="mb-4 text-sm text-slate-500">Click to fill the form below.</p>
+                    <div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                        <button v-for="t in planTemplates" :key="t.name" type="button" @click="applyTemplate(t)"
+                                class="flex flex-col rounded-xl border-2 border-slate-200 bg-white p-4 text-left transition hover:border-blue-400 hover:shadow-md">
+                            <img :src="'/static/img/' + t.image" class="mb-2 h-10 w-10 object-contain" alt="">
+                            <span class="font-semibold text-slate-800" v-text="t.name"></span>
+                            <span class="mt-1 text-xs text-slate-500" v-text="t.cpu + ' vCPU · ' + (t.gpu || 'no GPU')"></span>
+                        </button>
+                    </div>
+                </section>
+
+                <section class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm space-y-4">
+                    <h2 class="text-lg font-bold text-slate-900">Configuration</h2>
+                    <div>
+                        <label class="text-sm font-medium text-slate-600">Server name</label>
+                        <input v-model="form.name" type="text" placeholder="My workspace"
+                               class="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm">
+                    </div>
+                    <div class="grid gap-4 sm:grid-cols-2">
+                        <div><label class="text-sm font-medium text-slate-600">CPU (vCPU)</label>
+                            <select v-model.number="form.cpu" class="mt-1 w-full rounded-lg border px-3 py-2 text-sm">
+                                <option v-for="c in equipmentList.cpu" :key="c" :value="c" v-text="c"></option>
+                            </select></div>
+                        <div><label class="text-sm font-medium text-slate-600">RAM</label>
+                            <select v-model="form.ram" class="mt-1 w-full rounded-lg border px-3 py-2 text-sm">
+                                <option v-for="r in equipmentList.ram" :key="r" :value="r" v-text="r"></option>
+                            </select></div>
+                        <div><label class="text-sm font-medium text-slate-600">Drive (DirectPV)</label>
+                            <select v-model="form.drive" class="mt-1 w-full rounded-lg border px-3 py-2 text-sm">
+                                <option v-for="d in equipmentList.drive" :key="d" :value="d" v-text="d"></option>
+                            </select></div>
+                        <div><label class="text-sm font-medium text-slate-600">GPU</label>
+                            <select v-model="form.gpu" class="mt-1 w-full rounded-lg border px-3 py-2 text-sm">
+                                <option v-for="g in equipmentList.gpu" :key="g" :value="g" v-text="g"></option>
+                            </select></div>
+                    </div>
+                    <div class="grid gap-4 sm:grid-cols-2">
+                        <div><label class="text-sm font-medium text-slate-600">Docker image</label>
+                            <select v-model="form.docker_image_id" @change="onDockerImageChange"
+                                    class="mt-1 w-full rounded-lg border px-3 py-2 text-sm">
+                                <option v-for="img in dockerImages" :key="img.id" :value="img.id" v-text="img.label"></option>
+                            </select></div>
+                        <div><label class="text-sm font-medium text-slate-600">Version (tag)</label>
+                            <input v-model="form.docker_tag" type="text" class="mt-1 w-full rounded-lg border px-3 py-2 text-sm font-mono"></div>
+                    </div>
+                    <div>
+                        <label class="text-sm font-medium text-slate-600">Exposed ports (comma-separated)</label>
+                        <input v-model="form.ports_text" type="text" placeholder="8080, 3000"
+                               class="mt-1 w-full rounded-lg border px-3 py-2 text-sm font-mono">
+                    </div>
+                    <div>
+                        <label class="text-sm font-medium text-slate-600">Container command (space-separated)</label>
+                        <input v-model="form.command_text" type="text" placeholder="leave empty for image default"
+                               class="mt-1 w-full rounded-lg border px-3 py-2 text-sm font-mono">
+                    </div>
+                    <div>
+                        <label class="text-sm font-medium text-slate-600">Environment variables</label>
+                        <div class="mt-2 flex flex-wrap gap-2">
+                            <input v-model="envKey" placeholder="KEY" class="flex-1 min-w-[6rem] rounded-lg border px-3 py-2 text-sm font-mono">
+                            <input v-model="envValue" placeholder="value" class="flex-1 min-w-[8rem] rounded-lg border px-3 py-2 text-sm">
+                            <button type="button" @click="addEnv" class="rounded-lg bg-slate-200 px-4 py-2 text-sm font-semibold hover:bg-slate-300">Add / Update</button>
+                        </div>
+                        <ul v-if="envKeysSorted.length" class="mt-2 space-y-1">
+                            <li v-for="key in envKeysSorted" :key="key"
+                                @click="editEnv(key)"
+                                class="flex cursor-pointer items-center justify-between rounded-lg bg-slate-50 px-3 py-1.5 text-sm font-mono hover:bg-slate-100">
+                                <span v-text="key + '=' + form.env_vars[key]"></span>
+                                <button type="button" @click.stop="removeEnv(key)" class="text-rose-600 hover:text-rose-800"><i class="fa fa-times"></i></button>
+                            </li>
+                        </ul>
+                    </div>
+                </section>
+            </div>
+
+            <div class="space-y-6">
+                <section class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+                    <div class="mb-4 flex items-center justify-between">
+                        <h2 class="text-lg font-bold text-slate-900">Current specifications</h2>
+                        <button type="button" @click="exportFormConfig"
+                                class="rounded-lg border border-slate-300 px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50">
+                            <i class="fa fa-download"></i> Export JSON
+                        </button>
+                    </div>
+                    <div class="rounded-xl bg-slate-50 px-4 py-2 text-sm">
+                        <spec-row label="Name" :value="form.name"></spec-row>
+                        <spec-row label="CPU" :value="form.cpu + ' vCPU'"></spec-row>
+                        <spec-row label="RAM" :value="form.ram"></spec-row>
+                        <spec-row label="Storage" :value="form.drive"></spec-row>
+                        <spec-row label="GPU" :value="form.gpu || 'none'"></spec-row>
+                        <spec-row label="Image" :value="form.docker_repository + ':' + form.docker_tag"></spec-row>
+                        <spec-row label="Ports" :value="form.ports_text || '8080'"></spec-row>
+                        <spec-row label="Command" :value="form.command_text || '(default)'"></spec-row>
+                        <spec-row label="ENV" :value="Object.keys(form.env_vars).length + ' variable(s)'"></spec-row>
+                    </div>
+                    <button type="button" @click="runWorkspace" :disabled="runLoading"
+                            class="mt-4 w-full rounded-xl bg-blue-600 px-6 py-3 text-sm font-bold text-white shadow-lg hover:bg-blue-700 disabled:opacity-50">
+                        <span v-if="runLoading">Starting…</span>
+                        <span v-else>Run codehub</span>
+                    </button>
+                    <p v-if="runError" class="mt-2 text-sm text-rose-600" v-text="runError"></p>
+                </section>
+            </div>
+        </div>
+
+        <section class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm space-y-4">
+            <h2 class="text-lg font-bold text-slate-900">Bulk create</h2>
+            <div class="flex flex-wrap items-center gap-2">
+                <button type="button" @click="bulkMode='json'"
+                        :class="bulkMode==='json' ? 'bg-blue-600 text-white' : 'bg-slate-100 text-slate-700'"
+                        class="rounded-lg px-3 py-1.5 text-sm font-semibold">JSON</button>
+                <button type="button" @click="bulkMode='csv'"
+                        :class="bulkMode==='csv' ? 'bg-blue-600 text-white' : 'bg-slate-100 text-slate-700'"
+                        class="rounded-lg px-3 py-1.5 text-sm font-semibold">CSV</button>
+            </div>
+            <div class="rounded-xl border-2 border-dashed border-slate-200 bg-slate-50/80 p-6 text-center">
+                <input ref="bulkFileInput" type="file" accept=".json,.csv,application/json,text/csv" class="hidden"
+                       @change="onBulkFileSelected">
+                <p class="text-sm text-slate-600 mb-3">Upload a <strong>.json</strong> or <strong>.csv</strong> file</p>
+                <button type="button" @click="$refs.bulkFileInput.click()"
+                        class="inline-flex items-center gap-2 rounded-lg bg-white border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700 shadow-sm hover:bg-slate-50">
+                    <i class="fa fa-upload"></i> Choose file
+                </button>
+                <p v-if="bulkFileName" class="mt-2 text-xs font-mono text-blue-600" v-text="'Loaded: ' + bulkFileName"></p>
+            </div>
+            <p class="text-xs text-slate-500" v-if="bulkMode==='json'">
+                Or paste JSON array. Example:
+                <code class="block mt-1 rounded bg-slate-100 p-2 text-[10px] overflow-x-auto">[{"name":"ws1","cpu":2,"ram":"4G","drive":"20Gi","env_vars":{"PASSWORD":"secret"}}]</code>
+            </p>
+            <p class="text-xs text-slate-500" v-else>
+                Or paste CSV. Header: name,cpu,ram,drive,gpu,ports,command,docker_repository,docker_tag,env_PASSWORD,env_KEY…
+            </p>
+            <textarea v-model="bulkText" rows="5" class="w-full rounded-lg border px-3 py-2 text-xs font-mono"
+                      :placeholder="bulkMode==='json' ? '[{...}]' : 'name,cpu,ram,...'"></textarea>
+            <div class="flex flex-wrap items-center gap-4">
+                <label class="flex items-center gap-2 text-sm text-slate-600">
+                    <input type="checkbox" v-model="bulkAutoStart" class="rounded">
+                    Start servers after create
+                </label>
+                <button type="button" @click="clearBulk" class="text-sm text-slate-500 hover:text-slate-800">Clear</button>
+            </div>
+            <button type="button" @click="runBulkCreate" :disabled="bulkLoading"
+                    class="w-full sm:w-auto min-w-[12rem] rounded-xl bg-indigo-600 px-6 py-2.5 text-sm font-bold text-white hover:bg-indigo-700 disabled:opacity-50">
+                <span v-if="bulkLoading">Processing…</span>
+                <span v-else>Bulk create</span>
+            </button>
+            <div v-if="bulkSummary" class="rounded-lg bg-slate-50 px-3 py-2 text-xs text-slate-700" v-text="bulkSummary"></div>
+        </section>
+        </div>
+
+        <!-- My servers -->
+        <section v-if="is_login && menu==='servers'" class="space-y-4">
+            <h2 class="text-lg font-bold text-slate-900">My servers</h2>
+            <p v-if="myWorkspaces.length===0" class="text-sm text-slate-500">No servers yet. Use Home to run one.</p>
+            <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+                <workspace-card v-for="ws in myWorkspaces" :key="ws.id" :ws="ws"
+                                @detail="openWorkspaceModal" @copy="copyWorkspaceUrl"
+                                @start="startWorkspace" @stop="stopWorkspace" @open="openWorkspace"
+                                @export="exportWorkspace" @delete="ws => openDeleteModal(ws, false)"></workspace-card>
+            </div>
+        </section>
+
+        <!-- Admin users -->
+        <section v-if="is_login && menu==='admin-users' && is_admin" class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+            <h2 class="mb-4 text-lg font-bold text-slate-900">User management</h2>
+            <user-row v-for="u in userList" :key="u.username" :user="u"
+                      @accept="adminAcceptUser(u)" @delete="adminDeleteUser(u)"
+                      @role="role => adminChangeRole(u, role)"></user-row>
+        </section>
+
+        <!-- Admin servers -->
+        <section v-if="is_login && menu==='admin-servers' && is_admin" class="space-y-4">
+            <div class="flex flex-wrap items-center gap-3">
+                <h2 class="text-lg font-bold text-slate-900">All servers</h2>
+                <input v-model="adminServerFilter" @input="loadAdminWorkspaces(1)" placeholder="Filter by username…"
+                       class="rounded-lg border px-3 py-1.5 text-sm">
+                <span class="text-sm text-slate-500" v-text="'Page ' + adminPagination.page + ' / ' + adminPagination.pages"></span>
+            </div>
+            <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+                <workspace-card v-for="ws in adminWorkspaces" :key="ws.id" :ws="ws" :show-owner="true"
+                                @detail="openWorkspaceModal" @copy="copyWorkspaceUrl"
+                                @start="startWorkspace" @stop="stopWorkspace" @open="openWorkspace"
+                                @export="exportWorkspace" @delete="ws => openDeleteModal(ws, true)"></workspace-card>
+            </div>
+            <div class="flex justify-center gap-2">
+                <button :disabled="adminPagination.page<=1" @click="loadAdminWorkspaces(adminPagination.page-1)"
+                        class="rounded-lg border px-4 py-2 text-sm disabled:opacity-40">Prev</button>
+                <button :disabled="adminPagination.page>=adminPagination.pages" @click="loadAdminWorkspaces(adminPagination.page+1)"
+                        class="rounded-lg border px-4 py-2 text-sm disabled:opacity-40">Next</button>
+            </div>
+        </section>
+
+        <!-- Admin docker images -->
+        <section v-if="is_login && menu==='admin-images' && is_admin" class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm space-y-4">
+            <h2 class="text-lg font-bold text-slate-900">Docker images</h2>
+            <div class="grid gap-3 sm:grid-cols-4">
+                <input v-model="newImage.label" placeholder="Label" class="rounded-lg border px-3 py-2 text-sm">
+                <input v-model="newImage.repository" placeholder="repository/name" class="rounded-lg border px-3 py-2 text-sm sm:col-span-2">
+                <input v-model="newImage.default_tag" placeholder="tag" class="rounded-lg border px-3 py-2 text-sm font-mono">
+            </div>
+            <button @click="createDockerImage" class="rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white">Add image</button>
+            <table class="w-full text-sm">
+                <thead><tr class="border-b text-left text-slate-500">
+                    <th class="py-2">Label</th><th>Repository</th><th>Tag</th><th>Active</th><th></th>
+                </tr></thead>
+                <tbody>
+                    <tr v-for="img in adminDockerImages" :key="img.id" class="border-b border-slate-100">
+                        <td class="py-2" v-text="img.label"></td>
+                        <td class="font-mono text-xs" v-text="img.repository"></td>
+                        <td v-text="img.default_tag"></td>
+                        <td v-text="img.is_active ? 'yes' : 'no'"></td>
+                        <td><button @click="deleteDockerImage(img)" class="text-rose-600 text-xs">Delete</button></td>
+                    </tr>
+                </tbody>
+            </table>
+        </section>
+    </main>
+
+    <!-- Workspace detail modal -->
+    <div v-if="modalWorkspace" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50" @click.self="closeWorkspaceModal">
+        <div class="max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-2xl border border-slate-200 bg-white shadow-xl">
+            <div class="sticky top-0 flex items-center justify-between border-b border-slate-100 bg-white px-5 py-4">
+                <h3 class="text-lg font-bold text-slate-900" v-text="modalWorkspace.name"></h3>
+                <button type="button" @click="closeWorkspaceModal" class="text-slate-400 hover:text-slate-700"><i class="fa fa-times text-xl"></i></button>
+            </div>
+            <div class="space-y-4 px-5 py-4 text-sm">
+                <div class="flex items-center gap-2">
+                    <span class="font-mono text-xs text-slate-500 truncate flex-1" v-text="workspaceUrl(modalWorkspace)"></span>
+                    <button type="button" @click="copyWorkspaceUrl(modalWorkspace)" class="shrink-0 rounded-lg border px-2 py-1 text-xs hover:bg-slate-50" title="Copy URL">
+                        <i class="fa fa-copy"></i>
+                    </button>
+                </div>
+                <span class="inline-block rounded-full px-2 py-0.5 text-xs font-bold uppercase"
+                      :class="modalWorkspace.state==='running' ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-600'"
+                      v-text="modalWorkspace.state"></span>
+                <div class="rounded-xl bg-slate-50 px-4 py-2">
+                    <spec-row label="Owner" :value="modalWorkspace.owner || modalWorkspace.username"></spec-row>
+                    <spec-row label="Slug" :value="modalWorkspace.slug"></spec-row>
+                    <spec-row label="CPU" :value="modalWorkspace.cpu + ' vCPU'"></spec-row>
+                    <spec-row label="RAM" :value="modalWorkspace.ram"></spec-row>
+                    <spec-row label="Storage" :value="modalWorkspace.drive"></spec-row>
+                    <spec-row label="GPU" :value="modalWorkspace.gpu || 'none'"></spec-row>
+                    <spec-row label="Image" :value="modalWorkspace.docker_repository + ':' + modalWorkspace.docker_tag"></spec-row>
+                    <spec-row label="Ports" :value="(modalWorkspace.exposed_ports || []).join(', ') || '8080'"></spec-row>
+                    <spec-row label="Command" :value="(modalWorkspace.container_command || []).join(' ') || '(default)'"></spec-row>
+                </div>
+                <div>
+                    <p class="mb-2 font-semibold text-slate-700">Environment variables</p>
+                    <p v-if="!modalEnvKeys.length" class="text-slate-400 text-xs">None</p>
+                    <ul v-else class="space-y-1 rounded-lg bg-slate-50 p-3 font-mono text-xs">
+                        <li v-for="k in modalEnvKeys" :key="k" v-text="k + ' = ' + modalWorkspace.env_vars[k]"></li>
+                    </ul>
+                </div>
+                <div class="flex flex-wrap gap-2 pt-2">
+                    <button v-if="modalWorkspace.state==='running'" @click="openWorkspace(modalWorkspace); closeWorkspaceModal()"
+                            class="flex-1 rounded-lg border border-blue-600 text-blue-600 py-2 text-xs font-semibold">Open</button>
+                    <button @click="exportWorkspace(modalWorkspace)" class="rounded-lg border px-4 py-2 text-xs font-semibold">Export JSON</button>
+                    <button @click="exportModalConfig" class="rounded-lg border px-4 py-2 text-xs font-semibold">Download config</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Delete server confirmation -->
+    <div v-if="deleteModalWorkspace" class="fixed inset-0 z-[55] flex items-center justify-center p-4 bg-slate-900/50" @click.self="closeDeleteModal">
+        <div class="w-full max-w-md rounded-2xl border border-slate-200 bg-white shadow-xl">
+            <div class="border-b border-slate-100 px-5 py-4">
+                <h3 class="text-lg font-bold text-slate-900">Delete server</h3>
+                <p class="mt-1 text-sm text-slate-500">
+                    This will remove <strong class="text-slate-800" v-text="deleteModalWorkspace.name"></strong>
+                    <span v-if="deleteModalIsAdmin"> (@<span v-text="deleteModalWorkspace.owner"></span>)</span>.
+                    Running releases will be stopped. This cannot be undone.
+                </p>
+            </div>
+            <div class="space-y-4 px-5 py-4">
+                <p class="text-sm text-slate-600">
+                    Type <kbd class="rounded bg-slate-100 px-1.5 py-0.5 font-mono text-xs font-semibold">delete</kbd> to confirm:
+                </p>
+                <input v-model="deleteConfirmInput" type="text" autocomplete="off" spellcheck="false"
+                       placeholder="delete"
+                       class="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm font-mono focus:border-rose-400 focus:ring-2 focus:ring-rose-100"
+                       @keyup.enter="canConfirmDelete && confirmDeleteWorkspace()">
+                <div class="flex justify-end gap-2">
+                    <button type="button" @click="closeDeleteModal"
+                            class="rounded-lg border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50">Cancel</button>
+                    <button type="button" @click="confirmDeleteWorkspace"
+                            :disabled="!canConfirmDelete || deleteInProgress"
+                            class="rounded-lg bg-rose-600 px-4 py-2 text-sm font-semibold text-white hover:bg-rose-700 disabled:cursor-not-allowed disabled:opacity-40">
+                        <span v-if="deleteInProgress">Deleting…</span>
+                        <span v-else>Delete</span>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div v-if="toastMessage" class="fixed bottom-6 right-6 z-[60] rounded-lg bg-slate-900 px-4 py-2 text-sm text-white shadow-lg" v-text="toastMessage"></div>
+
+    <footer class="border-t border-slate-200 bg-white py-4 text-center text-sm text-slate-500">
+        <span class="font-semibold text-slate-700">Dohub</span>
+    </footer>
+</div>
+
+<script>var is_login = {% if is_login %}1{% else %}0{% endif %};</script>
+<script src="/static/js/vue.global.js"></script>
+<script src="/static/js/index.js"></script>
+</body>
+</html>

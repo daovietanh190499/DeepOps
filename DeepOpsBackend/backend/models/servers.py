@@ -1,13 +1,18 @@
 from django.db import models
 
-class Server(models.Model):
-    name = models.CharField(max_length=50)
-    avatar = models.CharField(max_length=50)
-    docker_image = models.CharField(max_length=50)
-    docker_tag = models.CharField(max_length=50)
-    cpu = models.CharField(max_length=50)
-    ram = models.CharField(max_length=50)
-    drive = models.CharField(max_length=50)
-    gpu = models.CharField(max_length=100)
-    color = models.CharField(max_length=10)
-    
+
+class ServerOption(models.Model):
+    name = models.CharField(max_length=255, unique=True)
+    image = models.CharField(max_length=255, default='logo.png')
+    docker_image = models.CharField(max_length=255, default='codercom/code-server')
+    cpu = models.PositiveIntegerField(default=2)
+    ram = models.CharField(max_length=64, default='4G')
+    drive = models.CharField(max_length=64, default='30TB')
+    gpu = models.CharField(max_length=255, blank=True, default='')
+    color = models.CharField(max_length=32, default='#fcb040')
+
+    class Meta:
+        ordering = ['id']
+
+    def __str__(self):
+        return self.name

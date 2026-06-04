@@ -1,0 +1,58 @@
+storage:
+  storageClassName: directpv-min-io
+  volumeMode: Filesystem
+  defaultWorkspaceSize: 20Gi
+  hubDatabaseSize: 5Gi
+
+initDockerImages:
+  - label: Code Server
+    repository: codercom/code-server
+    default_tag: 4.89.0-ubuntu
+    sort_order: 0
+
+initServerOptions:
+  - name: 'Lollipop'
+    image: 'lollipop.png'
+    docker_image: "codercom/code-server"
+    cpu: 2
+    ram: '4G'
+    drive: '20Gi'
+    volumeSize: 20Gi
+    gpu: ''
+    color: 'violet'
+  - name: 'Oreo'
+    image: 'oreo.png'
+    docker_image: "codercom/code-server"
+    cpu: 4
+    ram: '8G'
+    drive: '50Gi'
+    volumeSize: 50Gi
+    gpu: 'mig-2g.10gb'
+    color: '#1e88d2'
+  - name: 'Popeyes'
+    image: 'popeyes.png'
+    docker_image: "codercom/code-server"
+    cpu: 8
+    ram: '16G'
+    drive: '100Gi'
+    volumeSize: 100Gi
+    gpu: 'mig-3g.20gb'
+    color: '#f27802'
+  - name: 'Pizza'
+    image: 'pizza.png'
+    docker_image: "codercom/code-server"
+    cpu: 8
+    ram: '32G'
+    drive: '200Gi'
+    volumeSize: 200Gi
+    gpu: 'gpu'
+    color: '#fcca37'
+  - name: 'Spagetti'
+    image: 'spagetti.png'
+    docker_image: "codercom/code-server"
+    cpu: 16
+    ram: '64G'
+    drive: '500Gi'
+    volumeSize: 500Gi
+    gpu: 'gpu:2'
+    color: '#fcb040'

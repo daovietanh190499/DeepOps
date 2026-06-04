@@ -1,0 +1,45 @@
+controller:
+  adminUser: admin
+  adminPassword: "CHANGE_ME"
+  javaOpts: "-Xmx4096m -Xms1024m -Djenkins.install.runSetupWizard=false"
+  resources:
+    requests:
+      cpu: "1"
+      memory: "2Gi"
+    limits:
+      cpu: "4"
+      memory: "8Gi"
+
+persistence:
+  enabled: true
+  size: 50Gi
+  storageClass: ""
+
+ingress:
+  enabled: true
+  className: nginx
+  hosts:
+    - host: jenkins.your-domain.com
+      paths:
+        - path: /
+          pathType: Prefix
+  tls:
+    - secretName: jenkins-tls
+      hosts:
+        - jenkins.your-domain.com
+
+configurationAsCode:
+  jenkinsUrl: https://jenkins.your-domain.com
+
+kubernetesAgent:
+  enabled: true
+  templates:
+    - name: default
+      label: jenkins-agent
+      containers:
+        - name: jnlp
+          image: jenkins/inbound-agent:latest-jdk17
+          resourceRequestCpu: "1"
+          resourceRequestMemory: "1Gi"
+          resourceLimitCpu: "4"
+          resourceLimitMemory: "4Gi"

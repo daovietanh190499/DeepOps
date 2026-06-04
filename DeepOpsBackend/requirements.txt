@@ -1,8 +1,6 @@
-django
-django-admin
-django-rest-framework
-django_filter
-drf-spectacular
-drf-spectacular-sidecar
-environ
-celery
+Django>=4.2,<5
+gunicorn>=21.2
+whitenoise>=6.6
+requests>=2.31
+PyYAML>=6.0
+tzdata>=2024.1

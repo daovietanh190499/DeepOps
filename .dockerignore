@@ -1,0 +1,10 @@
+.git
+test
+docs
+*.md
+DeepOpsBackend/db.sqlite3
+DeepOpsBackend/.env
+dohub/secrets/.env
+**/__pycache__
+**/*.pyc
+.venv

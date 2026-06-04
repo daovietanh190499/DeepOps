@@ -1,45 +1,47 @@
-FROM ubuntu:20.04
+FROM ubuntu:22.04
 
 USER root
-
-WORKDIR /home/dohub
+WORKDIR /app
 
 RUN apt-get update --yes && \
-    # - apt-get upgrade is run to patch known vulnerabilities in apt-get packages as
-    #   the ubuntu base image is rebuilt too seldom sometimes (less than once a month)
     apt-get upgrade --yes && \
     apt-get install --yes --no-install-recommends \
-    dumb-init \
-    apt-transport-https \
-    ca-certificates \ 
+    ca-certificates \
     curl \
     wget \
     jq \
-    gettext \
-    python3-pip
+    tzdata \
+    python3 \
+    python3-pip \
+    python3-venv && \
+    rm -rf /var/lib/apt/lists/*
 
-ARG KUBE_VERSION
-ARG HELM_VERSION
-ARG TARGETOS
-ARG TARGETARCH
+ARG KUBE_VERSION=1.30.0
+ARG HELM_VERSION=3.14.4
+ARG TARGETOS=linux
+ARG TARGETARCH=amd64
 
-RUN wget -q https://storage.googleapis.com/kubernetes-release/release/v${KUBE_VERSION}/bin/${TARGETOS}/${TARGETARCH}/kubectl -O /usr/local/bin/kubectl \
-    && wget -q https://get.helm.sh/helm-v${HELM_VERSION}-${TARGETOS}-${TARGETARCH}.tar.gz -O - | tar -xzO ${TARGETOS}-${TARGETARCH}/helm > /usr/local/bin/helm \
-    && chmod +x /usr/local/bin/helm /usr/local/bin/kubectl \
-    && mkdir /config \
-    && chmod g+rwx /config /root \
-    && helm repo add "stable" "https://charts.helm.sh/stable" --force-update \
-    && kubectl version --client \
-    && helm version
+RUN wget -q "https://dl.k8s.io/release/v${KUBE_VERSION}/bin/${TARGETOS}/${TARGETARCH}/kubectl" -O /usr/local/bin/kubectl && \
+    wget -q "https://get.helm.sh/helm-v${HELM_VERSION}-${TARGETOS}-${TARGETARCH}.tar.gz" -O /tmp/helm.tgz && \
+    tar -xzf /tmp/helm.tgz -C /tmp && \
+    mv "/tmp/${TARGETOS}-${TARGETARCH}/helm" /usr/local/bin/helm && \
+    chmod +x /usr/local/bin/kubectl /usr/local/bin/helm && \
+    kubectl version --client && \
+    helm version
 
-COPY ./requirement.txt ./requirement.txt
+COPY DeepOpsBackend/requirements.txt /app/requirements.txt
+RUN pip3 install --no-cache-dir -r requirements.txt
 
-RUN pip3 install -r requirement.txt
+COPY DeepOpsBackend /app
+COPY charts/codehub /charts/codehub
 
-COPY . .
+ENV CODEHUB_CHART_PATH=/charts/codehub
+ENV PYTHONUNBUFFERED=1
+ENV DJANGO_SETTINGS_MODULE=DeepOpsBackend.settings
+ENV TZ=UTC
 
-USER root
-ENV USER=root
-ENV HOME=/home/dohub
+RUN python3 manage.py collectstatic --noinput
 
-WORKDIR /home/dohub
+EXPOSE 5000
+
+CMD ["/bin/bash", "-c", "python3 manage.py migrate --noinput && gunicorn DeepOpsBackend.wsgi:application --bind 0.0.0.0:5000 --workers 2 --timeout 120"]

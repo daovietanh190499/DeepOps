@@ -1,0 +1,156 @@
+import time
+
+from django.http import HttpResponseRedirect, JsonResponse
+from django.shortcuts import render
+from django.views.decorators.csrf import csrf_exempt
+from django.views.decorators.http import require_http_methods
+
+from backend.models import User, Workspace
+from backend.services.github_auth import auth
+from backend.services.k8s import remove_codehub
+
+
+def _user_payload(user: User) -> dict:
+    return {
+        'id': user.id,
+        'username': user.username,
+        'image': user.image,
+        'last_activity': user.last_activity,
+        'role': user.role,
+        'is_accept': user.is_accept,
+    }
+
+
+def _require_user(user):
+    if user is None:
+        return JsonResponse({'message': 'no permission'}, status=403)
+    return None
+
+
+def _require_admin(user):
+    denied = _require_user(user)
+    if denied:
+        return denied
+    if user.role != User.ROLE_ADMIN:
+        return JsonResponse({'message': 'no permission'}, status=403)
+    return None
+
+
+@auth.handle_callback
+def github_callback(request, github_user):
+    user = auth.register_or_update_user(github_user)
+    return auth.login_user(user, request)
+
+
+@auth.verify
+def login(request, user):
+    if user is None:
+        return auth.oauth_login(request)
+    return HttpResponseRedirect('/')
+
+
+@auth.verify
+def logout(request, user):
+    return auth.logout_user(request)
+
+
+@auth.verify
+def index(request, user):
+    return render(request, 'index.html', {
+        'user': user,
+        'is_login': bool(user),
+    })
+
+
+def page_error(request, code, error):
+    return render(request, 'page-error.html', {'code': code, 'error': error}, status=code)
+
+
+@auth.verify
+@require_http_methods(['GET'])
+def user_state(request, user):
+    denied = _require_user(user)
+    if denied:
+        return denied
+    return JsonResponse({'result': _user_payload(user)})
+
+
+@auth.verify
+@require_http_methods(['GET'])
+def all_users(request, user):
+    denied = _require_admin(user)
+    if denied:
+        return denied
+
+    result_list = [_user_payload(hub_user) for hub_user in User.objects.order_by('username')]
+    return JsonResponse({'result': result_list})
+
+
+@auth.verify
+@require_http_methods(['GET', 'POST', 'PUT', 'DELETE'])
+def accept_user(request, user, username):
+    denied = _require_admin(user)
+    if denied:
+        return denied
+    target = User.objects.filter(username=username).first()
+    if not target:
+        return JsonResponse({'message': 'not found'}, status=404)
+    target.is_accept = True
+    target.save(update_fields=['is_accept'])
+    return JsonResponse({'message': 'success'})
+
+
+def _stop_all_workspaces(target: User):
+    for ws in Workspace.objects.filter(user=target, state=Workspace.STATE_RUNNING):
+        remove_codehub(ws.release_name)
+        ws.state = Workspace.STATE_OFFLINE
+        ws.save(update_fields=['state', 'updated_at'])
+
+
+@auth.verify
+@csrf_exempt
+@require_http_methods(['GET', 'POST', 'PUT', 'DELETE'])
+def delete_user(request, user, username):
+    denied = _require_admin(user)
+    if denied:
+        return denied
+    target = User.objects.filter(username=username).first()
+    if not target:
+        return JsonResponse({'message': 'not found'}, status=404)
+    try:
+        _stop_all_workspaces(target)
+    except Exception:
+        return JsonResponse({'message': 'action failed'}, status=500)
+    target.delete()
+    return JsonResponse({'message': 'success'})
+
+
+@auth.verify
+@csrf_exempt
+@require_http_methods(['GET', 'POST', 'PUT', 'DELETE'])
+def change_role(request, user, username, role):
+    denied = _require_admin(user)
+    if denied:
+        return denied
+    if user.username == username:
+        return JsonResponse({'message': 'no permission'}, status=403)
+    if not user.is_accept:
+        return JsonResponse({'message': 'no permission'}, status=403)
+
+    target = User.objects.filter(username=username).first()
+    if not target or not target.is_accept:
+        return JsonResponse({'message': 'no permission'}, status=403)
+    if role not in (User.ROLE_ADMIN, User.ROLE_NORMAL):
+        return JsonResponse({'message': 'no permission'}, status=403)
+
+    target.role = role
+    target.save(update_fields=['role'])
+    return JsonResponse({'message': 'success'})
+
+
+@auth.verify
+def touch_activity(request, user):
+    if user:
+        user.last_activity = time.time() * 1000
+        user.save(update_fields=['last_activity'])
+    return JsonResponse({'ok': True})

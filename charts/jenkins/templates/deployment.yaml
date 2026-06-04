@@ -1,0 +1,112 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "jenkins.fullname" . }}
+  labels:
+    {{- include "jenkins.labels" . | nindent 4 }}
+spec:
+  replicas: {{ .Values.replicaCount }}
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      {{- include "jenkins.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      annotations:
+        checksum/jcasc: {{ include (print $.Template.BasePath "/configmap-jcasc.yaml") . | sha256sum }}
+        checksum/plugins: {{ include (print $.Template.BasePath "/configmap-plugins.yaml") . | sha256sum }}
+        {{- with .Values.podAnnotations }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+      labels:
+        {{- include "jenkins.labels" . | nindent 8 }}
+        {{- with .Values.podLabels }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+    spec:
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      serviceAccountName: {{ include "jenkins.serviceAccountName" . }}
+      securityContext:
+        {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      containers:
+        - name: {{ .Chart.Name }}
+          securityContext:
+            {{- toYaml .Values.securityContext | nindent 12 }}
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          ports:
+            - name: http
+              containerPort: {{ .Values.controller.httpPort }}
+              protocol: TCP
+            - name: agent-listener
+              containerPort: {{ .Values.controller.agentListenerPort }}
+              protocol: TCP
+          env:
+            - name: JENKINS_OPTS
+              value: {{ .Values.controller.jenkinsOpts | quote }}
+            - name: JAVA_OPTS
+              value: {{ .Values.controller.javaOpts | quote }}
+            - name: JENKINS_ADMIN_ID
+              valueFrom:
+                secretKeyRef:
+                  name: {{ if .Values.controller.existingSecret }}{{ .Values.controller.existingSecret }}{{ else }}{{ include "jenkins.fullname" . }}-admin{{ end }}
+                  key: {{ .Values.controller.existingSecretUserKey | default "jenkins-admin-user" }}
+            - name: JENKINS_ADMIN_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ if .Values.controller.existingSecret }}{{ .Values.controller.existingSecret }}{{ else }}{{ include "jenkins.fullname" . }}-admin{{ end }}
+                  key: {{ .Values.controller.existingSecretPasswordKey | default "jenkins-admin-password" }}
+            {{- if .Values.configurationAsCode.enabled }}
+            - name: CASC_JENKINS_CONFIG
+              value: /var/jenkins_config
+            {{- end }}
+          livenessProbe:
+            {{- toYaml .Values.livenessProbe | nindent 12 }}
+          readinessProbe:
+            {{- toYaml .Values.readinessProbe | nindent 12 }}
+          resources:
+            {{- toYaml .Values.controller.resources | nindent 12 }}
+          volumeMounts:
+            - name: jenkins-home
+              mountPath: /var/jenkins_home
+            - name: plugins-ref
+              mountPath: /usr/share/jenkins/ref/plugins.txt
+              subPath: plugins.txt
+              readOnly: true
+            {{- if .Values.configurationAsCode.enabled }}
+            - name: jcasc
+              mountPath: /var/jenkins_config
+              readOnly: true
+            {{- end }}
+      volumes:
+        - name: jenkins-home
+          {{- if .Values.persistence.enabled }}
+          persistentVolumeClaim:
+            claimName: {{ .Values.persistence.existingClaim | default (include "jenkins.fullname" .) }}
+          {{- else }}
+          emptyDir: {}
+          {{- end }}
+        - name: plugins-ref
+          configMap:
+            name: {{ include "jenkins.fullname" . }}-plugins
+        {{- if .Values.configurationAsCode.enabled }}
+        - name: jcasc
+          configMap:
+            name: {{ include "jenkins.fullname" . }}-jcasc
+        {{- end }}
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}

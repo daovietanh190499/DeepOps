@@ -1,0 +1,99 @@
+replicaCount: 1
+
+image:
+  repository: codercom/code-server
+  tag: "4.89.0-ubuntu"
+  pullPolicy: IfNotPresent
+
+# Per-user workspace PVC (DirectPV — WaitForFirstConsumer)
+persistence:
+  enabled: true
+  claimName: ""  # set at install: claim-{namespace}-{username}
+  storageClassName: directpv-min-io
+  volumeMode: Filesystem
+  accessModes:
+    - ReadWriteOnce
+  size: 20Gi
+
+# Legacy alias used by helm --set from spawner
+mainVolume:
+  claimName: ""
+
+service:
+  type: ClusterIP
+  port: 8080
+  extraPorts: []
+
+ingress:
+  enabled: true
+  className: nginx
+  annotations:
+    nginx.ingress.kubernetes.io/proxy-body-size: "0"
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "600"
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "600"
+    nginx.ingress.kubernetes.io/proxy-buffering: "off"
+    nginx.ingress.kubernetes.io/proxy-http-version: "1.1"
+    # WebSocket + forwarded headers (required for code-server login session behind nginx)
+    nginx.ingress.kubernetes.io/configuration-snippet: |
+      proxy_set_header Host $host;
+      proxy_set_header Upgrade $http_upgrade;
+      proxy_set_header Connection "upgrade";
+      proxy_set_header X-Real-IP $remote_addr;
+      proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+      proxy_set_header X-Forwarded-Proto $scheme;
+  hosts:
+    - host: example.dohub.com
+      paths:
+        - path: /
+          pathType: Prefix
+  tls:
+    - secretName: tls-dohub-secret
+      hosts:
+        - example.dohub.com
+
+secret:
+  name: codehub-secret
+
+env:
+  secret: {}
+
+# When true and PASSWORD is in env.secret, remove stale config.yaml on PVC before start
+# (code-server only applies PASSWORD on first init; old PVC keeps old hash)
+auth:
+  resetConfigOnDeploy: false
+
+# Trust X-Forwarded-* from ingress (cookies / login behind reverse proxy)
+trustProxy: true
+
+extraEnv: []
+
+serviceAccount:
+  create: false
+  automount: false
+  name: default
+
+podSecurityContext:
+  fsGroup: 100
+
+securityContext:
+  capabilities:
+    add: ['SYS_ADMIN']
+  allowPrivilegeEscalation: true
+  runAsUser: 0
+
+resources:
+  limits:
+    cpu: 3
+    memory: 6G
+  requests:
+    cpu: 2
+    memory: 4G
+
+volumes:
+  - name: shm-volume
+    emptyDir:
+      medium: Memory
+
+volumeMounts:
+  - mountPath: /dev/shm
+    name: shm-volume

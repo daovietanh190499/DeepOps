@@ -1,26 +1,42 @@
-# DeepOpsHub
+# DeepOps Hub
 
-[!["GitHub Discussions"](https://img.shields.io/badge/%20GitHub-%20Discussions-gray.svg?longCache=true&logo=github&colorB=purple)](https://github.com/daovietanh190499/DeepOps/discussions) [!["Join us on Slack"](https://img.shields.io/badge/join-us%20on%20slack-gray.svg?longCache=true&logo=slack&colorB=brightgreen)](https://dohub-workspace.slack.com/archives/C055MQTL258) [![Twitter Follow](https://img.shields.io/twitter/follow/daovietanh99?label=%40DOhub&style=social)](https://twitter.com/daovietanh99) [![See latest](https://img.shields.io/static/v1?label=Docs&message=see%20latest&color=blue)](https://github.com/daovietanh190499/DeepOps)
-
-Run [DeepOps Hub](https://github.com/daovietanh190499/DeepOps) on any cluster, system anywhere and
-access it in the browser.
+Nền tảng hub quản lý và spawn **code-server** trên Kubernetes, với đăng nhập GitHub và giao diện web.
 
 ![Screenshot](./docs/assets/screenshot-modified.png)
 
 ## Highlights
 
-- Code on any device with a consistent development environment
-- Use cloud servers to speed up tests, compilations, downloads, and more
-- Make things more automatic
+- Code trên trình duyệt với môi trường thống nhất
+- Spawn workspace theo cấu hình CPU/RAM/GPU qua Helm
+- Quản trị user/server từ trang Admin
+
+## Kiến trúc mới
+
+- **Backend:** Django (`DeepOpsBackend/`)
+- **Chart hệ thống:** `dohub/` (ở root repo)
+- **Chart workspace user:** `charts/codehub/`
+- **Chart Jenkins (CI/CD):** `charts/jenkins/` — xem [charts/jenkins/README.md](./charts/jenkins/README.md)
+
+## Triển khai nhanh
+
+Xem chi tiết trong [DEPLOY.md](./DEPLOY.md).
+
+```bash
+cp dohub/secrets/.env.example dohub/secrets/.env
+# chỉnh .env và dohub/configmap/config.yaml
+
+chmod +x build-and-deploy.sh
+./build-and-deploy.sh all          # hoặc: ./build-and-deploy.sh -r myreg/dohub -t 1.0.0 -p all
+```
+
+## Jenkins (tuỳ chọn)
+
+```bash
+JENKINS_ADMIN_PASSWORD='your-password' ./deploy-jenkins.sh install
+```
 
 ## Requirements
 
-See [requirements](https://github.com.daovietanh190499/DeepOps) for minimum specs, as well as instructions
-on how to set up a Google VM on which you can install code-server.
-
-**TL;DR:** Linux machine with WebSockets enabled, 1 GB RAM, and 2 vCPUs
-
-To run on machine that have K8s and helm installed
-```shell
-bash run.sh
-```
+- Linux, WebSockets (ingress nginx)
+- Cluster K8s + Helm 3 + DirectPV (`directpv-min-io`)
+- ~1 GB RAM cho hub pod (khuyến nghị)

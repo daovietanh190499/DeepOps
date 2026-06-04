@@ -1,0 +1,6 @@
+apiVersion: v2
+name: jenkins
+description: Full Jenkins LTS deployment with plugins, JCasC, persistence, ingress, and Kubernetes agents
+type: application
+version: 0.1.0
+appVersion: "2.492.1"

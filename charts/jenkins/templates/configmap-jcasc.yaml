@@ -1,0 +1,69 @@
+{{- if .Values.configurationAsCode.enabled }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "jenkins.fullname" . }}-jcasc
+  labels:
+    {{- include "jenkins.labels" . | nindent 4 }}
+data:
+  jcasc.yaml: |
+    jenkins:
+      systemMessage: "Jenkins managed by Helm (DeepOps jenkins chart)"
+      numExecutors: {{ .Values.controller.numExecutors }}
+      mode: NORMAL
+      clouds:
+        {{- if .Values.kubernetesAgent.enabled }}
+        - kubernetes:
+            name: "kubernetes"
+            serverUrl: "https://kubernetes.default.svc"
+            namespace: "{{ include "jenkins.namespace" . }}"
+            jenkinsUrl: "{{ include "jenkins.jenkinsUrl" . }}"
+            jenkinsTunnel: "{{ include "jenkins.jenkinsTunnel" . }}"
+            containerCapStr: "10"
+            maxRequestsPerHostStr: "32"
+            connectTimeout: 5
+            readTimeout: 15
+            templates:
+              {{- range .Values.kubernetesAgent.templates }}
+              - name: "{{ .name }}"
+                label: "{{ .label }}"
+                nodeUsageMode: {{ .nodeUsageMode | default "NORMAL" }}
+                serviceAccount: "{{ include "jenkins.serviceAccountName" $ }}"
+                idleMinutes: 5
+                slaveConnectTimeout: 100
+                instanceCap: 2147483647
+                containers:
+                  {{- range .containers }}
+                  - name: "{{ .name }}"
+                    image: "{{ .image }}"
+                    alwaysPullImage: {{ .alwaysPullImage | default true }}
+                    workingDir: "{{ .workingDir | default "/home/jenkins/agent" }}"
+                    resourceRequestCpu: "{{ .resourceRequestCpu | default "512m" }}"
+                    resourceRequestMemory: "{{ .resourceRequestMemory | default "512Mi" }}"
+                    resourceLimitCpu: "{{ .resourceLimitCpu | default "2" }}"
+                    resourceLimitMemory: "{{ .resourceLimitMemory | default "2Gi" }}"
+                    ttyEnabled: true
+                  {{- end }}
+                yaml: |
+                  spec:
+                    serviceAccountName: {{ include "jenkins.serviceAccountName" $ }}
+              {{- end }}
+        {{- end }}
+      securityRealm:
+        local:
+          allowsSignup: false
+          users:
+            - id: "${JENKINS_ADMIN_ID}"
+              password: "${JENKINS_ADMIN_PASSWORD}"
+      authorizationStrategy:
+        {{- if .Values.configurationAsCode.allowAnonymousRead }}
+        loggedInUsersCanDoAnything:
+          allowAnonymousRead: true
+        {{- else }}
+        loggedInUsersCanDoAnything:
+          allowAnonymousRead: false
+        {{- end }}
+    unclassified:
+      location:
+        url: "{{ include "jenkins.jenkinsUrl" . }}"
+{{- end }}

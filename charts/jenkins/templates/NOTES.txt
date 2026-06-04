@@ -1,0 +1,24 @@
+Jenkins has been deployed.
+
+1. Get the admin password:
+
+   kubectl get secret {{ include "jenkins.fullname" . }}-admin -n {{ .Release.Namespace }} \
+     -o jsonpath="{.data.jenkins-admin-password}" | base64 -d && echo
+
+   User: {{ .Values.controller.adminUser }}
+
+2. Open Jenkins:
+
+{{- if .Values.ingress.enabled }}
+   URL: {{ include "jenkins.jenkinsUrl" . }}
+{{- else }}
+   kubectl port-forward svc/{{ include "jenkins.fullname" . }} 8080:{{ .Values.service.httpPort }} -n {{ .Release.Namespace }}
+   URL: http://127.0.0.1:8080
+{{- end }}
+
+3. First startup may take several minutes while plugins install.
+
+4. Kubernetes cloud "{{ if .Values.kubernetesAgent.enabled }}enabled{{ else }}disabled{{ end }}" — dynamic agents use ServiceAccount:
+   {{ include "jenkins.serviceAccountName" . }}
+
+5. To set a fixed admin password, set controller.adminPassword in values or use controller.existingSecret before upgrade.
