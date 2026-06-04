@@ -101,10 +101,11 @@ def accept_user(request, user, username):
 
 
 def _stop_all_workspaces(target: User):
-    for ws in Workspace.objects.filter(user=target, state=Workspace.STATE_RUNNING):
-        remove_codehub(ws.release_name)
-        ws.state = Workspace.STATE_OFFLINE
-        ws.save(update_fields=['state', 'updated_at'])
+    from backend.services.k8s_status import live_workspace_state, workspace_is_active
+
+    for ws in Workspace.objects.filter(user=target):
+        if workspace_is_active(live_workspace_state(ws)):
+            remove_codehub(ws.release_name)
 
 
 @auth.verify

@@ -3,7 +3,6 @@ import os
 import subprocess
 
 from .config import get_hub_config
-from .storage import workspace_volume_size
 
 NAMESPACE = os.environ.get('NAMESPACE', 'dohub')
 DOMAIN_NAME = os.environ.get('DOMAIN_NAME', 'dohub.com')
@@ -35,6 +34,11 @@ def build_spawn_config(workspace) -> dict:
 
     user = workspace.user
     slug = workspace.slug
+    drive = workspace.user_drive
+    if not drive:
+        raise ValueError('workspace has no drive assigned')
+
+    mount_path = (workspace.mount_path or '/home/coder').strip() or '/home/coder'
 
     return {
         'workspace_id': str(workspace.id),
@@ -56,8 +60,8 @@ def build_spawn_config(workspace) -> dict:
         'env_vars': dict(workspace.env_vars or {}),
         'container_command': list(workspace.container_command or []),
         'storage_class': _storage_class(),
-        'volume_size': workspace_volume_size(workspace),
-        'claim_name': f'claim-{NAMESPACE}-{user.username}-{slug}',
+        'claim_name': drive.claim_name,
+        'mount_path': mount_path,
         'secret_name': f'{user.username}-{slug}-secret',
     }
 
@@ -96,7 +100,6 @@ def _helm_base_cmd(config: dict) -> list[str]:
         '--set-string', 'ingress.annotations.nginx\\.ingress\\.kubernetes\\.io/proxy-send-timeout=600',
         '--set-string', 'ingress.annotations.nginx\\.ingress\\.kubernetes\\.io/proxy-buffering=off',
         '--set-string', 'ingress.annotations.nginx\\.ingress\\.kubernetes\\.io/proxy-http-version=1.1',
-        '--set', 'trustProxy=true',
         '--set', 'ingress.className=nginx',
         '--set', f'ingress.hosts[0].host={config["hostname"]}',
         '--set', 'ingress.hosts[0].paths[0].path=/',
@@ -104,11 +107,10 @@ def _helm_base_cmd(config: dict) -> list[str]:
         '--set', f'ingress.tls[0].secretName=tls-{NAMESPACE}-secret',
         '--set', f'ingress.tls[0].hosts[0]={config["hostname"]}',
         '--set', 'persistence.enabled=true',
+        '--set', 'persistence.createPvc=false',
         '--set', f'persistence.claimName={config["claim_name"]}',
         '--set', f'mainVolume.claimName={config["claim_name"]}',
-        '--set', f'persistence.storageClassName={config["storage_class"]}',
-        '--set', 'persistence.volumeMode=Filesystem',
-        '--set-string', f'persistence.size={config["volume_size"]}',
+        '--set', f'persistence.mountPath={config["mount_path"]}',
         '--set', 'volumes[0].name=shm-volume',
         '--set', 'volumes[0].emptyDir.medium=Memory',
         '--set', f'resources.limits.cpu={config["max_cpu"]}',

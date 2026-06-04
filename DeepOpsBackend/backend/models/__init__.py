@@ -1,3 +1,4 @@
+from .drives import UserDrive
 from .servers import ServerOption
 from .users import User, UserServer
 from .workspaces import DockerImage, Workspace
@@ -8,4 +9,5 @@ __all__ = [
     'UserServer',
     'DockerImage',
     'Workspace',
+    'UserDrive',
 ]

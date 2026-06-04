@@ -38,7 +38,8 @@ spec:
             - sh
             - -c
             - |
-              CFG=/home/coder/.config/code-server/config.yaml
+              MNT="{{ .Values.persistence.mountPath | default "/home/coder" }}"
+              CFG="$MNT/.config/code-server/config.yaml"
               if [ -f "$CFG" ]; then
                 rm -f "$CFG"
                 echo "reset code-server auth config"
@@ -46,7 +47,7 @@ spec:
           {{- if .Values.persistence.enabled }}
           volumeMounts:
             - name: workspace-volume
-              mountPath: /home/coder
+              mountPath: {{ .Values.persistence.mountPath | default "/home/coder" }}
           {{- end }}
       {{- end }}
       {{- end }}
@@ -68,19 +69,14 @@ spec:
               value: {{ .value | quote }}
             {{- end }}
           {{- end }}
-          {{- if .Values.container }}
-          {{- with .Values.container.command }}
+          {{- $container := .Values.container | default dict }}
+          {{- if $container.command }}
           command:
-            {{- toYaml . | nindent 12 }}
+            {{- toYaml $container.command | nindent 12 }}
           {{- end }}
-          {{- with .Values.container.args }}
+          {{- if $container.args }}
           args:
-            {{- toYaml . | nindent 12 }}
-          {{- end }}
-          {{- else if .Values.trustProxy }}
-          args:
-            - --trust-proxy
-          {{- end }}
+            {{- toYaml $container.args | nindent 12 }}
           {{- end }}
           ports:
             - name: http
@@ -96,7 +92,7 @@ spec:
           volumeMounts:
             {{- if .Values.persistence.enabled }}
             - name: workspace-volume
-              mountPath: /home/coder
+              mountPath: {{ .Values.persistence.mountPath | default "/home/coder" }}
             {{- end }}
             {{- with .Values.volumeMounts }}
             {{- toYaml . | nindent 12 }}

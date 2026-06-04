@@ -12,14 +12,6 @@ _BINARY_SUFFIXES = ('Ei', 'Pi', 'Ti', 'Gi', 'Mi', 'Ki')
 _DECIMAL_SUFFIXES = ('E', 'P', 'T', 'G', 'M', 'K')
 
 
-def workspace_volume_size(workspace) -> str:
-    """Resolve PVC size from workspace drive field."""
-    hub_config = get_hub_config()
-    storage = hub_config.get('storage', {})
-    default_size = storage.get('defaultWorkspaceSize', '20Gi')
-    return drive_label_to_size(getattr(workspace, 'drive', None), default_size)
-
-
 def drive_label_to_size(drive: str | None, default: str = '20Gi') -> str:
     """Map drive field to a valid Kubernetes storage quantity (e.g. 50Gi)."""
     if not drive:

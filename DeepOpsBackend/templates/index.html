@@ -91,10 +91,17 @@
                             <select v-model="form.ram" class="mt-1 w-full rounded-lg border px-3 py-2 text-sm">
                                 <option v-for="r in equipmentList.ram" :key="r" :value="r" v-text="r"></option>
                             </select></div>
-                        <div><label class="text-sm font-medium text-slate-600">Drive (DirectPV)</label>
-                            <select v-model="form.drive" class="mt-1 w-full rounded-lg border px-3 py-2 text-sm">
-                                <option v-for="d in equipmentList.drive" :key="d" :value="d" v-text="d"></option>
-                            </select></div>
+                        <div><label class="text-sm font-medium text-slate-600">Mount drive (DirectPV)</label>
+                            <select v-model="form.drive_id" class="mt-1 w-full rounded-lg border px-3 py-2 text-sm">
+                                <option value="">— Select your drive —</option>
+                                <option v-for="d in myDrives" :key="d.id" :value="d.id"
+                                        v-text="d.name + ' (' + d.size + ') · ' + d.status"></option>
+                            </select>
+                            <p v-if="!myDrives.length" class="mt-1 text-xs text-amber-700">No drives yet. Create one in the <strong>Drives</strong> tab.</p>
+                        </div>
+                        <div><label class="text-sm font-medium text-slate-600">Mount path</label>
+                            <input v-model="form.mount_path" type="text" placeholder="/home/coder"
+                                   class="mt-1 w-full rounded-lg border px-3 py-2 text-sm font-mono"></div>
                         <div><label class="text-sm font-medium text-slate-600">GPU</label>
                             <select v-model="form.gpu" class="mt-1 w-full rounded-lg border px-3 py-2 text-sm">
                                 <option v-for="g in equipmentList.gpu" :key="g" :value="g" v-text="g"></option>
@@ -151,7 +158,8 @@
                         <spec-row label="Name" :value="form.name"></spec-row>
                         <spec-row label="CPU" :value="form.cpu + ' vCPU'"></spec-row>
                         <spec-row label="RAM" :value="form.ram"></spec-row>
-                        <spec-row label="Storage" :value="form.drive"></spec-row>
+                        <spec-row label="Drive" :value="selectedDriveLabel"></spec-row>
+                        <spec-row label="Mount path" :value="form.mount_path"></spec-row>
                         <spec-row label="GPU" :value="form.gpu || 'none'"></spec-row>
                         <spec-row label="Image" :value="form.docker_repository + ':' + form.docker_tag"></spec-row>
                         <spec-row label="Ports" :value="form.ports_text || '8080'"></spec-row>
@@ -193,7 +201,7 @@
                 <code class="block mt-1 rounded bg-slate-100 p-2 text-[10px] overflow-x-auto">[{"name":"ws1","cpu":2,"ram":"4G","drive":"20Gi","env_vars":{"PASSWORD":"secret"}}]</code>
             </p>
             <p class="text-xs text-slate-500" v-else>
-                Or paste CSV. Header: name,cpu,ram,drive,gpu,ports,command,docker_repository,docker_tag,env_PASSWORD,env_KEY…
+                Or paste CSV. Header: name,cpu,ram,drive_id,mount_path,gpu,ports,…
             </p>
             <textarea v-model="bulkText" rows="5" class="w-full rounded-lg border px-3 py-2 text-xs font-mono"
                       :placeholder="bulkMode==='json' ? '[{...}]' : 'name,cpu,ram,...'"></textarea>
@@ -212,6 +220,71 @@
             <div v-if="bulkSummary" class="rounded-lg bg-slate-50 px-3 py-2 text-xs text-slate-700" v-text="bulkSummary"></div>
         </section>
         </div>
+
+        <!-- My drives -->
+        <section v-if="is_login && menu==='drives'" class="space-y-4">
+            <div class="flex flex-wrap items-center justify-between gap-3">
+                <h2 class="text-lg font-bold text-slate-900">My drives</h2>
+                <button type="button" @click="showCreateDrive=true"
+                        class="rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700">Create drive</button>
+            </div>
+            <div v-if="showCreateDrive" class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm space-y-3 max-w-md">
+                <h3 class="font-semibold text-slate-800">New DirectPV drive</h3>
+                <input v-model="newDrive.name" placeholder="Drive name" class="w-full rounded-lg border px-3 py-2 text-sm">
+                <select v-model="newDrive.size" class="w-full rounded-lg border px-3 py-2 text-sm">
+                    <option v-for="s in driveSizeOptions" :key="s" :value="s" v-text="s"></option>
+                </select>
+                <div class="flex gap-2">
+                    <button type="button" @click="createDrive" :disabled="driveCreateLoading"
+                            class="rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50">Create</button>
+                    <button type="button" @click="showCreateDrive=false" class="rounded-lg border px-4 py-2 text-sm">Cancel</button>
+                </div>
+            </div>
+            <p v-if="myDrives.length===0 && !showCreateDrive" class="text-sm text-slate-500">No drives yet. Create a DirectPV volume before running a server.</p>
+            <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                <div v-for="d in myDrives" :key="d.id"
+                     class="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+                    <div class="flex justify-between items-start gap-2">
+                        <h3 class="font-bold text-slate-900" v-text="d.name"></h3>
+                        <span class="text-xs font-bold uppercase px-2 py-0.5 rounded-full"
+                              :class="d.status==='bound' ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'"
+                              v-text="d.status"></span>
+                    </div>
+                    <p class="mt-1 text-xs font-mono text-slate-500 truncate" v-text="d.claim_name"></p>
+                    <p class="mt-2 text-sm text-slate-600" v-text="d.size + (d.in_use ? ' · in use' : '')"></p>
+                    <button type="button" @click="openDeleteDriveModal(d)" :disabled="d.in_use"
+                            class="mt-3 text-xs font-semibold text-rose-600 hover:text-rose-800 disabled:opacity-40"
+                            :title="d.in_use ? 'Stop servers using this drive first' : 'Delete'">Delete drive</button>
+                </div>
+            </div>
+        </section>
+
+        <!-- Admin drives -->
+        <section v-if="is_login && menu==='admin-drives' && is_admin" class="space-y-4">
+            <div class="flex flex-wrap items-center gap-3">
+                <h2 class="text-lg font-bold text-slate-900">All drives</h2>
+                <input v-model="adminDriveFilter" @input="loadAdminDrives(1)" placeholder="Filter by username…"
+                       class="rounded-lg border px-3 py-1.5 text-sm">
+                <span class="text-sm text-slate-500" v-text="'Page ' + adminDrivePagination.page + ' / ' + adminDrivePagination.pages"></span>
+            </div>
+            <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+                <div v-for="d in adminDrives" :key="d.id"
+                     class="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+                    <h3 class="font-bold text-slate-900" v-text="d.name"></h3>
+                    <p class="text-xs text-slate-500" v-text="'@' + d.owner"></p>
+                    <p class="mt-1 text-xs font-mono text-slate-400 truncate" v-text="d.claim_name"></p>
+                    <p class="mt-2 text-sm" v-text="d.size + ' · ' + d.status"></p>
+                    <button type="button" @click="openDeleteDriveModal(d, true)" :disabled="d.in_use"
+                            class="mt-2 text-xs text-rose-600 disabled:opacity-40">Delete</button>
+                </div>
+            </div>
+            <div class="flex justify-center gap-2">
+                <button :disabled="adminDrivePagination.page<=1" @click="loadAdminDrives(adminDrivePagination.page-1)"
+                        class="rounded-lg border px-4 py-2 text-sm disabled:opacity-40">Prev</button>
+                <button :disabled="adminDrivePagination.page>=adminDrivePagination.pages" @click="loadAdminDrives(adminDrivePagination.page+1)"
+                        class="rounded-lg border px-4 py-2 text-sm disabled:opacity-40">Next</button>
+            </div>
+        </section>
 
         <!-- My servers -->
         <section v-if="is_login && menu==='servers'" class="space-y-4">
@@ -296,14 +369,15 @@
                     </button>
                 </div>
                 <span class="inline-block rounded-full px-2 py-0.5 text-xs font-bold uppercase"
-                      :class="modalWorkspace.state==='running' ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-600'"
+                      :class="modalWorkspace.state==='running' ? 'bg-emerald-100 text-emerald-700' : modalWorkspace.state==='offline' ? 'bg-slate-100 text-slate-600' : 'bg-amber-100 text-amber-700'"
                       v-text="modalWorkspace.state"></span>
                 <div class="rounded-xl bg-slate-50 px-4 py-2">
                     <spec-row label="Owner" :value="modalWorkspace.owner || modalWorkspace.username"></spec-row>
                     <spec-row label="Slug" :value="modalWorkspace.slug"></spec-row>
                     <spec-row label="CPU" :value="modalWorkspace.cpu + ' vCPU'"></spec-row>
                     <spec-row label="RAM" :value="modalWorkspace.ram"></spec-row>
-                    <spec-row label="Storage" :value="modalWorkspace.drive"></spec-row>
+                    <spec-row label="Drive" :value="modalWorkspace.drive_name || '—'"></spec-row>
+                    <spec-row label="Mount path" :value="modalWorkspace.mount_path"></spec-row>
                     <spec-row label="GPU" :value="modalWorkspace.gpu || 'none'"></spec-row>
                     <spec-row label="Image" :value="modalWorkspace.docker_repository + ':' + modalWorkspace.docker_tag"></spec-row>
                     <spec-row label="Ports" :value="(modalWorkspace.exposed_ports || []).join(', ') || '8080'"></spec-row>
@@ -321,6 +395,24 @@
                             class="flex-1 rounded-lg border border-blue-600 text-blue-600 py-2 text-xs font-semibold">Open</button>
                     <button @click="exportWorkspace(modalWorkspace)" class="rounded-lg border px-4 py-2 text-xs font-semibold">Export JSON</button>
                     <button @click="exportModalConfig" class="rounded-lg border px-4 py-2 text-xs font-semibold">Download config</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Delete drive confirmation -->
+    <div v-if="deleteModalDrive" class="fixed inset-0 z-[55] flex items-center justify-center p-4 bg-slate-900/50" @click.self="closeDeleteDriveModal">
+        <div class="w-full max-w-md rounded-2xl border border-slate-200 bg-white shadow-xl">
+            <div class="border-b border-slate-100 px-5 py-4">
+                <h3 class="text-lg font-bold text-slate-900">Delete drive</h3>
+                <p class="mt-1 text-sm text-slate-500">Type <kbd class="rounded bg-slate-100 px-1 font-mono text-xs">delete</kbd> to remove <strong v-text="deleteModalDrive.name"></strong> and its PVC.</p>
+            </div>
+            <div class="space-y-4 px-5 py-4">
+                <input v-model="deleteDriveConfirmInput" type="text" placeholder="delete" class="w-full rounded-lg border px-3 py-2 text-sm font-mono">
+                <div class="flex justify-end gap-2">
+                    <button type="button" @click="closeDeleteDriveModal" class="rounded-lg border px-4 py-2 text-sm">Cancel</button>
+                    <button type="button" @click="confirmDeleteDrive" :disabled="!canConfirmDeleteDrive || deleteDriveInProgress"
+                            class="rounded-lg bg-rose-600 px-4 py-2 text-sm font-semibold text-white disabled:opacity-40">Delete</button>
                 </div>
             </div>
         </div>

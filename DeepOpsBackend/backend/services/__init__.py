@@ -1,7 +1,7 @@
 from .config import get_hub_config
 from .github_auth import GitHubAuth
 from .k8s import create_codehub, get_codehub_workspace, remove_codehub
-from .storage import workspace_volume_size
+from .storage import drive_label_to_size
 
 __all__ = [
     'get_hub_config',
@@ -9,5 +9,5 @@ __all__ = [
     'create_codehub',
     'get_codehub_workspace',
     'remove_codehub',
-    'workspace_volume_size',
+    'drive_label_to_size',
 ]

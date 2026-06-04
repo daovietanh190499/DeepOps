@@ -48,6 +48,18 @@ Vue.component('workspace-card', {
             if (this.ws.state === 'offline') return 'bg-slate-100 text-slate-600'
             return 'bg-amber-100 text-amber-700'
         },
+        canStart() {
+            return this.ws.state === 'offline'
+        },
+        canStop() {
+            return ['running', 'pending_start', 'pending_stop'].includes(this.ws.state)
+        },
+        canOpen() {
+            return this.ws.state === 'running'
+        },
+        canDelete() {
+            return this.ws.state === 'offline'
+        },
         serverUrl() {
             return window.location.protocol + '//' + this.ws.hostname
         },
@@ -74,16 +86,17 @@ Vue.component('workspace-card', {
         <span class="shrink-0 rounded-full px-2 py-0.5 text-xs font-bold uppercase" :class="stateClass" v-text="ws.state"></span>
       </div>
       <div class="text-xs text-slate-600 space-y-0.5 pointer-events-none">
-        <p v-text="ws.cpu + ' vCPU · ' + ws.ram + ' · ' + ws.drive"></p>
+        <p v-text="ws.cpu + ' vCPU · ' + ws.ram"></p>
+        <p v-text="'Drive: ' + (ws.drive_name || '—') + ' → ' + (ws.mount_path || '/home/coder')"></p>
         <p v-text="'GPU: ' + (ws.gpu || 'none')"></p>
         <p class="font-mono truncate" v-text="ws.docker_repository + ':' + ws.docker_tag"></p>
       </div>
       <div class="flex flex-wrap gap-2 mt-auto" @click.stop>
-        <button v-if="ws.state==='offline'" @click="$emit('start', ws)" class="flex-1 rounded-lg bg-blue-600 text-white text-xs py-2 font-semibold">Start</button>
-        <button v-if="ws.state==='running'" @click="$emit('stop', ws)" class="flex-1 rounded-lg bg-rose-600 text-white text-xs py-2 font-semibold">Stop</button>
-        <button v-if="ws.state==='running'" @click="$emit('open', ws)" class="flex-1 rounded-lg border border-blue-600 text-blue-600 text-xs py-2 font-semibold">Open</button>
+        <button v-if="canStart" @click="$emit('start', ws)" class="flex-1 rounded-lg bg-blue-600 text-white text-xs py-2 font-semibold">Start</button>
+        <button v-if="canStop" @click="$emit('stop', ws)" class="flex-1 rounded-lg bg-rose-600 text-white text-xs py-2 font-semibold">Stop</button>
+        <button v-if="canOpen" @click="$emit('open', ws)" class="flex-1 rounded-lg border border-blue-600 text-blue-600 text-xs py-2 font-semibold">Open</button>
         <button @click="$emit('export', ws)" class="rounded-lg border px-2 py-2 text-xs" title="Export"><i class="fa fa-download"></i></button>
-        <button v-if="ws.state==='offline'" @click="$emit('delete', ws)" class="rounded-lg border border-rose-200 text-rose-600 px-2 py-2 text-xs"><i class="fa fa-trash"></i></button>
+        <button v-if="canDelete" @click="$emit('delete', ws)" class="rounded-lg border border-rose-200 text-rose-600 px-2 py-2 text-xs"><i class="fa fa-trash"></i></button>
       </div>
     </div>`,
 })
@@ -97,23 +110,23 @@ function randomToken(len) {
 
 const PLAN_TEMPLATES = [
     {
-        name: 'Lollipop', image: 'lollipop.png', cpu: 2, ram: '4G', drive: '20Gi', gpu: 'none',
+        name: 'Lollipop', image: 'lollipop.png', cpu: 2, ram: '4G', gpu: 'none',
         env_defaults: { PASSWORD: () => 'lollipop-' + randomToken(6), PWA_APPNAME: 'Lollipop' },
     },
     {
-        name: 'Oreo', image: 'oreo.png', cpu: 4, ram: '8G', drive: '50Gi', gpu: 'mig-2g.10gb',
+        name: 'Oreo', image: 'oreo.png', cpu: 4, ram: '8G', gpu: 'mig-2g.10gb',
         env_defaults: { PASSWORD: () => 'oreo-' + randomToken(6), PWA_APPNAME: 'Oreo' },
     },
     {
-        name: 'Popeyes', image: 'popeyes.png', cpu: 8, ram: '16G', drive: '100Gi', gpu: 'mig-3g.20gb',
+        name: 'Popeyes', image: 'popeyes.png', cpu: 8, ram: '16G', gpu: 'mig-3g.20gb',
         env_defaults: { PASSWORD: () => 'popeyes-' + randomToken(6), PWA_APPNAME: 'Popeyes' },
     },
     {
-        name: 'Pizza', image: 'pizza.png', cpu: 8, ram: '32G', drive: '200Gi', gpu: 'gpu',
+        name: 'Pizza', image: 'pizza.png', cpu: 8, ram: '32G', gpu: 'gpu',
         env_defaults: { PASSWORD: () => 'pizza-' + randomToken(6), PWA_APPNAME: 'Pizza' },
     },
     {
-        name: 'Spagetti', image: 'spagetti.png', cpu: 16, ram: '64G', drive: '500Gi', gpu: 'gpu:2',
+        name: 'Spagetti', image: 'spagetti.png', cpu: 16, ram: '64G', gpu: 'gpu:2',
         env_defaults: { PASSWORD: () => 'spagetti-' + randomToken(6), PWA_APPNAME: 'Spagetti' },
     },
 ]
@@ -123,7 +136,8 @@ function defaultForm() {
         name: 'My workspace',
         cpu: 2,
         ram: '4G',
-        drive: '20Gi',
+        drive_id: '',
+        mount_path: '/home/coder',
         gpu: 'none',
         docker_image_id: '',
         docker_repository: 'codercom/code-server',
@@ -159,7 +173,8 @@ function formPayload(form) {
         name: form.name,
         cpu: form.cpu,
         ram: form.ram,
-        drive: form.drive,
+        drive_id: form.drive_id || null,
+        mount_path: form.mount_path || '/home/coder',
         gpu: form.gpu === 'none' ? '' : form.gpu,
         docker_repository: form.docker_repository,
         docker_tag: form.docker_tag,
@@ -172,6 +187,8 @@ function formPayload(form) {
 function normalizeBulkItem(raw) {
     const item = { ...raw }
     if (item.gpu === 'none') item.gpu = ''
+    if (item.user_drive_id) item.drive_id = item.user_drive_id
+    if (!item.mount_path) item.mount_path = '/home/coder'
     if (typeof item.ports === 'string') item.exposed_ports = parsePorts(item.ports)
     else if (item.ports_text) item.exposed_ports = parsePorts(item.ports_text)
     else if (!item.exposed_ports) item.exposed_ports = [8080]
@@ -219,9 +236,20 @@ const appVue = new Vue({
         equipmentList: {
             cpu: [2, 4, 8, 16, 32],
             ram: ['2G', '4G', '8G', '16G', '32G', '64G'],
-            drive: ['20Gi', '50Gi', '100Gi', '200Gi', '500Gi', '1Ti'],
             gpu: ['none', 'mig-2g.10gb', 'mig-3g.20gb', 'gpu', 'gpu:2'],
         },
+        driveSizeOptions: ['20Gi', '50Gi', '100Gi', '200Gi', '500Gi', '1Ti'],
+        myDrives: [],
+        adminDrives: [],
+        adminDrivePagination: { page: 1, pages: 1, total: 0, per_page: 12 },
+        adminDriveFilter: '',
+        showCreateDrive: false,
+        newDrive: { name: 'My drive', size: '20Gi' },
+        driveCreateLoading: false,
+        deleteModalDrive: null,
+        deleteModalDriveIsAdmin: false,
+        deleteDriveConfirmInput: '',
+        deleteDriveInProgress: false,
         planTemplates: PLAN_TEMPLATES,
         form: defaultForm(),
         envKey: '',
@@ -253,18 +281,28 @@ const appVue = new Vue({
         deleteInProgress: false,
         toastMessage: '',
         toastTimer: null,
+        statusPollTimer: null,
     },
     computed: {
         canConfirmDelete() {
             return this.deleteConfirmInput.trim().toLowerCase() === 'delete'
         },
+        canConfirmDeleteDrive() {
+            return this.deleteDriveConfirmInput.trim().toLowerCase() === 'delete'
+        },
+        selectedDriveLabel() {
+            const d = this.myDrives.find((x) => x.id === this.form.drive_id)
+            return d ? d.name + ' (' + d.size + ')' : '—'
+        },
         visibleTabs() {
             const tabs = [
                 { id: 'home', label: 'Home' },
+                { id: 'drives', label: 'Drives' },
                 { id: 'servers', label: 'My servers' },
             ]
             if (this.is_admin) {
                 tabs.push({ id: 'admin-users', label: 'Users' })
+                tabs.push({ id: 'admin-drives', label: 'All drives' })
                 tabs.push({ id: 'admin-servers', label: 'Servers' })
                 tabs.push({ id: 'admin-images', label: 'Images' })
             }
@@ -283,7 +321,28 @@ const appVue = new Vue({
         this.menu = params.get('tab') || 'home'
         this.init()
     },
+    beforeDestroy() {
+        this.stopStatusPolling()
+    },
     methods: {
+        startStatusPolling() {
+            this.stopStatusPolling()
+            if (!this.is_login) return
+            this.statusPollTimer = setInterval(() => this.pollStatuses(), 5000)
+        },
+        stopStatusPolling() {
+            if (this.statusPollTimer) {
+                clearInterval(this.statusPollTimer)
+                this.statusPollTimer = null
+            }
+        },
+        async pollStatuses() {
+            const m = this.menu
+            if (m === 'drives' || m === 'home') await this.loadMyDrives()
+            if (m === 'servers' || m === 'home') await this.loadMyWorkspaces()
+            if (m === 'admin-drives') await this.loadAdminDrives(this.adminDrivePagination.page)
+            if (m === 'admin-servers') await this.loadAdminWorkspaces(this.adminPagination.page)
+        },
         loginWithGithub() { window.location = 'login' },
         logout() { window.location = 'logout' },
         workspaceUrl(ws) {
@@ -351,21 +410,31 @@ const appVue = new Vue({
             downloadJson(this.modalWorkspace, 'dohub-' + this.modalWorkspace.slug + '-config.json')
         },
         changeMenu(menu) {
+            this.stopStatusPolling()
             this.menu = menu
             window.history.replaceState({}, '', '/?tab=' + menu)
+            if (menu === 'drives') this.loadMyDrives()
             if (menu === 'servers') this.loadMyWorkspaces()
+            if (menu === 'admin-drives') this.loadAdminDrives(1)
             if (menu === 'admin-servers') this.loadAdminWorkspaces(1)
             if (menu === 'admin-users') this.getAllUsers()
             if (menu === 'admin-images') this.loadAdminDockerImages()
+            if (['home', 'drives', 'servers', 'admin-drives', 'admin-servers'].includes(menu)) {
+                this.startStatusPolling()
+            }
         },
         async init() {
             if (!this.is_login) return
             await this.getCurrentUserState()
             await this.loadDockerImages()
+            await this.loadMyDrives()
             await this.loadMyWorkspaces()
             if (this.is_admin) {
                 await this.getAllUsers()
                 await this.loadAdminDockerImages()
+            }
+            if (['home', 'drives', 'servers', 'admin-drives', 'admin-servers'].includes(this.menu)) {
+                this.startStatusPolling()
             }
         },
         async getCurrentUserState() {
@@ -398,7 +467,6 @@ const appVue = new Vue({
         applyTemplate(t) {
             this.form.cpu = t.cpu
             this.form.ram = t.ram
-            this.form.drive = t.drive
             this.form.gpu = t.gpu
             this.form.name = t.name + ' workspace'
             const env = resolveEnvDefaults(t.env_defaults)
@@ -485,7 +553,71 @@ const appVue = new Vue({
                 this.bulkLoading = false
             }
         },
+        async loadMyDrives() {
+            const res = await fetch('drives')
+            if (res.status !== 200) return
+            const data = await res.json()
+            this.myDrives = data.result || []
+            if (!this.form.drive_id && this.myDrives.length) {
+                this.form.drive_id = this.myDrives[0].id
+            }
+        },
+        async loadAdminDrives(page) {
+            const q = new URLSearchParams({ page: page || 1, per_page: 12, user: this.adminDriveFilter })
+            const res = await fetch('admin/drives?' + q)
+            if (res.status !== 200) return
+            const data = await res.json()
+            this.adminDrives = data.result || []
+            this.adminDrivePagination = data.pagination || this.adminDrivePagination
+        },
+        async createDrive() {
+            this.driveCreateLoading = true
+            const res = await fetch('drives/create', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(this.newDrive),
+            })
+            this.driveCreateLoading = false
+            if (res.status !== 201) {
+                const data = await res.json().catch(() => ({}))
+                this.showToast(data.message || 'Create failed')
+                return
+            }
+            this.showCreateDrive = false
+            this.newDrive = { name: 'My drive', size: '20Gi' }
+            await this.loadMyDrives()
+            this.showToast('Drive created')
+        },
+        openDeleteDriveModal(d, isAdmin) {
+            this.deleteModalDrive = d
+            this.deleteModalDriveIsAdmin = !!isAdmin
+            this.deleteDriveConfirmInput = ''
+        },
+        closeDeleteDriveModal() {
+            this.deleteModalDrive = null
+            this.deleteDriveConfirmInput = ''
+        },
+        async confirmDeleteDrive() {
+            if (!this.canConfirmDeleteDrive || !this.deleteModalDrive) return
+            const d = this.deleteModalDrive
+            this.deleteDriveInProgress = true
+            const res = await fetch('drives/' + d.id, { method: 'DELETE' })
+            this.deleteDriveInProgress = false
+            if (res.status !== 200) {
+                const data = await res.json().catch(() => ({}))
+                this.showToast(data.message || 'Delete failed')
+                return
+            }
+            this.closeDeleteDriveModal()
+            this.showToast('Drive deleted')
+            await this.loadMyDrives()
+            if (this.is_admin) await this.loadAdminDrives(this.adminDrivePagination.page)
+        },
         async runWorkspace() {
+            if (!this.form.drive_id) {
+                this.runError = 'Select a drive to mount'
+                return
+            }
             this.runLoading = true
             this.runError = ''
             this.addEnv()

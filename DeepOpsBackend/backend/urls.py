@@ -1,6 +1,7 @@
 from django.urls import path
 
 from backend import views
+from backend.views import drives as drive_views
 from backend.views import workspaces as ws_views
 
 urlpatterns = [
@@ -13,6 +14,11 @@ urlpatterns = [
     path('accept_user/<str:username>', views.accept_user, name='accept-user'),
     path('delete_user/<str:username>', views.delete_user, name='delete-user'),
     path('change_role/<str:username>/<str:role>', views.change_role, name='change-role'),
+
+    path('drives', drive_views.my_drives, name='my-drives'),
+    path('drives/create', drive_views.drive_create, name='drive-create'),
+    path('drives/<uuid:drive_id>', drive_views.drive_delete, name='drive-delete'),
+    path('admin/drives', drive_views.admin_drives, name='admin-drives'),
 
     path('docker_images', ws_views.docker_images_list, name='docker-images'),
     path('workspaces/run', ws_views.workspace_run, name='workspace-run'),

@@ -4,6 +4,7 @@ import uuid
 from django.db import models
 from django.utils.text import slugify
 
+from .drives import UserDrive
 from .users import User
 
 
@@ -51,7 +52,14 @@ class Workspace(models.Model):
     slug = models.SlugField(max_length=48)
     cpu = models.PositiveIntegerField(default=2)
     ram = models.CharField(max_length=64, default='4G')
-    drive = models.CharField(max_length=64, default='20Gi')
+    user_drive = models.ForeignKey(
+        UserDrive,
+        on_delete=models.PROTECT,
+        related_name='workspaces',
+        null=True,
+        blank=True,
+    )
+    mount_path = models.CharField(max_length=256, default='/home/coder')
     gpu = models.CharField(max_length=255, blank=True, default='')
     docker_repository = models.CharField(max_length=512, default='codercom/code-server')
     docker_tag = models.CharField(max_length=128, default='4.89.0-ubuntu')
@@ -102,7 +110,10 @@ class Workspace(models.Model):
             'username': self.user.username,
             'cpu': self.cpu,
             'ram': self.ram,
-            'drive': self.drive,
+            'drive_id': str(self.user_drive_id) if self.user_drive_id else None,
+            'drive_name': self.user_drive.name if self.user_drive_id else None,
+            'drive_size': self.user_drive.size if self.user_drive_id else None,
+            'mount_path': self.mount_path,
             'gpu': self.gpu or 'none',
             'docker_repository': self.docker_repository,
             'docker_tag': self.docker_tag,

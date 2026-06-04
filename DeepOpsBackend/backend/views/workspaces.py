@@ -6,7 +6,7 @@ from django.http import HttpResponse, JsonResponse
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_http_methods
 
-from backend.models import DockerImage, User, Workspace
+from backend.models import DockerImage, User, UserDrive, Workspace
 from backend.services.github_auth import auth
 from backend.services.k8s import (
     build_spawn_config,
@@ -14,6 +14,7 @@ from backend.services.k8s import (
     get_codehub_workspace,
     remove_codehub,
 )
+from backend.services.k8s_status import live_workspace_state, workspace_is_active
 
 
 def _require_user(user):
@@ -42,6 +43,7 @@ def _require_accepted(user):
 
 def _workspace_payload(ws: Workspace, include_log: bool = False) -> dict:
     data = ws.to_config_dict()
+    data['state'] = live_workspace_state(ws)
     data['user_id'] = ws.user_id
     data['owner'] = ws.user.username
     data['created_at'] = ws.created_at.isoformat()
@@ -52,7 +54,7 @@ def _workspace_payload(ws: Workspace, include_log: bool = False) -> dict:
 
 
 def _get_workspace_for_user(user, workspace_id):
-    ws = Workspace.objects.filter(id=workspace_id).select_related('user').first()
+    ws = Workspace.objects.filter(id=workspace_id).select_related('user', 'user_drive').first()
     if not ws:
         return None, JsonResponse({'message': 'not found'}, status=404)
     if user.role != User.ROLE_ADMIN and ws.user_id != user.id:
@@ -66,10 +68,26 @@ def _parse_body(request) -> dict:
     return json.loads(request.body.decode('utf-8'))
 
 
-def _apply_workspace_fields(ws: Workspace, data: dict):
-    for field in ('name', 'cpu', 'ram', 'drive', 'gpu', 'docker_repository', 'docker_tag'):
+def _resolve_user_drive(user: User, data: dict) -> UserDrive | None:
+    drive_id = data.get('drive_id') or data.get('user_drive_id')
+    if not drive_id:
+        return None
+    drive = UserDrive.objects.filter(id=drive_id, user=user).first()
+    if not drive and user.role == User.ROLE_ADMIN:
+        drive = UserDrive.objects.filter(id=drive_id).first()
+    return drive
+
+
+def _apply_workspace_fields(ws: Workspace, data: dict, owner: User | None = None):
+    owner = owner or ws.user
+    for field in ('name', 'cpu', 'ram', 'gpu', 'docker_repository', 'docker_tag'):
         if field in data and data[field] is not None:
             setattr(ws, field, data[field])
+    if 'mount_path' in data and data['mount_path']:
+        ws.mount_path = str(data['mount_path']).strip()[:256] or '/home/coder'
+    drive = _resolve_user_drive(owner, data)
+    if drive:
+        ws.user_drive = drive
     if 'env_vars' in data and isinstance(data['env_vars'], dict):
         ws.env_vars = data['env_vars']
     if 'exposed_ports' in data and isinstance(data['exposed_ports'], list):
@@ -107,7 +125,7 @@ def my_workspaces(request, user):
     denied = _require_accepted(user)
     if denied:
         return denied
-    qs = Workspace.objects.filter(user=user).select_related('user')
+    qs = Workspace.objects.filter(user=user).select_related('user', 'user_drive')
     return JsonResponse({
         'result': [_workspace_payload(ws) for ws in qs],
     })
@@ -130,7 +148,9 @@ def workspace_create(request, user):
         return JsonResponse({'message': 'name required'}, status=400)
 
     ws = Workspace(user=user, name=name)
-    _apply_workspace_fields(ws, data)
+    _apply_workspace_fields(ws, data, owner=user)
+    if not ws.user_drive_id:
+        return JsonResponse({'message': 'drive_id required'}, status=400)
     ws.save()
     return JsonResponse({'result': _workspace_payload(ws)}, status=201)
 
@@ -147,13 +167,13 @@ def workspace_detail(request, user, workspace_id):
         return err
 
     if request.method == 'DELETE':
-        if ws.state == Workspace.STATE_RUNNING:
+        if workspace_is_active(live_workspace_state(ws)):
             if settings.DEFAULT_SPAWNER == 'k8s':
                 remove_codehub(ws.release_name)
         ws.delete()
         return JsonResponse({'message': 'success'})
 
-    if ws.state != Workspace.STATE_OFFLINE:
+    if live_workspace_state(ws) != Workspace.STATE_OFFLINE:
         return JsonResponse({'message': 'stop server before editing'}, status=400)
     try:
         data = _parse_body(request)
@@ -185,8 +205,14 @@ def workspace_export(request, user, workspace_id):
 
 
 def _start_workspace(ws: Workspace):
+    if not ws.user_drive_id:
+        return JsonResponse({'message': 'select a drive to mount'}, status=400)
+    try:
+        if settings.DEFAULT_SPAWNER == 'k8s':
+            config = build_spawn_config(ws)
+    except ValueError as exc:
+        return JsonResponse({'message': str(exc)}, status=400)
     if settings.DEFAULT_SPAWNER == 'k8s':
-        config = build_spawn_config(ws)
         command, logs, exit_code = create_codehub(config)
         if exit_code != 0:
             return JsonResponse({
@@ -195,8 +221,6 @@ def _start_workspace(ws: Workspace):
                 'command': command,
                 'exit_code': exit_code,
             }, status=500)
-    ws.state = Workspace.STATE_RUNNING
-    ws.save(update_fields=['state', 'updated_at'])
     return JsonResponse({'message': 'success', 'result': _workspace_payload(ws)})
 
 
@@ -204,8 +228,6 @@ def _stop_workspace(ws: Workspace):
     try:
         if settings.DEFAULT_SPAWNER == 'k8s':
             remove_codehub(ws.release_name)
-        ws.state = Workspace.STATE_OFFLINE
-        ws.save(update_fields=['state', 'updated_at'])
     except Exception:
         return JsonResponse({'message': 'action failed'}, status=500)
     return JsonResponse({'message': 'success', 'result': _workspace_payload(ws)})
@@ -221,7 +243,8 @@ def workspace_start(request, user, workspace_id):
     ws, err = _get_workspace_for_user(user, workspace_id)
     if err:
         return err
-    if ws.state not in (Workspace.STATE_OFFLINE, Workspace.STATE_PENDING_STOP):
+    state = live_workspace_state(ws)
+    if state != Workspace.STATE_OFFLINE:
         return JsonResponse({'message': 'already running or pending'}, status=400)
     return _start_workspace(ws)
 
@@ -236,7 +259,7 @@ def workspace_stop(request, user, workspace_id):
     ws, err = _get_workspace_for_user(user, workspace_id)
     if err:
         return err
-    if ws.state not in (Workspace.STATE_RUNNING, Workspace.STATE_PENDING_START):
+    if not workspace_is_active(live_workspace_state(ws)):
         return JsonResponse({'message': 'not running'}, status=400)
     return _stop_workspace(ws)
 
@@ -256,7 +279,9 @@ def workspace_run(request, user):
 
     name = (data.get('name') or 'Workspace').strip()[:128]
     ws = Workspace(user=user, name=name)
-    _apply_workspace_fields(ws, data)
+    _apply_workspace_fields(ws, data, owner=user)
+    if not ws.user_drive_id:
+        return JsonResponse({'message': 'drive_id required'}, status=400)
     ws.save()
     return _start_workspace(ws)
 
@@ -286,12 +311,20 @@ def workspace_bulk_run(request, user):
             continue
         name = (item.get('name') or f'Workspace {i + 1}').strip()[:128]
         ws = Workspace(user=user, name=name)
-        _apply_workspace_fields(ws, item)
+        _apply_workspace_fields(ws, item, owner=user)
+        if not ws.user_drive_id:
+            results.append({'index': i, 'ok': False, 'error': 'drive_id required'})
+            continue
         ws.save()
         entry = {'index': i, 'ok': True, 'id': str(ws.id), 'name': ws.name, 'slug': ws.slug}
         if auto_start:
+            try:
+                if settings.DEFAULT_SPAWNER == 'k8s':
+                    config = build_spawn_config(ws)
+            except ValueError as exc:
+                results.append({'index': i, 'ok': False, 'error': str(exc)})
+                continue
             if settings.DEFAULT_SPAWNER == 'k8s':
-                config = build_spawn_config(ws)
                 command, logs, exit_code = create_codehub(config)
                 if exit_code != 0:
                     entry['ok'] = False
@@ -299,9 +332,7 @@ def workspace_bulk_run(request, user):
                     entry['logs'] = logs
                     results.append(entry)
                     continue
-            ws.state = Workspace.STATE_RUNNING
-            ws.save(update_fields=['state', 'updated_at'])
-            entry['state'] = ws.state
+            entry['state'] = live_workspace_state(ws)
         results.append(entry)
 
     ok_count = sum(1 for r in results if r.get('ok'))
@@ -324,7 +355,7 @@ def admin_workspaces(request, user):
     per_page = min(48, max(6, int(request.GET.get('per_page', 12))))
     user_filter = (request.GET.get('user') or '').strip()
 
-    qs = Workspace.objects.select_related('user').order_by('-updated_at')
+    qs = Workspace.objects.select_related('user', 'user_drive').order_by('-updated_at')
     if user_filter:
         qs = qs.filter(user__username__icontains=user_filter)
 

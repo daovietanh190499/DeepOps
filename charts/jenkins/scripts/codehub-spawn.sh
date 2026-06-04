@@ -77,7 +77,6 @@ HELM_CMD=(
   --set-string ingress.annotations.nginx\.ingress\.kubernetes\.io/proxy-send-timeout=600
   --set-string ingress.annotations.nginx\.ingress\.kubernetes\.io/proxy-buffering=off
   --set-string ingress.annotations.nginx\.ingress\.kubernetes\.io/proxy-http-version=1.1
-  --set trustProxy=true
   --set ingress.className=nginx
   --set "ingress.hosts[0].host=${INGRESS_HOST}"
   --set ingress.hosts[0].paths[0].path=/

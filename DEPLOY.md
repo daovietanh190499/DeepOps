@@ -98,6 +98,15 @@ python manage.py runserver 0.0.0.0:5000
 
 Mở http://localhost:5000
 
+## Drives (DirectPV) vs servers
+
+- **Drives** tab: user creates a DirectPV PVC (`kubectl apply`) with name + size (`20Gi`, …).
+- **Servers** no longer create storage; pick an existing drive + **mount path** (e.g. `/home/coder`).
+- PVC name: `drive-{namespace}-{username}-{slug}`.
+- Delete drive: type `delete` in modal; blocked if a server still uses it or server is running.
+
+API: `GET/POST /drives/create`, `DELETE /drives/<id>`, `GET /admin/drives`.
+
 ## Workspaces (multi-server)
 
 - **Home**: cấu hình CPU/RAM/GPU/Drive, docker image+tag, ENV, ports, command → **Run codehub**
@@ -112,7 +121,7 @@ API chính: `POST /workspaces/run`, `GET /workspaces`, `POST /workspaces/<id>/st
 
 ## Code-server behind nginx ingress (WebSocket / session)
 
-Each codehub release sets ingress annotations for WebSocket upgrade and proxy headers (`Host`, `Upgrade`, `Connection`, `X-Forwarded-*`). The chart also enables `--trust-proxy` on code-server when no custom container command is set.
+Each codehub release sets ingress annotations for WebSocket upgrade and proxy headers (`Host`, `Upgrade`, `Connection`, `X-Forwarded-*`). Custom `codehub` images may not support the code-server `--trust-proxy` CLI flag; proxy trust is handled via ingress headers only.
 
 After chart changes, **Stop → Start** each workspace (or `helm upgrade` the release) so ingress picks up new annotations.
 

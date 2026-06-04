@@ -8,7 +8,9 @@ image:
 # Per-user workspace PVC (DirectPV — WaitForFirstConsumer)
 persistence:
   enabled: true
-  claimName: ""  # set at install: claim-{namespace}-{username}
+  createPvc: false  # drives are created separately; mount existing claim
+  claimName: ""
+  mountPath: /home/coder
   storageClassName: directpv-min-io
   volumeMode: Filesystem
   accessModes:
@@ -61,9 +63,6 @@ env:
 # (code-server only applies PASSWORD on first init; old PVC keeps old hash)
 auth:
   resetConfigOnDeploy: false
-
-# Trust X-Forwarded-* from ingress (cookies / login behind reverse proxy)
-trustProxy: true
 
 extraEnv: []
 
