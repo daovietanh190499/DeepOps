@@ -60,3 +60,14 @@ Create the name of the service account to use
 {{- default "default" .Values.serviceAccount.name }}
 {{- end }}
 {{- end }}
+
+{{/*
+Service account used by the pod when ssh-bridge is enabled.
+*/}}
+{{- define "codehub.sshBridgeServiceAccountName" -}}
+{{- if .Values.sshBridge.serviceAccount.create }}
+{{- default (printf "%s-ssh" (include "codehub.fullname" .)) .Values.sshBridge.serviceAccount.name }}
+{{- else }}
+{{- include "codehub.serviceAccountName" . }}
+{{- end }}
+{{- end }}

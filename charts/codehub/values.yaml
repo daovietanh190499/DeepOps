@@ -39,6 +39,13 @@ sshBridge:
   ingressPath: /ssh-tunnel
   secretName: ""
   authorizedKeys: ""
+  # Main workspace container kubectl exec target
+  targetContainer: codehub
+  serviceAccount:
+    create: true
+    name: ""
+  rbac:
+    create: true
 
 ingress:
   enabled: true

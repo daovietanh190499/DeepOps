@@ -155,6 +155,8 @@ def _helm_base_cmd(config: dict) -> list[str]:
         bridge_tag = os.environ.get('SSH_BRIDGE_TAG', 'latest')
         cmd.extend([
             '--set', 'sshBridge.enabled=true',
+            '--set', 'sshBridge.serviceAccount.create=true',
+            '--set', 'sshBridge.rbac.create=true',
             '--set', f'sshBridge.secretName={config["ssh_secret_name"]}',
             '--set', f'sshBridge.image.repository={bridge_image}',
             '--set', f'sshBridge.image.tag={bridge_tag}',
