@@ -68,14 +68,18 @@
         <!-- My drives -->
         <section v-if="is_login && menu==='drives'" class="space-y-4">
             <div class="flex flex-wrap items-center justify-between gap-3">
-                <h2 class="text-lg font-bold text-slate-900">My drives</h2>
+                <div>
+                    <h2 class="text-lg font-bold text-slate-900">My drives</h2>
+                    <p v-if="resourceLimits.limited && resourceLimits.limits.max_drives" class="text-xs text-slate-500 mt-0.5"
+                       v-text="'Drives: ' + (resourceLimits.limits.drive_count ?? myDrives.length) + ' / ' + resourceLimits.limits.max_drives"></p>
+                </div>
                 <div class="flex flex-wrap items-center gap-2">
-                    <button type="button" @click="openCreateDriveModal"
-                            class="rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700">
+                    <button type="button" @click="openCreateDriveModal" :disabled="!canCreateMoreDrives"
+                            class="rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700 disabled:opacity-40">
                         Create drive
                     </button>
-                    <button type="button" @click="openBulkCreateDriveModal"
-                            class="rounded-lg border border-indigo-200 bg-indigo-50 px-4 py-2 text-sm font-semibold text-indigo-700 hover:bg-indigo-100">
+                    <button type="button" @click="openBulkCreateDriveModal" :disabled="!canCreateMoreDrives"
+                            class="rounded-lg border border-indigo-200 bg-indigo-50 px-4 py-2 text-sm font-semibold text-indigo-700 hover:bg-indigo-100 disabled:opacity-40">
                         Bulk create drive
                     </button>
                 </div>
@@ -263,14 +267,18 @@
         <!-- My servers -->
         <section v-if="is_login && menu==='servers'" class="space-y-4">
             <div class="flex flex-wrap items-center justify-between gap-3">
-                <h2 class="text-lg font-bold text-slate-900">My servers</h2>
+                <div>
+                    <h2 class="text-lg font-bold text-slate-900">My servers</h2>
+                    <p v-if="resourceLimits.limited && resourceLimits.limits.max_servers" class="text-xs text-slate-500 mt-0.5"
+                       v-text="'Servers: ' + (resourceLimits.limits.server_count ?? myWorkspaces.length) + ' / ' + resourceLimits.limits.max_servers"></p>
+                </div>
                 <div class="flex flex-wrap items-center gap-2">
-                    <button type="button" @click="openCreateServerModal"
-                            class="rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700">
+                    <button type="button" @click="openCreateServerModal" :disabled="!canCreateMoreServers"
+                            class="rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700 disabled:opacity-40">
                         Create server
                     </button>
-                    <button type="button" @click="openBulkCreateServerModal"
-                            class="rounded-lg border border-indigo-200 bg-indigo-50 px-4 py-2 text-sm font-semibold text-indigo-700 hover:bg-indigo-100">
+                    <button type="button" @click="openBulkCreateServerModal" :disabled="!canCreateMoreServers"
+                            class="rounded-lg border border-indigo-200 bg-indigo-50 px-4 py-2 text-sm font-semibold text-indigo-700 hover:bg-indigo-100 disabled:opacity-40">
                         Bulk create server
                     </button>
                 </div>
@@ -350,6 +358,8 @@
                             <span v-text="'RAM ≤ ' + g.max_ram_g + 'G'"></span>
                             <span v-text="'Drive ≤ ' + g.max_drive_size_gi + 'Gi'"></span>
                             <span v-text="'GPU VRAM ≤ ' + g.max_gpu_vram_g + 'G'"></span>
+                            <span v-text="'Servers ≤ ' + (g.max_servers || '∞')"></span>
+                            <span v-text="'Drives ≤ ' + (g.max_drives || '∞')"></span>
                         </div>
                     </div>
                 </div>
@@ -515,7 +525,8 @@
                     Group <strong v-text="resourceLimits.limits.group_name"></strong>:
                     CPU ≤ <span v-text="resourceLimits.limits.max_cpu"></span> vCPU,
                     RAM ≤ <span v-text="resourceLimits.limits.max_ram_g"></span>G,
-                    GPU VRAM ≤ <span v-text="resourceLimits.limits.max_gpu_vram_g"></span>G
+                    GPU VRAM ≤ <span v-text="resourceLimits.limits.max_gpu_vram_g"></span>G<span v-if="resourceLimits.limits.max_servers">,
+                    servers <span v-text="(resourceLimits.limits.server_count ?? myWorkspaces.length) + '/' + resourceLimits.limits.max_servers"></span></span>
                 </p>
                 <section>
                     <h4 class="mb-3 text-sm font-bold text-slate-900">Quick templates</h4>
@@ -704,7 +715,8 @@
             </div>
             <div class="space-y-4 px-5 py-4">
                 <p v-if="resourceLimits.limited" class="rounded-lg bg-amber-50 border border-amber-200 px-3 py-2 text-xs text-amber-800">
-                    Max drive size for your group: <strong v-text="resourceLimits.limits.max_drive_size_gi + 'Gi'"></strong>
+                    Max drive size: <strong v-text="resourceLimits.limits.max_drive_size_gi + 'Gi'"></strong><span v-if="resourceLimits.limits.max_drives"> ·
+                    drives <span v-text="(resourceLimits.limits.drive_count ?? myDrives.length) + '/' + resourceLimits.limits.max_drives"></span></span>
                 </p>
                 <div>
                     <label class="block text-sm font-medium text-slate-700">Name</label>
@@ -860,8 +872,16 @@
                         <label class="block text-xs font-medium text-slate-600">Max GPU VRAM (GB)</label>
                         <input v-model.number="groupForm.max_gpu_vram_g" type="number" min="0" class="mt-1 w-full rounded-lg border px-3 py-2 text-sm">
                     </div>
+                    <div>
+                        <label class="block text-xs font-medium text-slate-600">Max servers</label>
+                        <input v-model.number="groupForm.max_servers" type="number" min="0" class="mt-1 w-full rounded-lg border px-3 py-2 text-sm">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-medium text-slate-600">Max drives</label>
+                        <input v-model.number="groupForm.max_drives" type="number" min="0" class="mt-1 w-full rounded-lg border px-3 py-2 text-sm">
+                    </div>
                 </div>
-                <p class="text-xs text-slate-500">Limits apply per member (each user in the group gets the same cap).</p>
+                <p class="text-xs text-slate-500">Limits apply per member. Use 0 for unlimited servers/drives.</p>
                 <div class="flex justify-end gap-2">
                     <button type="button" @click="closeGroupFormModal" class="rounded-lg border px-4 py-2 text-sm">Cancel</button>
                     <button type="button" @click="saveResourceGroup" :disabled="groupFormLoading"

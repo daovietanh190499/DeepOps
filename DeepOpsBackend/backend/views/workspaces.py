@@ -15,7 +15,7 @@ from backend.services.bulk import (
     spawn_workspace,
 )
 from backend.services.k8s_status import live_workspace_state, workspace_is_active
-from backend.services.resource_limits import validate_workspace_resources
+from backend.services.resource_limits import validate_server_count, validate_workspace_resources
 from backend.services.ssh_keys import ssh_info_payload
 
 
@@ -149,7 +149,7 @@ def workspace_create(request, user):
     if not name:
         return JsonResponse({'message': 'name required'}, status=400)
 
-    limit_err = _validate_workspace_limits(user, data)
+    limit_err = validate_server_count(user) or _validate_workspace_limits(user, data)
     if limit_err:
         return JsonResponse({'message': limit_err}, status=400)
 
@@ -278,7 +278,7 @@ def workspace_run(request, user):
         return JsonResponse({'message': 'invalid json'}, status=400)
 
     name = (data.get('name') or 'Workspace').strip()[:128]
-    limit_err = _validate_workspace_limits(user, data)
+    limit_err = validate_server_count(user) or _validate_workspace_limits(user, data)
     if limit_err:
         return JsonResponse({'message': limit_err}, status=400)
     ws = Workspace(user=user, name=name)
@@ -314,7 +314,7 @@ def workspace_bulk_run(request, user):
             continue
 
         name = (item.get('name') or f'Workspace {i + 1}').strip()[:128]
-        limit_err = _validate_workspace_limits(user, item)
+        limit_err = validate_server_count(user) or _validate_workspace_limits(user, item)
         if limit_err:
             results.append({'index': i, 'ok': False, 'error': limit_err, 'name': name})
             continue

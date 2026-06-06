@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import re
 
-from backend.models import ResourceGroup, ResourceGroupMember, User
+from backend.models import ResourceGroup, ResourceGroupMember, User, UserDrive, Workspace
 
 ALL_CPU = [2, 4, 8, 16, 32]
 ALL_RAM = ['2G', '4G', '8G', '16G', '32G', '64G']
@@ -57,17 +57,31 @@ def get_user_group(user: User) -> ResourceGroup | None:
         return None
 
 
-def limits_payload(group: ResourceGroup | None) -> dict | None:
+def user_drive_count(user: User) -> int:
+    return UserDrive.objects.filter(user=user).count()
+
+
+def user_server_count(user: User) -> int:
+    return Workspace.objects.filter(user=user).count()
+
+
+def limits_payload(group: ResourceGroup | None, user: User | None = None) -> dict | None:
     if group is None:
         return None
-    return {
+    payload = {
         'group_id': str(group.id),
         'group_name': group.name,
         'max_cpu': group.max_cpu,
         'max_ram_g': group.max_ram_g,
         'max_drive_size_gi': group.max_drive_size_gi,
         'max_gpu_vram_g': group.max_gpu_vram_g,
+        'max_servers': group.max_servers,
+        'max_drives': group.max_drives,
     }
+    if user is not None:
+        payload['server_count'] = user_server_count(user)
+        payload['drive_count'] = user_drive_count(user)
+    return payload
 
 
 def allowed_equipment(group: ResourceGroup | None) -> dict:
@@ -88,7 +102,7 @@ def allowed_equipment(group: ResourceGroup | None) -> dict:
 
 def resource_limits_for_user(user: User) -> dict:
     group = get_user_group(user)
-    limits = limits_payload(group)
+    limits = limits_payload(group, user=user)
     equipment = allowed_equipment(group)
     return {
         'limited': limits is not None,
@@ -123,4 +137,24 @@ def validate_drive_size(user: User, size: str) -> str | None:
     size_gi = parse_size_gi(size)
     if size_gi > group.max_drive_size_gi:
         return f'Drive size exceeds group limit ({group.max_drive_size_gi}Gi)'
+    return None
+
+
+def validate_server_count(user: User) -> str | None:
+    group = get_user_group(user)
+    if group is None or not group.max_servers:
+        return None
+    current = user_server_count(user)
+    if current >= group.max_servers:
+        return f'Server count exceeds group limit ({group.max_servers} max, you have {current})'
+    return None
+
+
+def validate_drive_count(user: User) -> str | None:
+    group = get_user_group(user)
+    if group is None or not group.max_drives:
+        return None
+    current = user_drive_count(user)
+    if current >= group.max_drives:
+        return f'Drive count exceeds group limit ({group.max_drives} max, you have {current})'
     return None

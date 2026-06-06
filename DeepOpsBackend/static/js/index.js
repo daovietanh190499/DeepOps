@@ -324,7 +324,7 @@ const appVue = new Vue({
         resourceGroups: [],
         showGroupFormModal: false,
         editingGroup: null,
-        groupForm: { name: '', max_cpu: 4, max_ram_g: 8, max_drive_size_gi: 50, max_gpu_vram_g: 10 },
+        groupForm: { name: '', max_cpu: 4, max_ram_g: 8, max_drive_size_gi: 50, max_gpu_vram_g: 10, max_servers: 5, max_drives: 3 },
         groupFormLoading: false,
         groupMembersModal: null,
         memberSearchQuery: '',
@@ -409,6 +409,18 @@ const appVue = new Vue({
             return this.planTemplates.filter((t) =>
                 cpus.includes(t.cpu) && rams.includes(t.ram) && gpus.includes(t.gpu),
             )
+        },
+        canCreateMoreServers() {
+            const l = this.resourceLimits.limits
+            if (!this.resourceLimits.limited || !l || !l.max_servers) return true
+            const count = l.server_count ?? this.myWorkspaces.length
+            return count < l.max_servers
+        },
+        canCreateMoreDrives() {
+            const l = this.resourceLimits.limits
+            if (!this.resourceLimits.limited || !l || !l.max_drives) return true
+            const count = l.drive_count ?? this.myDrives.length
+            return count < l.max_drives
         },
     },
     created() {
@@ -687,6 +699,31 @@ const appVue = new Vue({
             }
             return null
         },
+        checkServerCountLimit() {
+            if (!this.resourceLimits.limited || !this.resourceLimits.limits) return null
+            const l = this.resourceLimits.limits
+            if (!l.max_servers) return null
+            const count = l.server_count ?? this.myWorkspaces.length
+            if (count >= l.max_servers) {
+                return `Server count exceeds group limit (${l.max_servers} max, you have ${count})`
+            }
+            return null
+        },
+        checkDriveCountLimit() {
+            if (!this.resourceLimits.limited || !this.resourceLimits.limits) return null
+            const l = this.resourceLimits.limits
+            if (!l.max_drives) return null
+            const count = l.drive_count ?? this.myDrives.length
+            if (count >= l.max_drives) {
+                return `Drive count exceeds group limit (${l.max_drives} max, you have ${count})`
+            }
+            return null
+        },
+        syncResourceUsageCounts() {
+            if (!this.resourceLimits.limits) return
+            this.resourceLimits.limits.server_count = this.myWorkspaces.length
+            this.resourceLimits.limits.drive_count = this.myDrives.length
+        },
         async loadDockerImages() {
             const res = await fetch('docker_images')
             if (res.status !== 200) return
@@ -857,6 +894,7 @@ const appVue = new Vue({
             if (!this.form.drive_id && this.myDrives.length) {
                 this.form.drive_id = this.myDrives[0].id
             }
+            this.syncResourceUsageCounts()
         },
         async loadAdminDrives(page) {
             const q = new URLSearchParams({ page: page || 1, per_page: 12, user: this.adminDriveFilter })
@@ -867,19 +905,29 @@ const appVue = new Vue({
             this.adminDrivePagination = data.pagination || this.adminDrivePagination
         },
         openCreateDriveModal() {
+            const limitErr = this.checkDriveCountLimit()
+            if (limitErr) {
+                this.showToast(limitErr)
+                return
+            }
             this.showCreateDriveModal = true
         },
         closeCreateDriveModal() {
             this.showCreateDriveModal = false
         },
         openBulkCreateDriveModal() {
+            const limitErr = this.checkDriveCountLimit()
+            if (limitErr) {
+                this.showToast(limitErr)
+                return
+            }
             this.showBulkCreateDriveModal = true
         },
         closeBulkCreateDriveModal() {
             this.showBulkCreateDriveModal = false
         },
         async createDrive() {
-            const limitErr = this.checkDriveSizeLimit(this.newDrive.size)
+            const limitErr = this.checkDriveCountLimit() || this.checkDriveSizeLimit(this.newDrive.size)
             if (limitErr) {
                 this.showToast(limitErr)
                 return
@@ -927,6 +975,11 @@ const appVue = new Vue({
             if (this.is_admin) await this.loadAdminDrives(this.adminDrivePagination.page)
         },
         openCreateServerModal() {
+            const limitErr = this.checkServerCountLimit()
+            if (limitErr) {
+                this.showToast(limitErr)
+                return
+            }
             this.runError = ''
             this.showCreateServerModal = true
         },
@@ -935,6 +988,11 @@ const appVue = new Vue({
             this.runError = ''
         },
         openBulkCreateServerModal() {
+            const limitErr = this.checkServerCountLimit()
+            if (limitErr) {
+                this.showToast(limitErr)
+                return
+            }
             this.showBulkCreateServerModal = true
         },
         closeBulkCreateServerModal() {
@@ -945,7 +1003,8 @@ const appVue = new Vue({
                 this.runError = 'Select a drive to mount'
                 return
             }
-            const limitErr = this.checkWorkspaceLimits(this.form.cpu, this.form.ram, this.form.gpu)
+            const limitErr = this.checkServerCountLimit()
+                || this.checkWorkspaceLimits(this.form.cpu, this.form.ram, this.form.gpu)
             if (limitErr) {
                 this.runError = limitErr
                 this.showToast(limitErr)
@@ -979,6 +1038,7 @@ const appVue = new Vue({
                 const updated = this.myWorkspaces.find((w) => w.id === this.modalWorkspace.id)
                 if (updated) this.modalWorkspace = { ...updated, env_vars: { ...(updated.env_vars || {}) } }
             }
+            this.syncResourceUsageCounts()
         },
         async loadAdminWorkspaces(page) {
             const q = new URLSearchParams({
@@ -1053,7 +1113,7 @@ const appVue = new Vue({
         },
         openCreateGroupModal() {
             this.editingGroup = null
-            this.groupForm = { name: '', max_cpu: 4, max_ram_g: 8, max_drive_size_gi: 50, max_gpu_vram_g: 10 }
+            this.groupForm = { name: '', max_cpu: 4, max_ram_g: 8, max_drive_size_gi: 50, max_gpu_vram_g: 10, max_servers: 5, max_drives: 3 }
             this.showGroupFormModal = true
         },
         openEditGroupModal(g) {
@@ -1064,6 +1124,8 @@ const appVue = new Vue({
                 max_ram_g: g.max_ram_g,
                 max_drive_size_gi: g.max_drive_size_gi,
                 max_gpu_vram_g: g.max_gpu_vram_g,
+                max_servers: g.max_servers,
+                max_drives: g.max_drives,
             }
             this.showGroupFormModal = true
         },

@@ -15,6 +15,14 @@ class ResourceGroup(models.Model):
         default=0,
         help_text='Max GPU VRAM (GB) per server for each member; 0 disables GPU',
     )
+    max_servers = models.PositiveIntegerField(
+        default=0,
+        help_text='Max servers (workspaces) per member; 0 = unlimited',
+    )
+    max_drives = models.PositiveIntegerField(
+        default=0,
+        help_text='Max drives per member; 0 = unlimited',
+    )
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 

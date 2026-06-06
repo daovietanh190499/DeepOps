@@ -46,6 +46,8 @@ def _group_payload(group: ResourceGroup, *, include_members: bool = False) -> di
         'max_ram_g': group.max_ram_g,
         'max_drive_size_gi': group.max_drive_size_gi,
         'max_gpu_vram_g': group.max_gpu_vram_g,
+        'max_servers': group.max_servers,
+        'max_drives': group.max_drives,
         'member_count': member_count,
         'equipment': allowed_equipment(group),
     }
@@ -63,6 +65,8 @@ def _parse_group_fields(data: dict) -> tuple[dict | None, str | None]:
             'max_ram_g': int(data.get('max_ram_g', 0)),
             'max_drive_size_gi': int(data.get('max_drive_size_gi', 0)),
             'max_gpu_vram_g': int(data.get('max_gpu_vram_g', 0)),
+            'max_servers': int(data.get('max_servers', 0)),
+            'max_drives': int(data.get('max_drives', 0)),
         }
     except (TypeError, ValueError):
         return None, 'invalid limit values'
@@ -71,8 +75,9 @@ def _parse_group_fields(data: dict) -> tuple[dict | None, str | None]:
     for key in ('max_cpu', 'max_ram_g', 'max_drive_size_gi'):
         if fields[key] <= 0:
             return None, f'{key} must be positive'
-    if fields['max_gpu_vram_g'] < 0:
-        return None, 'max_gpu_vram_g must be non-negative'
+    for key in ('max_gpu_vram_g', 'max_servers', 'max_drives'):
+        if fields[key] < 0:
+            return None, f'{key} must be non-negative'
     return fields, None
 
 
