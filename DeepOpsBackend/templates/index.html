@@ -65,234 +65,23 @@
             </div>
         </section>
 
-        <!-- Home: configure & run -->
-        <div v-if="is_login && menu==='home'" class="space-y-6">
-        <div class="grid gap-6 xl:grid-cols-2">
-            <div class="space-y-6">
-                <section class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-                    <h2 class="mb-3 text-lg font-bold text-slate-900">Quick templates</h2>
-                    <p class="mb-4 text-sm text-slate-500">Click to fill the form below.</p>
-                    <div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-                        <button v-for="t in planTemplates" :key="t.name" type="button" @click="applyTemplate(t)"
-                                class="flex flex-col rounded-xl border-2 border-slate-200 bg-white p-4 text-left transition hover:border-blue-400 hover:shadow-md">
-                            <img :src="'/static/img/' + t.image" class="mb-2 h-10 w-10 object-contain" alt="">
-                            <span class="font-semibold text-slate-800" v-text="t.name"></span>
-                            <span class="mt-1 text-xs text-slate-500" v-text="t.cpu + ' vCPU · ' + (t.gpu || 'no GPU')"></span>
-                        </button>
-                    </div>
-                </section>
-
-                <section class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm space-y-4">
-                    <h2 class="text-lg font-bold text-slate-900">Configuration</h2>
-                    <div>
-                        <label class="text-sm font-medium text-slate-600">Server name</label>
-                        <input v-model="form.name" type="text" placeholder="My workspace"
-                               class="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm">
-                    </div>
-                    <div class="grid gap-4 sm:grid-cols-2">
-                        <div><label class="text-sm font-medium text-slate-600">CPU (vCPU)</label>
-                            <select v-model.number="form.cpu" class="mt-1 w-full rounded-lg border px-3 py-2 text-sm">
-                                <option v-for="c in equipmentList.cpu" :key="c" :value="c" v-text="c"></option>
-                            </select></div>
-                        <div><label class="text-sm font-medium text-slate-600">RAM</label>
-                            <select v-model="form.ram" class="mt-1 w-full rounded-lg border px-3 py-2 text-sm">
-                                <option v-for="r in equipmentList.ram" :key="r" :value="r" v-text="r"></option>
-                            </select></div>
-                        <div><label class="text-sm font-medium text-slate-600">Mount drive (DirectPV)</label>
-                            <select v-model="form.drive_id" class="mt-1 w-full rounded-lg border px-3 py-2 text-sm">
-                                <option value="">— Select your drive —</option>
-                                <option v-for="d in myDrives" :key="d.id" :value="d.id"
-                                        v-text="d.name + ' (' + d.size + ') · ' + d.status"></option>
-                            </select>
-                            <p v-if="!myDrives.length" class="mt-1 text-xs text-amber-700">No drives yet. Create one in the <strong>Drives</strong> tab.</p>
-                        </div>
-                        <div><label class="text-sm font-medium text-slate-600">Mount path</label>
-                            <input v-model="form.mount_path" type="text" placeholder="/home/coder"
-                                   class="mt-1 w-full rounded-lg border px-3 py-2 text-sm font-mono"></div>
-                        <div><label class="text-sm font-medium text-slate-600">GPU</label>
-                            <select v-model="form.gpu" class="mt-1 w-full rounded-lg border px-3 py-2 text-sm">
-                                <option v-for="g in equipmentList.gpu" :key="g" :value="g" v-text="g"></option>
-                            </select></div>
-                    </div>
-                    <div class="grid gap-4 sm:grid-cols-2">
-                        <div><label class="text-sm font-medium text-slate-600">Docker image</label>
-                            <select v-model="form.docker_image_id" @change="onDockerImageChange"
-                                    class="mt-1 w-full rounded-lg border px-3 py-2 text-sm">
-                                <option v-for="img in dockerImages" :key="img.id" :value="img.id" v-text="img.label"></option>
-                            </select></div>
-                        <div><label class="text-sm font-medium text-slate-600">Version (tag)</label>
-                            <input v-model="form.docker_tag" type="text" class="mt-1 w-full rounded-lg border px-3 py-2 text-sm font-mono"></div>
-                    </div>
-                    <div>
-                        <label class="text-sm font-medium text-slate-600">Exposed ports (comma-separated)</label>
-                        <input v-model="form.ports_text" type="text" placeholder="8080, 3000"
-                               class="mt-1 w-full rounded-lg border px-3 py-2 text-sm font-mono">
-                    </div>
-                    <div>
-                        <label class="text-sm font-medium text-slate-600">Container command (space-separated)</label>
-                        <input v-model="form.command_text" type="text" placeholder="leave empty for image default"
-                               class="mt-1 w-full rounded-lg border px-3 py-2 text-sm font-mono">
-                    </div>
-                    <div>
-                        <label class="text-sm font-medium text-slate-600">Environment variables</label>
-                        <div class="mt-2 flex flex-wrap gap-2">
-                            <input v-model="envKey" placeholder="KEY" class="flex-1 min-w-[6rem] rounded-lg border px-3 py-2 text-sm font-mono">
-                            <input v-model="envValue" placeholder="value" class="flex-1 min-w-[8rem] rounded-lg border px-3 py-2 text-sm">
-                            <button type="button" @click="addEnv" class="rounded-lg bg-slate-200 px-4 py-2 text-sm font-semibold hover:bg-slate-300">Add / Update</button>
-                        </div>
-                        <ul v-if="envKeysSorted.length" class="mt-2 space-y-1">
-                            <li v-for="key in envKeysSorted" :key="key"
-                                @click="editEnv(key)"
-                                class="flex cursor-pointer items-center justify-between rounded-lg bg-slate-50 px-3 py-1.5 text-sm font-mono hover:bg-slate-100">
-                                <span v-text="key + '=' + form.env_vars[key]"></span>
-                                <button type="button" @click.stop="removeEnv(key)" class="text-rose-600 hover:text-rose-800"><i class="fa fa-times"></i></button>
-                            </li>
-                        </ul>
-                    </div>
-                </section>
-            </div>
-
-            <div class="space-y-6">
-                <section class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-                    <div class="mb-4 flex items-center justify-between">
-                        <h2 class="text-lg font-bold text-slate-900">Current specifications</h2>
-                        <button type="button" @click="exportFormConfig"
-                                class="rounded-lg border border-slate-300 px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50">
-                            <i class="fa fa-download"></i> Export JSON
-                        </button>
-                    </div>
-                    <div class="rounded-xl bg-slate-50 px-4 py-2 text-sm">
-                        <spec-row label="Name" :value="form.name"></spec-row>
-                        <spec-row label="CPU" :value="form.cpu + ' vCPU'"></spec-row>
-                        <spec-row label="RAM" :value="form.ram"></spec-row>
-                        <spec-row label="Drive" :value="selectedDriveLabel"></spec-row>
-                        <spec-row label="Mount path" :value="form.mount_path"></spec-row>
-                        <spec-row label="GPU" :value="form.gpu || 'none'"></spec-row>
-                        <spec-row label="Image" :value="form.docker_repository + ':' + form.docker_tag"></spec-row>
-                        <spec-row label="Ports" :value="form.ports_text || '8080'"></spec-row>
-                        <spec-row label="Command" :value="form.command_text || '(default)'"></spec-row>
-                        <spec-row label="ENV" :value="Object.keys(form.env_vars).length + ' variable(s)'"></spec-row>
-                    </div>
-                    <button type="button" @click="runWorkspace" :disabled="runLoading"
-                            class="mt-4 w-full rounded-xl bg-blue-600 px-6 py-3 text-sm font-bold text-white shadow-lg hover:bg-blue-700 disabled:opacity-50">
-                        <span v-if="runLoading">Starting…</span>
-                        <span v-else>Run codehub</span>
-                    </button>
-                    <p v-if="runError" class="mt-2 text-sm text-rose-600" v-text="runError"></p>
-                </section>
-            </div>
-        </div>
-
-        <section class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm space-y-4">
-            <h2 class="text-lg font-bold text-slate-900">Bulk create</h2>
-            <div class="flex flex-wrap items-center gap-2">
-                <button type="button" @click="bulkMode='json'"
-                        :class="bulkMode==='json' ? 'bg-blue-600 text-white' : 'bg-slate-100 text-slate-700'"
-                        class="rounded-lg px-3 py-1.5 text-sm font-semibold">JSON</button>
-                <button type="button" @click="bulkMode='csv'"
-                        :class="bulkMode==='csv' ? 'bg-blue-600 text-white' : 'bg-slate-100 text-slate-700'"
-                        class="rounded-lg px-3 py-1.5 text-sm font-semibold">CSV</button>
-            </div>
-            <div class="rounded-xl border-2 border-dashed border-slate-200 bg-slate-50/80 p-6 text-center">
-                <input ref="bulkFileInput" type="file" accept=".json,.csv,application/json,text/csv" class="hidden"
-                       @change="onBulkFileSelected">
-                <p class="text-sm text-slate-600 mb-3">Upload a <strong>.json</strong> or <strong>.csv</strong> file</p>
-                <button type="button" @click="$refs.bulkFileInput.click()"
-                        class="inline-flex items-center gap-2 rounded-lg bg-white border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700 shadow-sm hover:bg-slate-50">
-                    <i class="fa fa-upload"></i> Choose file
-                </button>
-                <p v-if="bulkFileName" class="mt-2 text-xs font-mono text-blue-600" v-text="'Loaded: ' + bulkFileName"></p>
-            </div>
-            <p class="text-xs text-slate-500" v-if="bulkMode==='json'">
-                Or paste JSON array. Each server needs a drive:
-                <code class="block mt-1 rounded bg-slate-100 p-2 text-[10px] overflow-x-auto">[{"name":"ws1","cpu":2,"ram":"4G","drive_id":"&lt;uuid&gt;","mount_path":"/home/coder","docker_repository":"codercom/code-server","docker_tag":"4.89.0-ubuntu","env_vars":{"PASSWORD":"secret"}}]</code>
-                Use <code class="text-[10px]">drive_name</code> or <code class="text-[10px]">drive_slug</code> instead of <code class="text-[10px]">drive_id</code> if you prefer.
-            </p>
-            <p class="text-xs text-slate-500" v-else>
-                Or paste CSV. Header: name,cpu,ram,drive_id,drive_name,mount_path,gpu,docker_repository,docker_tag,ports,command,env_json
-            </p>
-            <textarea v-model="bulkText" rows="5" class="w-full rounded-lg border px-3 py-2 text-xs font-mono"
-                      :placeholder="bulkMode==='json' ? '[{...}]' : 'name,cpu,ram,...'"></textarea>
-            <div class="flex flex-wrap items-center gap-4">
-                <label class="flex items-center gap-2 text-sm text-slate-600">
-                    <input type="checkbox" v-model="bulkAutoStart" class="rounded">
-                    Start servers after create
-                </label>
-                <button type="button" @click="clearBulk" class="text-sm text-slate-500 hover:text-slate-800">Clear</button>
-            </div>
-            <button type="button" @click="runBulkCreate" :disabled="bulkLoading"
-                    class="w-full sm:w-auto min-w-[12rem] rounded-xl bg-indigo-600 px-6 py-2.5 text-sm font-bold text-white hover:bg-indigo-700 disabled:opacity-50">
-                <span v-if="bulkLoading">Processing…</span>
-                <span v-else>Bulk create</span>
-            </button>
-            <div v-if="bulkSummary" class="rounded-lg bg-slate-50 px-3 py-2 text-xs text-slate-700 whitespace-pre-wrap" v-text="bulkSummary"></div>
-        </section>
-        </div>
-
         <!-- My drives -->
         <section v-if="is_login && menu==='drives'" class="space-y-4">
-            <h2 class="text-lg font-bold text-slate-900">My drives</h2>
-
-            <div class="grid gap-4 lg:grid-cols-2 lg:items-start">
-                <!-- Single drive create -->
-                <section class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm space-y-4 h-full">
-                    <h3 class="text-lg font-bold text-slate-900">Create drive</h3>
-                    <p class="text-xs text-slate-500">Provision one DirectPV volume.</p>
-                    <label class="block text-sm font-medium text-slate-700">Name</label>
-                    <input v-model="newDrive.name" placeholder="Drive name" class="w-full rounded-lg border px-3 py-2 text-sm">
-                    <label class="block text-sm font-medium text-slate-700">Size</label>
-                    <select v-model="newDrive.size" class="w-full rounded-lg border px-3 py-2 text-sm">
-                        <option v-for="s in driveSizeOptions" :key="s" :value="s" v-text="s"></option>
-                    </select>
-                    <button type="button" @click="createDrive" :disabled="driveCreateLoading"
-                            class="w-full rounded-xl bg-blue-600 px-6 py-2.5 text-sm font-bold text-white hover:bg-blue-700 disabled:opacity-50">
-                        <span v-if="driveCreateLoading">Creating…</span>
-                        <span v-else>Create drive</span>
+            <div class="flex flex-wrap items-center justify-between gap-3">
+                <h2 class="text-lg font-bold text-slate-900">My drives</h2>
+                <div class="flex flex-wrap items-center gap-2">
+                    <button type="button" @click="openCreateDriveModal"
+                            class="rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700">
+                        Create drive
                     </button>
-                </section>
-
-                <!-- Bulk drive create -->
-                <section class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm space-y-4 h-full">
-                    <h3 class="text-lg font-bold text-slate-900">Bulk create</h3>
-                    <p class="text-xs text-slate-500">Import many drives from JSON or CSV.</p>
-                    <div class="flex flex-wrap items-center gap-2">
-                        <button type="button" @click="driveBulkMode='json'"
-                                :class="driveBulkMode==='json' ? 'bg-blue-600 text-white' : 'bg-slate-100 text-slate-700'"
-                                class="rounded-lg px-3 py-1.5 text-sm font-semibold">JSON</button>
-                        <button type="button" @click="driveBulkMode='csv'"
-                                :class="driveBulkMode==='csv' ? 'bg-blue-600 text-white' : 'bg-slate-100 text-slate-700'"
-                                class="rounded-lg px-3 py-1.5 text-sm font-semibold">CSV</button>
-                    </div>
-                    <div class="rounded-xl border-2 border-dashed border-slate-200 bg-slate-50/80 p-4 text-center">
-                        <input ref="driveBulkFileInput" type="file" accept=".json,.csv,application/json,text/csv" class="hidden"
-                               @change="onBulkFileSelected($event, 'drives')">
-                        <p class="text-sm text-slate-600 mb-2">Upload <strong>.json</strong> or <strong>.csv</strong></p>
-                        <button type="button" @click="$refs.driveBulkFileInput.click()"
-                                class="inline-flex items-center gap-2 rounded-lg bg-white border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700 shadow-sm hover:bg-slate-50">
-                            <i class="fa fa-upload"></i> Choose file
-                        </button>
-                        <p v-if="driveBulkFileName" class="mt-2 text-xs font-mono text-blue-600" v-text="'Loaded: ' + driveBulkFileName"></p>
-                    </div>
-                    <p class="text-xs text-slate-500" v-if="driveBulkMode==='json'">
-                        Example:
-                        <code class="block mt-1 rounded bg-slate-100 p-2 text-[10px] overflow-x-auto">[{"name":"data-a","size":"20Gi"},{"name":"data-b","size":"50Gi"}]</code>
-                    </p>
-                    <p class="text-xs text-slate-500" v-else>CSV header: name,size</p>
-                    <textarea v-model="driveBulkText" rows="4" class="w-full rounded-lg border px-3 py-2 text-xs font-mono"
-                              :placeholder="driveBulkMode==='json' ? '[{...}]' : 'name,size'"></textarea>
-                    <div class="flex flex-wrap items-center justify-between gap-2">
-                        <button type="button" @click="clearDriveBulk" class="text-sm text-slate-500 hover:text-slate-800">Clear</button>
-                        <button type="button" @click="runDriveBulkCreate" :disabled="driveBulkLoading"
-                                class="rounded-xl bg-indigo-600 px-6 py-2.5 text-sm font-bold text-white hover:bg-indigo-700 disabled:opacity-50">
-                            <span v-if="driveBulkLoading">Processing…</span>
-                            <span v-else>Bulk create</span>
-                        </button>
-                    </div>
-                    <div v-if="driveBulkSummary" class="rounded-lg bg-slate-50 px-3 py-2 text-xs text-slate-700 whitespace-pre-wrap" v-text="driveBulkSummary"></div>
-                </section>
+                    <button type="button" @click="openBulkCreateDriveModal"
+                            class="rounded-lg border border-indigo-200 bg-indigo-50 px-4 py-2 text-sm font-semibold text-indigo-700 hover:bg-indigo-100">
+                        Bulk create drive
+                    </button>
+                </div>
             </div>
 
-            <p v-if="myDrives.length===0" class="text-sm text-slate-500">No drives yet. Create a DirectPV volume before running a server.</p>
+            <p v-if="myDrives.length===0" class="text-sm text-slate-500">No drives yet. Use <strong>Create drive</strong> or <strong>Bulk create drive</strong> to provision a DirectPV volume.</p>
 
             <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
                 <div v-for="d in myDrives" :key="d.id"
@@ -447,7 +236,7 @@
         <!-- Admin drives -->
         <section v-if="is_login && menu==='admin-drives' && is_admin" class="space-y-4">
             <div class="flex flex-wrap items-center gap-3">
-                <h2 class="text-lg font-bold text-slate-900">All drives</h2>
+                <h2 class="text-lg font-bold text-slate-900">Drives</h2>
                 <input v-model="adminDriveFilter" @input="loadAdminDrives(1)" placeholder="Filter by username…"
                        class="rounded-lg border px-3 py-1.5 text-sm">
                 <span class="text-sm text-slate-500" v-text="'Page ' + adminDrivePagination.page + ' / ' + adminDrivePagination.pages"></span>
@@ -473,8 +262,20 @@
 
         <!-- My servers -->
         <section v-if="is_login && menu==='servers'" class="space-y-4">
-            <h2 class="text-lg font-bold text-slate-900">My servers</h2>
-            <p v-if="myWorkspaces.length===0" class="text-sm text-slate-500">No servers yet. Use Home to run one.</p>
+            <div class="flex flex-wrap items-center justify-between gap-3">
+                <h2 class="text-lg font-bold text-slate-900">My servers</h2>
+                <div class="flex flex-wrap items-center gap-2">
+                    <button type="button" @click="openCreateServerModal"
+                            class="rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700">
+                        Create server
+                    </button>
+                    <button type="button" @click="openBulkCreateServerModal"
+                            class="rounded-lg border border-indigo-200 bg-indigo-50 px-4 py-2 text-sm font-semibold text-indigo-700 hover:bg-indigo-100">
+                        Bulk create server
+                    </button>
+                </div>
+            </div>
+            <p v-if="myWorkspaces.length===0" class="text-sm text-slate-500">No servers yet. Use <strong>Create server</strong> or <strong>Bulk create server</strong> to get started.</p>
             <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
                 <workspace-card v-for="ws in myWorkspaces" :key="ws.id" :ws="ws"
                                 @detail="openWorkspaceModal" @copy="copyWorkspaceUrl"
@@ -484,11 +285,31 @@
         </section>
 
         <!-- Admin users -->
-        <section v-if="is_login && menu==='admin-users' && is_admin" class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-            <h2 class="mb-4 text-lg font-bold text-slate-900">User management</h2>
-            <user-row v-for="u in userList" :key="u.username" :user="u"
-                      @accept="adminAcceptUser(u)" @delete="adminDeleteUser(u)"
-                      @role="role => adminChangeRole(u, role)"></user-row>
+        <section v-if="is_login && menu==='admin-users' && is_admin" class="space-y-4">
+            <div class="flex flex-wrap items-center gap-3">
+                <h2 class="text-lg font-bold text-slate-900">User management</h2>
+                <input v-model="adminUserFilter" @input="loadAdminUsers(1)" placeholder="Filter by username…"
+                       class="rounded-lg border px-3 py-1.5 text-sm">
+                <select v-model="adminUserStatus" @change="loadAdminUsers(1)"
+                        class="rounded-lg border px-3 py-1.5 text-sm">
+                    <option value="">All statuses</option>
+                    <option value="accepted">Accepted</option>
+                    <option value="pending">Pending</option>
+                </select>
+                <span class="text-sm text-slate-500" v-text="'Page ' + adminUserPagination.page + ' / ' + adminUserPagination.pages + ' (' + adminUserPagination.total + ' users)'"></span>
+            </div>
+            <div class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+                <p v-if="userList.length===0" class="text-sm text-slate-500">No users match this filter.</p>
+                <user-row v-for="u in userList" :key="u.username" :user="u"
+                          @accept="adminAcceptUser(u)" @delete="adminDeleteUser(u)"
+                          @role="role => adminChangeRole(u, role)"></user-row>
+            </div>
+            <div class="flex justify-center gap-2">
+                <button :disabled="adminUserPagination.page<=1" @click="loadAdminUsers(adminUserPagination.page-1)"
+                        class="rounded-lg border px-4 py-2 text-sm disabled:opacity-40">Prev</button>
+                <button :disabled="adminUserPagination.page>=adminUserPagination.pages" @click="loadAdminUsers(adminUserPagination.page+1)"
+                        class="rounded-lg border px-4 py-2 text-sm disabled:opacity-40">Next</button>
+            </div>
         </section>
 
         <!-- Admin servers -->
@@ -586,6 +407,16 @@
                         </button>
                     </div>
                     <p class="text-xs text-slate-600">Tunnel SSH through <code class="rounded bg-white px-1">wss://…/ssh-tunnel</code> (port 443). See <code class="text-[10px]">docs/SSH-OVER-HTTPS.md</code>.</p>
+                    <div class="rounded-lg border border-slate-200 bg-white p-3 text-xs text-slate-600 space-y-1">
+                        <p class="font-semibold text-slate-700">Install wstunnel (client)</p>
+                        <p>SSH uses <code class="rounded bg-slate-100 px-1">wstunnel</code> as <code class="rounded bg-slate-100 px-1">ProxyCommand</code>. Download the binary for your OS from
+                            <a href="https://github.com/erebe/wstunnel/releases" target="_blank" rel="noopener noreferrer"
+                               class="font-semibold text-indigo-600 hover:underline">wstunnel releases</a>
+                            (e.g. <code class="rounded bg-slate-100 px-1">wstunnel_*_windows_amd64.zip</code>,
+                            <code class="rounded bg-slate-100 px-1">darwin_arm64</code>,
+                            <code class="rounded bg-slate-100 px-1">linux_amd64</code>), extract it, and add the folder to your <code class="rounded bg-slate-100 px-1">PATH</code>.
+                        </p>
+                    </div>
                     <div v-if="modalWorkspace.has_key" class="space-y-2 text-xs">
                         <div class="flex items-center gap-2">
                             <span class="font-medium text-slate-500 shrink-0">WSS URL</span>
@@ -620,6 +451,277 @@
                             class="flex-1 rounded-lg border border-blue-600 text-blue-600 py-2 text-xs font-semibold">Open</button>
                     <button @click="exportWorkspace(modalWorkspace)" class="rounded-lg border px-4 py-2 text-xs font-semibold">Export JSON</button>
                     <button @click="exportModalConfig" class="rounded-lg border px-4 py-2 text-xs font-semibold">Download config</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Create server modal -->
+    <div v-if="showCreateServerModal" class="fixed inset-0 z-[55] flex items-center justify-center p-4 bg-slate-900/50" @click.self="closeCreateServerModal">
+        <div class="w-full max-w-5xl rounded-2xl border border-slate-200 bg-white shadow-xl max-h-[92vh] overflow-y-auto">
+            <div class="flex items-center justify-between border-b border-slate-100 px-5 py-4 sticky top-0 bg-white z-10">
+                <div>
+                    <h3 class="text-lg font-bold text-slate-900">Create server</h3>
+                    <p class="mt-0.5 text-xs text-slate-500">Configure and deploy a codehub workspace.</p>
+                </div>
+                <button type="button" @click="closeCreateServerModal" class="text-slate-400 hover:text-slate-700"><i class="fa fa-times text-xl"></i></button>
+            </div>
+            <div class="p-5 space-y-6">
+                <section>
+                    <h4 class="mb-3 text-sm font-bold text-slate-900">Quick templates</h4>
+                    <p class="mb-3 text-xs text-slate-500">Click to fill the form below.</p>
+                    <div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                        <button v-for="t in planTemplates" :key="t.name" type="button" @click="applyTemplate(t)"
+                                class="flex flex-col rounded-xl border-2 border-slate-200 bg-white p-3 text-left transition hover:border-blue-400 hover:shadow-md">
+                            <img :src="'/static/img/' + t.image" class="mb-2 h-8 w-8 object-contain" alt="">
+                            <span class="text-sm font-semibold text-slate-800" v-text="t.name"></span>
+                            <span class="mt-1 text-xs text-slate-500" v-text="t.cpu + ' vCPU · ' + (t.gpu || 'no GPU')"></span>
+                        </button>
+                    </div>
+                </section>
+                <div class="grid gap-6 lg:grid-cols-2">
+                    <section class="space-y-4">
+                        <h4 class="text-sm font-bold text-slate-900">Configuration</h4>
+                        <div>
+                            <label class="text-sm font-medium text-slate-600">Server name</label>
+                            <input v-model="form.name" type="text" placeholder="My workspace"
+                                   class="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm">
+                        </div>
+                        <div class="grid gap-4 sm:grid-cols-2">
+                            <div><label class="text-sm font-medium text-slate-600">CPU (vCPU)</label>
+                                <select v-model.number="form.cpu" class="mt-1 w-full rounded-lg border px-3 py-2 text-sm">
+                                    <option v-for="c in equipmentList.cpu" :key="c" :value="c" v-text="c"></option>
+                                </select></div>
+                            <div><label class="text-sm font-medium text-slate-600">RAM</label>
+                                <select v-model="form.ram" class="mt-1 w-full rounded-lg border px-3 py-2 text-sm">
+                                    <option v-for="r in equipmentList.ram" :key="r" :value="r" v-text="r"></option>
+                                </select></div>
+                            <div><label class="text-sm font-medium text-slate-600">Mount drive (DirectPV)</label>
+                                <select v-model="form.drive_id" class="mt-1 w-full rounded-lg border px-3 py-2 text-sm">
+                                    <option value="">— Select your drive —</option>
+                                    <option v-for="d in myDrives" :key="d.id" :value="d.id"
+                                            v-text="d.name + ' (' + d.size + ') · ' + d.status"></option>
+                                </select>
+                                <p v-if="!myDrives.length" class="mt-1 text-xs text-amber-700">No drives yet. Create one in the <strong>Drives</strong> tab.</p>
+                            </div>
+                            <div><label class="text-sm font-medium text-slate-600">Mount path</label>
+                                <input v-model="form.mount_path" type="text" placeholder="/home/coder"
+                                       class="mt-1 w-full rounded-lg border px-3 py-2 text-sm font-mono"></div>
+                            <div class="sm:col-span-2"><label class="text-sm font-medium text-slate-600">GPU</label>
+                                <select v-model="form.gpu" class="mt-1 w-full rounded-lg border px-3 py-2 text-sm">
+                                    <option v-for="g in equipmentList.gpu" :key="g" :value="g" v-text="g"></option>
+                                </select></div>
+                        </div>
+                        <div class="grid gap-4 sm:grid-cols-2">
+                            <div><label class="text-sm font-medium text-slate-600">Docker image</label>
+                                <select v-model="form.docker_image_id" @change="onDockerImageChange"
+                                        class="mt-1 w-full rounded-lg border px-3 py-2 text-sm">
+                                    <option v-for="img in dockerImages" :key="img.id" :value="img.id" v-text="img.label"></option>
+                                </select></div>
+                            <div><label class="text-sm font-medium text-slate-600">Version (tag)</label>
+                                <input v-model="form.docker_tag" type="text" class="mt-1 w-full rounded-lg border px-3 py-2 text-sm font-mono"></div>
+                        </div>
+                        <div>
+                            <label class="text-sm font-medium text-slate-600">Exposed ports (comma-separated)</label>
+                            <input v-model="form.ports_text" type="text" placeholder="8080, 3000"
+                                   class="mt-1 w-full rounded-lg border px-3 py-2 text-sm font-mono">
+                        </div>
+                        <div>
+                            <label class="text-sm font-medium text-slate-600">Container command (space-separated)</label>
+                            <input v-model="form.command_text" type="text" placeholder="leave empty for image default"
+                                   class="mt-1 w-full rounded-lg border px-3 py-2 text-sm font-mono">
+                        </div>
+                        <div>
+                            <label class="text-sm font-medium text-slate-600">Environment variables</label>
+                            <div class="mt-2 flex flex-wrap gap-2">
+                                <input v-model="envKey" placeholder="KEY" class="flex-1 min-w-[6rem] rounded-lg border px-3 py-2 text-sm font-mono">
+                                <input v-model="envValue" placeholder="value" class="flex-1 min-w-[8rem] rounded-lg border px-3 py-2 text-sm">
+                                <button type="button" @click="addEnv" class="rounded-lg bg-slate-200 px-4 py-2 text-sm font-semibold hover:bg-slate-300">Add / Update</button>
+                            </div>
+                            <ul v-if="envKeysSorted.length" class="mt-2 space-y-1">
+                                <li v-for="key in envKeysSorted" :key="key"
+                                    @click="editEnv(key)"
+                                    class="flex cursor-pointer items-center justify-between rounded-lg bg-slate-50 px-3 py-1.5 text-sm font-mono hover:bg-slate-100">
+                                    <span v-text="key + '=' + form.env_vars[key]"></span>
+                                    <button type="button" @click.stop="removeEnv(key)" class="text-rose-600 hover:text-rose-800"><i class="fa fa-times"></i></button>
+                                </li>
+                            </ul>
+                        </div>
+                    </section>
+                    <section class="space-y-4">
+                        <div class="flex items-center justify-between">
+                            <h4 class="text-sm font-bold text-slate-900">Current specifications</h4>
+                            <button type="button" @click="exportFormConfig"
+                                    class="rounded-lg border border-slate-300 px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50">
+                                <i class="fa fa-download"></i> Export JSON
+                            </button>
+                        </div>
+                        <div class="rounded-xl bg-slate-50 px-4 py-2 text-sm">
+                            <spec-row label="Name" :value="form.name"></spec-row>
+                            <spec-row label="CPU" :value="form.cpu + ' vCPU'"></spec-row>
+                            <spec-row label="RAM" :value="form.ram"></spec-row>
+                            <spec-row label="Drive" :value="selectedDriveLabel"></spec-row>
+                            <spec-row label="Mount path" :value="form.mount_path"></spec-row>
+                            <spec-row label="GPU" :value="form.gpu || 'none'"></spec-row>
+                            <spec-row label="Image" :value="form.docker_repository + ':' + form.docker_tag"></spec-row>
+                            <spec-row label="Ports" :value="form.ports_text || '8080'"></spec-row>
+                            <spec-row label="Command" :value="form.command_text || '(default)'"></spec-row>
+                            <spec-row label="ENV" :value="Object.keys(form.env_vars).length + ' variable(s)'"></spec-row>
+                        </div>
+                        <p v-if="runError" class="text-sm text-rose-600" v-text="runError"></p>
+                        <div class="flex justify-end gap-2 pt-2">
+                            <button type="button" @click="closeCreateServerModal" class="rounded-lg border px-4 py-2 text-sm">Cancel</button>
+                            <button type="button" @click="runWorkspace" :disabled="runLoading"
+                                    class="rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700 disabled:opacity-50">
+                                <span v-if="runLoading">Starting…</span>
+                                <span v-else>Create server</span>
+                            </button>
+                        </div>
+                    </section>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Bulk create server modal -->
+    <div v-if="showBulkCreateServerModal" class="fixed inset-0 z-[55] flex items-center justify-center p-4 bg-slate-900/50" @click.self="closeBulkCreateServerModal">
+        <div class="w-full max-w-lg rounded-2xl border border-slate-200 bg-white shadow-xl max-h-[90vh] overflow-y-auto">
+            <div class="flex items-center justify-between border-b border-slate-100 px-5 py-4 sticky top-0 bg-white">
+                <div>
+                    <h3 class="text-lg font-bold text-slate-900">Bulk create server</h3>
+                    <p class="mt-0.5 text-xs text-slate-500">Import many servers from JSON or CSV.</p>
+                </div>
+                <button type="button" @click="closeBulkCreateServerModal" class="text-slate-400 hover:text-slate-700"><i class="fa fa-times text-xl"></i></button>
+            </div>
+            <div class="space-y-4 px-5 py-4">
+                <div class="flex flex-wrap items-center gap-2">
+                    <button type="button" @click="bulkMode='json'"
+                            :class="bulkMode==='json' ? 'bg-blue-600 text-white' : 'bg-slate-100 text-slate-700'"
+                            class="rounded-lg px-3 py-1.5 text-sm font-semibold">JSON</button>
+                    <button type="button" @click="bulkMode='csv'"
+                            :class="bulkMode==='csv' ? 'bg-blue-600 text-white' : 'bg-slate-100 text-slate-700'"
+                            class="rounded-lg px-3 py-1.5 text-sm font-semibold">CSV</button>
+                </div>
+                <div class="rounded-xl border-2 border-dashed border-slate-200 bg-slate-50/80 p-4 text-center">
+                    <input ref="bulkFileInput" type="file" accept=".json,.csv,application/json,text/csv" class="hidden"
+                           @change="onBulkFileSelected">
+                    <p class="text-sm text-slate-600 mb-2">Upload <strong>.json</strong> or <strong>.csv</strong></p>
+                    <button type="button" @click="$refs.bulkFileInput.click()"
+                            class="inline-flex items-center gap-2 rounded-lg bg-white border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700 shadow-sm hover:bg-slate-50">
+                        <i class="fa fa-upload"></i> Choose file
+                    </button>
+                    <p v-if="bulkFileName" class="mt-2 text-xs font-mono text-blue-600" v-text="'Loaded: ' + bulkFileName"></p>
+                </div>
+                <p class="text-xs text-slate-500" v-if="bulkMode==='json'">
+                    Example:
+                    <code class="block mt-1 rounded bg-slate-100 p-2 text-[10px] overflow-x-auto">[{"name":"ws1","cpu":2,"ram":"4G","drive_id":"&lt;uuid&gt;","mount_path":"/home/coder","docker_repository":"codercom/code-server","docker_tag":"4.89.0-ubuntu","env_vars":{"PASSWORD":"secret"}}]</code>
+                    Use <code class="text-[10px]">drive_name</code> or <code class="text-[10px]">drive_slug</code> instead of <code class="text-[10px]">drive_id</code> if you prefer.
+                </p>
+                <p class="text-xs text-slate-500" v-else>
+                    CSV header: name,cpu,ram,drive_id,drive_name,mount_path,gpu,docker_repository,docker_tag,ports,command,env_json
+                </p>
+                <textarea v-model="bulkText" rows="5" class="w-full rounded-lg border px-3 py-2 text-xs font-mono"
+                          :placeholder="bulkMode==='json' ? '[{...}]' : 'name,cpu,ram,...'"></textarea>
+                <label class="flex items-center gap-2 text-sm text-slate-600">
+                    <input type="checkbox" v-model="bulkAutoStart" class="rounded">
+                    Start servers after create
+                </label>
+                <div v-if="bulkSummary" class="rounded-lg bg-slate-50 px-3 py-2 text-xs text-slate-700 whitespace-pre-wrap" v-text="bulkSummary"></div>
+                <div class="flex flex-wrap items-center justify-between gap-2 pt-1">
+                    <button type="button" @click="clearBulk" class="text-sm text-slate-500 hover:text-slate-800">Clear</button>
+                    <div class="flex gap-2">
+                        <button type="button" @click="closeBulkCreateServerModal" class="rounded-lg border px-4 py-2 text-sm">Cancel</button>
+                        <button type="button" @click="runBulkCreate" :disabled="bulkLoading"
+                                class="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-700 disabled:opacity-50">
+                            <span v-if="bulkLoading">Processing…</span>
+                            <span v-else>Bulk create</span>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Create drive modal -->
+    <div v-if="showCreateDriveModal" class="fixed inset-0 z-[55] flex items-center justify-center p-4 bg-slate-900/50" @click.self="closeCreateDriveModal">
+        <div class="w-full max-w-md rounded-2xl border border-slate-200 bg-white shadow-xl">
+            <div class="flex items-center justify-between border-b border-slate-100 px-5 py-4">
+                <div>
+                    <h3 class="text-lg font-bold text-slate-900">Create drive</h3>
+                    <p class="mt-0.5 text-xs text-slate-500">Provision one DirectPV volume.</p>
+                </div>
+                <button type="button" @click="closeCreateDriveModal" class="text-slate-400 hover:text-slate-700"><i class="fa fa-times text-xl"></i></button>
+            </div>
+            <div class="space-y-4 px-5 py-4">
+                <div>
+                    <label class="block text-sm font-medium text-slate-700">Name</label>
+                    <input v-model="newDrive.name" placeholder="Drive name" class="mt-1 w-full rounded-lg border px-3 py-2 text-sm">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-slate-700">Size</label>
+                    <select v-model="newDrive.size" class="mt-1 w-full rounded-lg border px-3 py-2 text-sm">
+                        <option v-for="s in driveSizeOptions" :key="s" :value="s" v-text="s"></option>
+                    </select>
+                </div>
+                <div class="flex justify-end gap-2 pt-1">
+                    <button type="button" @click="closeCreateDriveModal" class="rounded-lg border px-4 py-2 text-sm">Cancel</button>
+                    <button type="button" @click="createDrive" :disabled="driveCreateLoading"
+                            class="rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700 disabled:opacity-50">
+                        <span v-if="driveCreateLoading">Creating…</span>
+                        <span v-else>Create drive</span>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Bulk create drive modal -->
+    <div v-if="showBulkCreateDriveModal" class="fixed inset-0 z-[55] flex items-center justify-center p-4 bg-slate-900/50" @click.self="closeBulkCreateDriveModal">
+        <div class="w-full max-w-lg rounded-2xl border border-slate-200 bg-white shadow-xl max-h-[90vh] overflow-y-auto">
+            <div class="flex items-center justify-between border-b border-slate-100 px-5 py-4 sticky top-0 bg-white">
+                <div>
+                    <h3 class="text-lg font-bold text-slate-900">Bulk create drive</h3>
+                    <p class="mt-0.5 text-xs text-slate-500">Import many drives from JSON or CSV.</p>
+                </div>
+                <button type="button" @click="closeBulkCreateDriveModal" class="text-slate-400 hover:text-slate-700"><i class="fa fa-times text-xl"></i></button>
+            </div>
+            <div class="space-y-4 px-5 py-4">
+                <div class="flex flex-wrap items-center gap-2">
+                    <button type="button" @click="driveBulkMode='json'"
+                            :class="driveBulkMode==='json' ? 'bg-blue-600 text-white' : 'bg-slate-100 text-slate-700'"
+                            class="rounded-lg px-3 py-1.5 text-sm font-semibold">JSON</button>
+                    <button type="button" @click="driveBulkMode='csv'"
+                            :class="driveBulkMode==='csv' ? 'bg-blue-600 text-white' : 'bg-slate-100 text-slate-700'"
+                            class="rounded-lg px-3 py-1.5 text-sm font-semibold">CSV</button>
+                </div>
+                <div class="rounded-xl border-2 border-dashed border-slate-200 bg-slate-50/80 p-4 text-center">
+                    <input ref="driveBulkFileInput" type="file" accept=".json,.csv,application/json,text/csv" class="hidden"
+                           @change="onBulkFileSelected($event, 'drives')">
+                    <p class="text-sm text-slate-600 mb-2">Upload <strong>.json</strong> or <strong>.csv</strong></p>
+                    <button type="button" @click="$refs.driveBulkFileInput.click()"
+                            class="inline-flex items-center gap-2 rounded-lg bg-white border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700 shadow-sm hover:bg-slate-50">
+                        <i class="fa fa-upload"></i> Choose file
+                    </button>
+                    <p v-if="driveBulkFileName" class="mt-2 text-xs font-mono text-blue-600" v-text="'Loaded: ' + driveBulkFileName"></p>
+                </div>
+                <p class="text-xs text-slate-500" v-if="driveBulkMode==='json'">
+                    Example:
+                    <code class="block mt-1 rounded bg-slate-100 p-2 text-[10px] overflow-x-auto">[{"name":"data-a","size":"20Gi"},{"name":"data-b","size":"50Gi"}]</code>
+                </p>
+                <p class="text-xs text-slate-500" v-else>CSV header: name,size</p>
+                <textarea v-model="driveBulkText" rows="5" class="w-full rounded-lg border px-3 py-2 text-xs font-mono"
+                          :placeholder="driveBulkMode==='json' ? '[{...}]' : 'name,size'"></textarea>
+                <div v-if="driveBulkSummary" class="rounded-lg bg-slate-50 px-3 py-2 text-xs text-slate-700 whitespace-pre-wrap" v-text="driveBulkSummary"></div>
+                <div class="flex flex-wrap items-center justify-between gap-2 pt-1">
+                    <button type="button" @click="clearDriveBulk" class="text-sm text-slate-500 hover:text-slate-800">Clear</button>
+                    <div class="flex gap-2">
+                        <button type="button" @click="closeBulkCreateDriveModal" class="rounded-lg border px-4 py-2 text-sm">Cancel</button>
+                        <button type="button" @click="runDriveBulkCreate" :disabled="driveBulkLoading"
+                                class="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-700 disabled:opacity-50">
+                            <span v-if="driveBulkLoading">Processing…</span>
+                            <span v-else>Bulk create</span>
+                        </button>
+                    </div>
                 </div>
             </div>
         </div>

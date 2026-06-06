@@ -1,5 +1,6 @@
 import time
 
+from django.core.paginator import Paginator
 from django.http import HttpResponseRedirect, JsonResponse
 from django.shortcuts import render
 from django.views.decorators.csrf import csrf_exempt
@@ -82,8 +83,30 @@ def all_users(request, user):
     if denied:
         return denied
 
-    result_list = [_user_payload(hub_user) for hub_user in User.objects.order_by('username')]
-    return JsonResponse({'result': result_list})
+    page = max(1, int(request.GET.get('page', 1)))
+    per_page = min(48, max(6, int(request.GET.get('per_page', 10))))
+    user_filter = (request.GET.get('user') or '').strip()
+    status = (request.GET.get('status') or '').strip().lower()
+
+    qs = User.objects.order_by('username')
+    if user_filter:
+        qs = qs.filter(username__icontains=user_filter)
+    if status == 'accepted':
+        qs = qs.filter(is_accept=True)
+    elif status == 'pending':
+        qs = qs.filter(is_accept=False)
+
+    paginator = Paginator(qs, per_page)
+    page_obj = paginator.get_page(page)
+    return JsonResponse({
+        'result': [_user_payload(hub_user) for hub_user in page_obj.object_list],
+        'pagination': {
+            'page': page_obj.number,
+            'per_page': per_page,
+            'total': paginator.count,
+            'pages': paginator.num_pages or 1,
+        },
+    })
 
 
 @auth.verify

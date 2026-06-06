@@ -278,6 +278,8 @@ const appVue = new Vue({
         adminDrivePagination: { page: 1, pages: 1, total: 0, per_page: 12 },
         adminDriveFilter: '',
         newDrive: { name: 'My drive', size: '20Gi' },
+        showCreateDriveModal: false,
+        showBulkCreateDriveModal: false,
         driveCreateLoading: false,
         deleteModalDrive: null,
         deleteModalDriveIsAdmin: false,
@@ -314,8 +316,13 @@ const appVue = new Vue({
         sshGenerateLoading: false,
         sshPrivateKeyOnce: '',
         userList: [],
+        adminUserFilter: '',
+        adminUserStatus: '',
+        adminUserPagination: { page: 1, pages: 1, total: 0, per_page: 10 },
         is_login: typeof is_login !== 'undefined' ? is_login : 0,
-        menu: 'home',
+        menu: 'servers',
+        showCreateServerModal: false,
+        showBulkCreateServerModal: false,
         current_user: '',
         is_admin: false,
         runLoading: false,
@@ -342,16 +349,15 @@ const appVue = new Vue({
         },
         userTabs() {
             return [
-                { id: 'home', label: 'Home' },
-                { id: 'drives', label: 'Drives' },
                 { id: 'servers', label: 'My servers' },
+                { id: 'drives', label: 'My drives' },
             ]
         },
         adminTabs() {
             return [
                 { id: 'admin-overall', label: 'Overall' },
                 { id: 'admin-users', label: 'Users' },
-                { id: 'admin-drives', label: 'All drives' },
+                { id: 'admin-drives', label: 'Drives' },
                 { id: 'admin-servers', label: 'Servers' },
                 { id: 'admin-images', label: 'Images' },
             ]
@@ -373,7 +379,8 @@ const appVue = new Vue({
     },
     created() {
         const params = new URLSearchParams(window.location.search)
-        this.menu = params.get('tab') || 'home'
+        const tab = params.get('tab') || 'servers'
+        this.menu = tab === 'home' ? 'servers' : tab
         this.init()
     },
     beforeDestroy() {
@@ -393,8 +400,8 @@ const appVue = new Vue({
         },
         async pollStatuses() {
             const m = this.menu
-            if (m === 'drives' || m === 'home') await this.loadMyDrives()
-            if (m === 'servers' || m === 'home') await this.loadMyWorkspaces()
+            if (m === 'drives' || m === 'servers') await this.loadMyDrives()
+            if (m === 'servers') await this.loadMyWorkspaces()
             if (m === 'admin-drives') await this.loadAdminDrives(this.adminDrivePagination.page)
             if (m === 'admin-servers') await this.loadAdminWorkspaces(this.adminPagination.page)
             if (m === 'admin-overall') await this.loadClusterOverview()
@@ -517,9 +524,9 @@ const appVue = new Vue({
             if (menu === 'admin-overall') this.loadClusterOverview()
             if (menu === 'admin-drives') this.loadAdminDrives(1)
             if (menu === 'admin-servers') this.loadAdminWorkspaces(1)
-            if (menu === 'admin-users') this.getAllUsers()
+            if (menu === 'admin-users') this.loadAdminUsers(1)
             if (menu === 'admin-images') this.loadAdminDockerImages()
-            if (['home', 'drives', 'servers', 'admin-drives', 'admin-servers', 'admin-overall'].includes(menu)) {
+            if (['drives', 'servers', 'admin-drives', 'admin-servers', 'admin-overall'].includes(menu)) {
                 this.startStatusPolling()
             }
         },
@@ -530,11 +537,11 @@ const appVue = new Vue({
             await this.loadMyDrives()
             await this.loadMyWorkspaces()
             if (this.is_admin) {
-                await this.getAllUsers()
+                if (this.menu === 'admin-users') await this.loadAdminUsers(1)
                 await this.loadAdminDockerImages()
             }
             if (this.menu === 'admin-overall') await this.loadClusterOverview()
-            if (['home', 'drives', 'servers', 'admin-drives', 'admin-servers', 'admin-overall'].includes(this.menu)) {
+            if (['drives', 'servers', 'admin-drives', 'admin-servers', 'admin-overall'].includes(this.menu)) {
                 this.startStatusPolling()
             }
         },
@@ -701,6 +708,7 @@ const appVue = new Vue({
                 this.bulkSummary = formatBulkSummary(data, items.length)
                 await this.loadMyWorkspaces()
                 await this.loadMyDrives()
+                this.showToast('Bulk server create finished')
             } catch (e) {
                 this.bulkSummary = e.message || String(e)
             } finally {
@@ -735,6 +743,7 @@ const appVue = new Vue({
                 this.driveBulkSummary = formatBulkSummary(data, items.length)
                 await this.loadMyDrives()
                 if (this.is_admin) await this.loadAdminDrives(this.adminDrivePagination.page)
+                this.showToast('Bulk drive create finished')
             } catch (e) {
                 this.driveBulkSummary = e.message || String(e)
             } finally {
@@ -758,6 +767,18 @@ const appVue = new Vue({
             this.adminDrives = data.result || []
             this.adminDrivePagination = data.pagination || this.adminDrivePagination
         },
+        openCreateDriveModal() {
+            this.showCreateDriveModal = true
+        },
+        closeCreateDriveModal() {
+            this.showCreateDriveModal = false
+        },
+        openBulkCreateDriveModal() {
+            this.showBulkCreateDriveModal = true
+        },
+        closeBulkCreateDriveModal() {
+            this.showBulkCreateDriveModal = false
+        },
         async createDrive() {
             this.driveCreateLoading = true
             const res = await fetch('drives/create', {
@@ -773,6 +794,7 @@ const appVue = new Vue({
             }
             this.newDrive = { name: 'My drive', size: '20Gi' }
             await this.loadMyDrives()
+            this.closeCreateDriveModal()
             this.showToast('Drive created')
         },
         openDeleteDriveModal(d, isAdmin) {
@@ -800,6 +822,20 @@ const appVue = new Vue({
             await this.loadMyDrives()
             if (this.is_admin) await this.loadAdminDrives(this.adminDrivePagination.page)
         },
+        openCreateServerModal() {
+            this.runError = ''
+            this.showCreateServerModal = true
+        },
+        closeCreateServerModal() {
+            this.showCreateServerModal = false
+            this.runError = ''
+        },
+        openBulkCreateServerModal() {
+            this.showBulkCreateServerModal = true
+        },
+        closeBulkCreateServerModal() {
+            this.showBulkCreateServerModal = false
+        },
         async runWorkspace() {
             if (!this.form.drive_id) {
                 this.runError = 'Select a drive to mount'
@@ -820,7 +856,8 @@ const appVue = new Vue({
                 return
             }
             await this.loadMyWorkspaces()
-            this.changeMenu('servers')
+            this.closeCreateServerModal()
+            this.showToast('Server created')
         },
         async loadMyWorkspaces() {
             const res = await fetch('workspaces')
@@ -864,22 +901,33 @@ const appVue = new Vue({
                 await this.loadAdminWorkspaces(this.adminPagination.page)
             }
         },
-        async getAllUsers() {
-            const res = await fetch('all_users')
-            if (res.status === 200) {
-                const data = await res.json()
-                this.userList = data.result
-            }
+        async loadAdminUsers(page) {
+            const q = new URLSearchParams({
+                page: page || 1,
+                per_page: 10,
+                user: this.adminUserFilter,
+            })
+            if (this.adminUserStatus) q.set('status', this.adminUserStatus)
+            const res = await fetch('all_users?' + q)
+            if (res.status !== 200) return
+            const data = await res.json()
+            this.userList = data.result || []
+            this.adminUserPagination = data.pagination || this.adminUserPagination
         },
         adminAcceptUser(u) {
-            fetch('accept_user/' + u.username).then(() => this.getAllUsers())
+            fetch('accept_user/' + u.username).then(() => this.loadAdminUsers(this.adminUserPagination.page))
         },
         adminDeleteUser(u) {
             if (!confirm('Delete user ' + u.username + '?')) return
-            fetch('delete_user/' + u.username, { method: 'DELETE' }).then(() => this.getAllUsers())
+            fetch('delete_user/' + u.username, { method: 'DELETE' }).then(() => {
+                const page = this.adminUserPagination.page
+                const next = this.userList.length <= 1 && page > 1 ? page - 1 : page
+                this.loadAdminUsers(next)
+            })
         },
         adminChangeRole(u, role) {
-            fetch('change_role/' + u.username + '/' + role, { method: 'PUT' }).then(() => this.getAllUsers())
+            fetch('change_role/' + u.username + '/' + role, { method: 'PUT' })
+                .then(() => this.loadAdminUsers(this.adminUserPagination.page))
         },
         async loadAdminDockerImages() {
             const res = await fetch('admin/docker_images')
