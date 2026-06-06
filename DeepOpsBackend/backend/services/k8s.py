@@ -3,6 +3,7 @@ import os
 import subprocess
 
 from .config import get_hub_config
+from .ssh_keys import get_or_none, ssh_secret_name
 
 NAMESPACE = os.environ.get('NAMESPACE', 'dohub')
 DOMAIN_NAME = os.environ.get('DOMAIN_NAME', 'dohub.com')
@@ -39,6 +40,7 @@ def build_spawn_config(workspace) -> dict:
         raise ValueError('workspace has no drive assigned')
 
     mount_path = (workspace.mount_path or '/home/coder').strip() or '/home/coder'
+    ssh_record = get_or_none(workspace)
 
     return {
         'workspace_id': str(workspace.id),
@@ -63,6 +65,9 @@ def build_spawn_config(workspace) -> dict:
         'claim_name': drive.claim_name,
         'mount_path': mount_path,
         'secret_name': f'{user.username}-{slug}-secret',
+        'ssh_enabled': ssh_record is not None,
+        'ssh_secret_name': ssh_secret_name(workspace),
+        'ssh_public_key': ssh_record.public_key if ssh_record else '',
     }
 
 
@@ -145,6 +150,16 @@ def _helm_base_cmd(config: dict) -> list[str]:
     if command:
         cmd.extend(['--set-json', f'container.command={json.dumps(command)}'])
 
+    if config.get('ssh_enabled') and config.get('ssh_secret_name'):
+        bridge_image = os.environ.get('SSH_BRIDGE_IMAGE', 'localhost:32000/ssh-bridge')
+        bridge_tag = os.environ.get('SSH_BRIDGE_TAG', 'latest')
+        cmd.extend([
+            '--set', 'sshBridge.enabled=true',
+            '--set', f'sshBridge.secretName={config["ssh_secret_name"]}',
+            '--set', f'sshBridge.image.repository={bridge_image}',
+            '--set', f'sshBridge.image.tag={bridge_tag}',
+        ])
+
     cmd.extend([
         *gpu_flags,
         config['release_name'],
@@ -154,6 +169,12 @@ def _helm_base_cmd(config: dict) -> list[str]:
 
 
 def create_codehub(config: dict) -> tuple[str, str, int]:
+    if config.get('ssh_enabled') and config.get('ssh_public_key'):
+        from .ssh_k8s import apply_ssh_secret
+
+        logs, code = apply_ssh_secret(config['ssh_secret_name'], config['ssh_public_key'])
+        if code != 0:
+            return '', f'ssh secret apply failed: {logs}', code
     cmd = _helm_base_cmd(config)
     result = subprocess.run(cmd, capture_output=True, text=True, check=False)
     logs = result.stdout + result.stderr

@@ -11,6 +11,12 @@ spec:
       targetPort: http
       protocol: TCP
       name: http
+    {{- if .Values.sshBridge.enabled }}
+    - port: {{ .Values.sshBridge.wsPort }}
+      targetPort: ssh-ws
+      protocol: TCP
+      name: ssh-ws
+    {{- end }}
     {{- range .Values.service.extraPorts }}
     - port: {{ .port }}
       targetPort: {{ .name }}

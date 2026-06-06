@@ -311,6 +311,8 @@ const appVue = new Vue({
         joinCommandRaw: '',
         joinCommandLoading: false,
         joinCommandError: '',
+        sshGenerateLoading: false,
+        sshPrivateKeyOnce: '',
         userList: [],
         is_login: typeof is_login !== 'undefined' ? is_login : 0,
         menu: 'home',
@@ -424,9 +426,52 @@ const appVue = new Vue({
         },
         openWorkspaceModal(ws) {
             this.modalWorkspace = { ...ws, env_vars: { ...(ws.env_vars || {}) } }
+            this.sshPrivateKeyOnce = ''
+            this.loadWorkspaceSsh(ws)
         },
         closeWorkspaceModal() {
             this.modalWorkspace = null
+            this.sshPrivateKeyOnce = ''
+        },
+        async loadWorkspaceSsh(ws) {
+            const res = await fetch('workspaces/' + ws.id + '/ssh')
+            if (res.status !== 200 || !this.modalWorkspace || this.modalWorkspace.id !== ws.id) return
+            const data = await res.json()
+            const info = data.result || {}
+            Object.assign(this.modalWorkspace, info)
+        },
+        async generateSshKeys(ws) {
+            this.sshGenerateLoading = true
+            this.sshPrivateKeyOnce = ''
+            try {
+                const res = await fetch('workspaces/' + ws.id + '/ssh/generate', { method: 'POST' })
+                const data = await res.json().catch(() => ({}))
+                const result = data.result || {}
+                if (res.status !== 200) {
+                    this.showToast(data.message || 'SSH key generation failed')
+                    if (result.private_key) this.sshPrivateKeyOnce = result.private_key
+                    if (result.has_key !== undefined) Object.assign(this.modalWorkspace, result)
+                    return
+                }
+                Object.assign(this.modalWorkspace, result)
+                if (result.private_key) this.sshPrivateKeyOnce = result.private_key
+                this.showToast('SSH keys ready — save the private key')
+                await this.refreshLists()
+            } finally {
+                this.sshGenerateLoading = false
+            }
+        },
+        downloadSshKey(ws) {
+            window.location = 'workspaces/' + ws.id + '/ssh/download'
+        },
+        async copyText(text, msg) {
+            if (!text) return
+            try {
+                await navigator.clipboard.writeText(text)
+                this.showToast(msg || 'Copied')
+            } catch {
+                this.showToast('Copy failed')
+            }
         },
         openDeleteModal(ws, isAdmin) {
             this.deleteModalWorkspace = ws

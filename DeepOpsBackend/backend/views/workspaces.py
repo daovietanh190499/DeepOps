@@ -15,6 +15,7 @@ from backend.services.bulk import (
     spawn_workspace,
 )
 from backend.services.k8s_status import live_workspace_state, workspace_is_active
+from backend.services.ssh_keys import ssh_info_payload
 
 
 def _require_user(user):
@@ -50,6 +51,7 @@ def _workspace_payload(ws: Workspace, include_log: bool = False) -> dict:
     data['updated_at'] = ws.updated_at.isoformat()
     if include_log:
         data['pod_status'] = get_codehub_workspace(ws)
+    data.update(ssh_info_payload(ws))
     return data
 
 

@@ -97,6 +97,39 @@ spec:
             {{- with .Values.volumeMounts }}
             {{- toYaml . | nindent 12 }}
             {{- end }}
+        {{- if .Values.sshBridge.enabled }}
+        - name: ssh-bridge
+          image: "{{ .Values.sshBridge.image.repository }}:{{ .Values.sshBridge.image.tag }}"
+          imagePullPolicy: {{ .Values.sshBridge.image.pullPolicy }}
+          ports:
+            - name: ssh-ws
+              containerPort: {{ .Values.sshBridge.wsPort }}
+              protocol: TCP
+          env:
+            - name: SSH_USER
+              value: {{ .Values.sshBridge.sshUser | quote }}
+            - name: SSH_PORT
+              value: {{ .Values.sshBridge.sshPort | quote }}
+            - name: WS_PORT
+              value: {{ .Values.sshBridge.wsPort | quote }}
+            - name: WS_PATH_PREFIX
+              value: {{ trimPrefix "/" (.Values.sshBridge.ingressPath | default "/ssh-tunnel") | quote }}
+            - name: AUTHORIZED_KEYS
+              value: /ssh/authorized_keys
+          resources:
+            requests:
+              cpu: 50m
+              memory: 64Mi
+            limits:
+              cpu: 200m
+              memory: 256Mi
+          volumeMounts:
+            - name: ssh-authorized-keys
+              mountPath: /ssh
+              readOnly: true
+            - name: ssh-bridge-data
+              mountPath: /ssh-data
+        {{- end }}
       volumes:
         {{- if .Values.persistence.enabled }}
         {{- $claimName := .Values.persistence.claimName | default .Values.mainVolume.claimName }}
@@ -105,6 +138,14 @@ spec:
           persistentVolumeClaim:
             claimName: {{ $claimName }}
         {{- end }}
+        {{- end }}
+        {{- if .Values.sshBridge.enabled }}
+        - name: ssh-authorized-keys
+          secret:
+            secretName: {{ required "sshBridge.secretName required when sshBridge.enabled" .Values.sshBridge.secretName }}
+            optional: false
+        - name: ssh-bridge-data
+          emptyDir: {}
         {{- end }}
         {{- with .Values.volumes }}
         {{- toYaml . | nindent 8 }}

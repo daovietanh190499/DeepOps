@@ -34,6 +34,8 @@ RUN pip3 install --no-cache-dir -r requirements.txt
 
 COPY DeepOpsBackend /app
 COPY charts/codehub /charts/codehub
+
+# Add kubectl-directpv to path this will need to update by the version of directpv
 COPY ./kubectl-directpv /usr/local/bin/kubectl-directpv
 RUN chmod +x /usr/local/bin/kubectl-directpv
 

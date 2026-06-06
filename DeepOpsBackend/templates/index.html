@@ -541,7 +541,7 @@
 
     <!-- Workspace detail modal -->
     <div v-if="modalWorkspace" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50" @click.self="closeWorkspaceModal">
-        <div class="max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-2xl border border-slate-200 bg-white shadow-xl">
+        <div class="max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-2xl border border-slate-200 bg-white shadow-xl">
             <div class="sticky top-0 flex items-center justify-between border-b border-slate-100 bg-white px-5 py-4">
                 <h3 class="text-lg font-bold text-slate-900" v-text="modalWorkspace.name"></h3>
                 <button type="button" @click="closeWorkspaceModal" class="text-slate-400 hover:text-slate-700"><i class="fa fa-times text-xl"></i></button>
@@ -575,6 +575,46 @@
                         <li v-for="k in modalEnvKeys" :key="k" v-text="k + ' = ' + modalWorkspace.env_vars[k]"></li>
                     </ul>
                 </div>
+
+                <div class="rounded-xl border border-indigo-100 bg-indigo-50/50 p-4 space-y-3">
+                    <div class="flex flex-wrap items-center justify-between gap-2">
+                        <p class="font-semibold text-slate-800">SSH over HTTPS</p>
+                        <button type="button" @click="generateSshKeys(modalWorkspace)" :disabled="sshGenerateLoading"
+                                class="rounded-lg bg-indigo-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-indigo-700 disabled:opacity-50">
+                            <span v-if="sshGenerateLoading">Generating…</span>
+                            <span v-else v-text="modalWorkspace.has_key ? 'Regenerate key pair' : 'Generate key pair'"></span>
+                        </button>
+                    </div>
+                    <p class="text-xs text-slate-600">Tunnel SSH through <code class="rounded bg-white px-1">wss://…/ssh-tunnel</code> (port 443). See <code class="text-[10px]">docs/SSH-OVER-HTTPS.md</code>.</p>
+                    <div v-if="modalWorkspace.has_key" class="space-y-2 text-xs">
+                        <div class="flex items-center gap-2">
+                            <span class="font-medium text-slate-500 shrink-0">WSS URL</span>
+                            <span class="font-mono text-slate-800 truncate flex-1" v-text="modalWorkspace.wss_url"></span>
+                            <button type="button" @click="copyText(modalWorkspace.wss_url, 'WSS URL copied')" class="shrink-0 rounded border bg-white px-2 py-0.5 hover:bg-slate-50"><i class="fa fa-copy"></i></button>
+                        </div>
+                        <div class="flex items-center gap-2">
+                            <span class="font-medium text-slate-500 shrink-0">SSH</span>
+                            <span class="font-mono text-slate-800" v-text="modalWorkspace.ssh_command"></span>
+                            <button type="button" @click="copyText(modalWorkspace.ssh_command, 'SSH command copied')" class="shrink-0 rounded border bg-white px-2 py-0.5 hover:bg-slate-50"><i class="fa fa-copy"></i></button>
+                        </div>
+                        <p class="text-slate-500" v-text="'Fingerprint: ' + (modalWorkspace.fingerprint || '—')"></p>
+                        <pre class="overflow-x-auto rounded-lg bg-slate-900 p-3 text-[10px] text-slate-100 whitespace-pre-wrap" v-text="modalWorkspace.ssh_config"></pre>
+                        <div class="flex flex-wrap gap-2">
+                            <button type="button" @click="copyText(modalWorkspace.ssh_config, 'SSH config copied')"
+                                    class="rounded-lg border bg-white px-3 py-1.5 text-xs font-semibold hover:bg-slate-50">Copy ~/.ssh/config block</button>
+                            <button type="button" @click="downloadSshKey(modalWorkspace)"
+                                    class="rounded-lg border bg-white px-3 py-1.5 text-xs font-semibold hover:bg-slate-50">Download private key</button>
+                        </div>
+                    </div>
+                    <p v-else class="text-xs text-slate-500">Generate a key pair to enable SSH. Restart or start the server after generating.</p>
+                    <div v-if="sshPrivateKeyOnce" class="rounded-lg border border-amber-200 bg-amber-50 p-3 space-y-2">
+                        <p class="text-xs font-semibold text-amber-800">Save this private key now — shown once after generate:</p>
+                        <pre class="max-h-32 overflow-auto rounded bg-slate-900 p-2 text-[10px] text-emerald-200 whitespace-pre-wrap" v-text="sshPrivateKeyOnce"></pre>
+                        <button type="button" @click="copyText(sshPrivateKeyOnce, 'Private key copied')"
+                                class="rounded-lg border border-amber-300 bg-white px-3 py-1 text-xs font-semibold">Copy private key</button>
+                    </div>
+                </div>
+
                 <div class="flex flex-wrap gap-2 pt-2">
                     <button v-if="modalWorkspace.state==='running'" @click="openWorkspace(modalWorkspace); closeWorkspaceModal()"
                             class="flex-1 rounded-lg border border-blue-600 text-blue-600 py-2 text-xs font-semibold">Open</button>

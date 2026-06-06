@@ -42,6 +42,22 @@ spec:
     - host: {{ .host | quote }}
       http:
         paths:
+          {{- if $.Values.sshBridge.enabled }}
+          - path: {{ $.Values.sshBridge.ingressPath | default "/ssh-tunnel" }}
+            {{- if semverCompare ">=1.18-0" $.Capabilities.KubeVersion.GitVersion }}
+            pathType: Prefix
+            {{- end }}
+            backend:
+              {{- if semverCompare ">=1.19-0" $.Capabilities.KubeVersion.GitVersion }}
+              service:
+                name: {{ $fullName }}
+                port:
+                  number: {{ $.Values.sshBridge.wsPort }}
+              {{- else }}
+              serviceName: {{ $fullName }}
+              servicePort: {{ $.Values.sshBridge.wsPort }}
+              {{- end }}
+          {{- end }}
           {{- range .paths }}
           - path: {{ .path }}
             {{- if and .pathType (semverCompare ">=1.18-0" $.Capabilities.KubeVersion.GitVersion) }}

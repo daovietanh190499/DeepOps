@@ -26,6 +26,20 @@ service:
   port: 8080
   extraPorts: []
 
+# SSH over HTTPS: asyncssh + WebSocket sidecar (no OpenSSH in main container)
+sshBridge:
+  enabled: false
+  image:
+    repository: localhost:32000/ssh-bridge
+    tag: latest
+    pullPolicy: Always
+  wsPort: 8022
+  sshPort: 2222
+  sshUser: coder
+  ingressPath: /ssh-tunnel
+  secretName: ""
+  authorizedKeys: ""
+
 ingress:
   enabled: true
   className: nginx

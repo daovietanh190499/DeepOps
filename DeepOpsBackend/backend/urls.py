@@ -3,6 +3,7 @@ from django.urls import path
 from backend import views
 from backend.views import cluster as cluster_views
 from backend.views import drives as drive_views
+from backend.views import ssh as ssh_views
 from backend.views import workspaces as ws_views
 
 urlpatterns = [
@@ -28,6 +29,9 @@ urlpatterns = [
     path('workspaces/run', ws_views.workspace_run, name='workspace-run'),
     path('workspaces/bulk_run', ws_views.workspace_bulk_run, name='workspace-bulk-run'),
     path('workspaces/create', ws_views.workspace_create, name='workspace-create'),
+    path('workspaces/<uuid:workspace_id>/ssh/generate', ssh_views.workspace_ssh_generate, name='workspace-ssh-generate'),
+    path('workspaces/<uuid:workspace_id>/ssh/download', ssh_views.workspace_ssh_download_key, name='workspace-ssh-download'),
+    path('workspaces/<uuid:workspace_id>/ssh', ssh_views.workspace_ssh_info, name='workspace-ssh-info'),
     path('workspaces/<uuid:workspace_id>/export', ws_views.workspace_export, name='workspace-export'),
     path('workspaces/<uuid:workspace_id>/start', ws_views.workspace_start, name='workspace-start'),
     path('workspaces/<uuid:workspace_id>/stop', ws_views.workspace_stop, name='workspace-stop'),

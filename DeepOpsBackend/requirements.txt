@@ -4,3 +4,4 @@ whitenoise>=6.6
 requests>=2.31
 PyYAML>=6.0
 tzdata>=2024.1
+cryptography>=42.0,<44
