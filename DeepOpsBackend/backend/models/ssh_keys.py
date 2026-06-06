@@ -14,6 +14,7 @@ class WorkspaceSSHKey(models.Model):
     )
     public_key = models.TextField()
     private_key_encrypted = models.TextField()
+    host_key_encrypted = models.TextField(blank=True, default='')
     fingerprint = models.CharField(max_length=128)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)

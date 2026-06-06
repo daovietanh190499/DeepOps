@@ -28,14 +28,22 @@ def public_key_fingerprint(public_openssh: str) -> str:
     return 'SHA256:' + base64.b64encode(digest).decode('ascii').rstrip('=')
 
 
-def generate_keypair() -> tuple[str, str, str]:
-    private_key = Ed25519PrivateKey.generate()
-    public_key = private_key.public_key()
-    private_openssh = private_key.private_bytes(
+def _openssh_private_bytes(private_key: Ed25519PrivateKey) -> str:
+    return private_key.private_bytes(
         encoding=serialization.Encoding.PEM,
         format=serialization.PrivateFormat.OpenSSH,
         encryption_algorithm=serialization.NoEncryption(),
     ).decode('utf-8')
+
+
+def generate_host_key_openssh() -> str:
+    return _openssh_private_bytes(Ed25519PrivateKey.generate())
+
+
+def generate_keypair() -> tuple[str, str, str]:
+    private_key = Ed25519PrivateKey.generate()
+    public_key = private_key.public_key()
+    private_openssh = _openssh_private_bytes(private_key)
     public_openssh = public_key.public_bytes(
         encoding=serialization.Encoding.OpenSSH,
         format=serialization.PublicFormat.OpenSSH,
@@ -91,15 +99,33 @@ def get_or_none(workspace: Workspace) -> WorkspaceSSHKey | None:
     return WorkspaceSSHKey.objects.filter(workspace=workspace).first()
 
 
+def host_key_plaintext(record: WorkspaceSSHKey) -> str:
+    if not record.host_key_encrypted:
+        return ''
+    return decrypt_private_key(record.host_key_encrypted)
+
+
+def ensure_host_key_material(record: WorkspaceSSHKey) -> str:
+    """Return ssh-bridge host private key, generating and persisting if needed."""
+    existing = host_key_plaintext(record)
+    if existing:
+        return existing
+    host_key = generate_host_key_openssh()
+    record.host_key_encrypted = encrypt_private_key(host_key)
+    record.save(update_fields=['host_key_encrypted', 'updated_at'])
+    return host_key
+
+
 def create_or_rotate_keys(workspace: Workspace) -> tuple[WorkspaceSSHKey, str]:
     """Returns (record, private_key_openssh plaintext for one-time download)."""
     public_key, private_key, fingerprint = generate_keypair()
-    encrypted = encrypt_private_key(private_key)
+    host_key = generate_host_key_openssh()
     record, _created = WorkspaceSSHKey.objects.update_or_create(
         workspace=workspace,
         defaults={
             'public_key': public_key.strip(),
-            'private_key_encrypted': encrypted,
+            'private_key_encrypted': encrypt_private_key(private_key),
+            'host_key_encrypted': encrypt_private_key(host_key),
             'fingerprint': fingerprint,
         },
     )

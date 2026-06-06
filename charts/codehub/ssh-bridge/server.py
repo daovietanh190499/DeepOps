@@ -131,9 +131,10 @@ async def handle_client(process: asyncssh.SSHServerProcess) -> None:
 
 
 async def ensure_host_key() -> None:
-    HOST_KEY.parent.mkdir(parents=True, exist_ok=True)
-    if HOST_KEY.exists():
+    if HOST_KEY.is_file():
+        LOG.info('using SSH host key from %s', HOST_KEY)
         return
+    HOST_KEY.parent.mkdir(parents=True, exist_ok=True)
     key = asyncssh.generate_private_key('ssh-ed25519')
     key.write_private_key(str(HOST_KEY))
     LOG.info('generated ephemeral SSH host key at %s', HOST_KEY)

@@ -171,10 +171,12 @@ def _helm_base_cmd(config: dict) -> list[str]:
 
 
 def create_codehub(config: dict) -> tuple[str, str, int]:
-    if config.get('ssh_enabled') and config.get('ssh_public_key'):
-        from .ssh_k8s import apply_ssh_secret
+    if config.get('ssh_enabled'):
+        from backend.models import Workspace
+        from .ssh_k8s import sync_ssh_secret_for_workspace
 
-        logs, code = apply_ssh_secret(config['ssh_secret_name'], config['ssh_public_key'])
+        workspace = Workspace.objects.get(id=config['workspace_id'])
+        logs, code = sync_ssh_secret_for_workspace(workspace)
         if code != 0:
             return '', f'ssh secret apply failed: {logs}', code
     cmd = _helm_base_cmd(config)

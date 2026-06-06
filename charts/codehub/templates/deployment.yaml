@@ -138,10 +138,13 @@ spec:
               memory: 256Mi
           volumeMounts:
             - name: ssh-authorized-keys
-              mountPath: /ssh
+              mountPath: /ssh/authorized_keys
+              subPath: authorized_keys
               readOnly: true
-            - name: ssh-bridge-data
-              mountPath: /ssh-data
+            - name: ssh-authorized-keys
+              mountPath: /ssh-data/host_key
+              subPath: host_key
+              readOnly: true
             - name: k8s-token
               mountPath: /var/run/secrets/kubernetes.io/serviceaccount
               readOnly: true
@@ -160,8 +163,6 @@ spec:
           secret:
             secretName: {{ required "sshBridge.secretName required when sshBridge.enabled" .Values.sshBridge.secretName }}
             optional: false
-        - name: ssh-bridge-data
-          emptyDir: {}
         - name: k8s-token
           projected:
             sources:
