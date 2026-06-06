@@ -183,6 +183,23 @@ def create_codehub(config: dict) -> tuple[str, str, int]:
     return ' '.join(cmd), logs, result.returncode
 
 
+def scale_codehub(release_name: str, replicas: int) -> tuple[str, int]:
+    """Scale the workspace deployment without removing the Helm release."""
+    cmd = [
+        'kubectl', 'scale', 'deployment',
+        '-n', NAMESPACE,
+        f'-l=app.kubernetes.io/instance={release_name}',
+        f'--replicas={replicas}',
+    ]
+    result = subprocess.run(cmd, capture_output=True, text=True, check=False)
+    logs = (result.stdout or '') + (result.stderr or '')
+    return ' '.join(cmd), result.returncode
+
+
+def stop_codehub(release_name: str) -> tuple[str, int]:
+    return scale_codehub(release_name, 0)
+
+
 def remove_codehub(release_name: str) -> int:
     return subprocess.call([
         'helm', 'uninstall', '-n', NAMESPACE, release_name,

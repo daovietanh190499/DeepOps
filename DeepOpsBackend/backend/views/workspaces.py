@@ -8,7 +8,7 @@ from django.views.decorators.http import require_http_methods
 
 from backend.models import DockerImage, User, UserDrive, Workspace
 from backend.services.github_auth import auth
-from backend.services.k8s import get_codehub_workspace, remove_codehub
+from backend.services.k8s import get_codehub_workspace, remove_codehub, stop_codehub
 from backend.services.bulk import (
     bulk_workspace_result,
     resolve_user_drive,
@@ -208,7 +208,9 @@ def _start_workspace(ws: Workspace):
 def _stop_workspace(ws: Workspace):
     try:
         if settings.DEFAULT_SPAWNER == 'k8s':
-            remove_codehub(ws.release_name)
+            _, exit_code = stop_codehub(ws.release_name)
+            if exit_code != 0:
+                return JsonResponse({'message': 'action failed'}, status=500)
     except Exception:
         return JsonResponse({'message': 'action failed'}, status=500)
     return JsonResponse({'message': 'success', 'result': _workspace_payload(ws)})

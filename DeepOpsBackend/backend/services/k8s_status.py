@@ -41,6 +41,28 @@ def helm_release_exists(release_name: str) -> bool:
     return bool((result.stdout or '').strip())
 
 
+def deployment_replicas(release_name: str) -> int | None:
+    """Desired replica count for the workspace deployment, or None if missing."""
+    result = subprocess.run(
+        [
+            'kubectl', 'get', 'deployment',
+            '-n', NAMESPACE,
+            f'-l=app.kubernetes.io/instance={release_name}',
+            '-o', 'jsonpath={.items[0].spec.replicas}',
+        ],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    out = (result.stdout or '').strip()
+    if result.returncode != 0 or not out:
+        return None
+    try:
+        return int(out)
+    except ValueError:
+        return None
+
+
 def live_workspace_state(workspace: Workspace) -> str:
     """Derive workspace state from pod / helm release in the cluster."""
     try:
@@ -61,6 +83,9 @@ def live_workspace_state(workspace: Workspace) -> str:
             return STATE_PENDING_START
 
     if helm_release_exists(workspace.release_name):
+        replicas = deployment_replicas(workspace.release_name)
+        if replicas == 0:
+            return STATE_OFFLINE
         return STATE_PENDING_START
 
     return STATE_OFFLINE
