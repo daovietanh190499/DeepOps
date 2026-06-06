@@ -284,32 +284,76 @@
             </div>
         </section>
 
-        <!-- Admin users -->
+        <!-- Admin users & groups -->
         <section v-if="is_login && menu==='admin-users' && is_admin" class="space-y-4">
             <div class="flex flex-wrap items-center gap-3">
                 <h2 class="text-lg font-bold text-slate-900">User management</h2>
-                <input v-model="adminUserFilter" @input="loadAdminUsers(1)" placeholder="Filter by username…"
-                       class="rounded-lg border px-3 py-1.5 text-sm">
-                <select v-model="adminUserStatus" @change="loadAdminUsers(1)"
-                        class="rounded-lg border px-3 py-1.5 text-sm">
-                    <option value="">All statuses</option>
-                    <option value="accepted">Accepted</option>
-                    <option value="pending">Pending</option>
-                </select>
-                <span class="text-sm text-slate-500" v-text="'Page ' + adminUserPagination.page + ' / ' + adminUserPagination.pages + ' (' + adminUserPagination.total + ' users)'"></span>
+                <div class="flex rounded-lg border border-slate-200 overflow-hidden text-sm">
+                    <button type="button" @click="adminUsersTab='users'"
+                            :class="adminUsersTab==='users' ? 'bg-blue-600 text-white' : 'bg-white text-slate-600'"
+                            class="px-4 py-1.5 font-semibold">Users</button>
+                    <button type="button" @click="switchAdminUsersTab('groups')"
+                            :class="adminUsersTab==='groups' ? 'bg-blue-600 text-white' : 'bg-white text-slate-600'"
+                            class="px-4 py-1.5 font-semibold border-l border-slate-200">Groups</button>
+                </div>
             </div>
-            <div class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-                <p v-if="userList.length===0" class="text-sm text-slate-500">No users match this filter.</p>
-                <user-row v-for="u in userList" :key="u.username" :user="u"
-                          @accept="adminAcceptUser(u)" @delete="adminDeleteUser(u)"
-                          @role="role => adminChangeRole(u, role)"></user-row>
-            </div>
-            <div class="flex justify-center gap-2">
-                <button :disabled="adminUserPagination.page<=1" @click="loadAdminUsers(adminUserPagination.page-1)"
-                        class="rounded-lg border px-4 py-2 text-sm disabled:opacity-40">Prev</button>
-                <button :disabled="adminUserPagination.page>=adminUserPagination.pages" @click="loadAdminUsers(adminUserPagination.page+1)"
-                        class="rounded-lg border px-4 py-2 text-sm disabled:opacity-40">Next</button>
-            </div>
+
+            <template v-if="adminUsersTab==='users'">
+                <div class="flex flex-wrap items-center gap-3">
+                    <input v-model="adminUserFilter" @input="loadAdminUsers(1)" placeholder="Filter by username or email…"
+                           class="rounded-lg border px-3 py-1.5 text-sm">
+                    <select v-model="adminUserStatus" @change="loadAdminUsers(1)"
+                            class="rounded-lg border px-3 py-1.5 text-sm">
+                        <option value="">All statuses</option>
+                        <option value="accepted">Accepted</option>
+                        <option value="pending">Pending</option>
+                    </select>
+                    <span class="text-sm text-slate-500" v-text="'Page ' + adminUserPagination.page + ' / ' + adminUserPagination.pages + ' (' + adminUserPagination.total + ' users)'"></span>
+                </div>
+                <div class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+                    <p v-if="userList.length===0" class="text-sm text-slate-500">No users match this filter.</p>
+                    <user-row v-for="u in userList" :key="u.username" :user="u"
+                              @accept="adminAcceptUser(u)" @delete="adminDeleteUser(u)"
+                              @role="role => adminChangeRole(u, role)"></user-row>
+                </div>
+                <div class="flex justify-center gap-2">
+                    <button :disabled="adminUserPagination.page<=1" @click="loadAdminUsers(adminUserPagination.page-1)"
+                            class="rounded-lg border px-4 py-2 text-sm disabled:opacity-40">Prev</button>
+                    <button :disabled="adminUserPagination.page>=adminUserPagination.pages" @click="loadAdminUsers(adminUserPagination.page+1)"
+                            class="rounded-lg border px-4 py-2 text-sm disabled:opacity-40">Next</button>
+                </div>
+            </template>
+
+            <template v-else>
+                <div class="flex flex-wrap items-center justify-between gap-3">
+                    <p class="text-sm text-slate-500">Resource groups set per-user limits for CPU, RAM, drive size, and GPU VRAM.</p>
+                    <button type="button" @click="openCreateGroupModal"
+                            class="rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700">Create group</button>
+                </div>
+                <p v-if="resourceGroups.length===0" class="text-sm text-slate-500 rounded-2xl border border-slate-200 bg-white p-5">No groups yet.</p>
+                <div v-else class="grid gap-4 sm:grid-cols-2">
+                    <div v-for="g in resourceGroups" :key="g.id"
+                         class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm space-y-3">
+                        <div class="flex items-start justify-between gap-2">
+                            <div>
+                                <h3 class="font-bold text-slate-900" v-text="g.name"></h3>
+                                <p class="text-xs text-slate-500 mt-0.5" v-text="g.member_count + ' member(s)'"></p>
+                            </div>
+                            <div class="flex gap-1">
+                                <button type="button" @click="openEditGroupModal(g)" class="rounded-lg border px-2 py-1 text-xs hover:bg-slate-50">Edit</button>
+                                <button type="button" @click="openGroupMembersModal(g)" class="rounded-lg bg-indigo-600 text-white px-2 py-1 text-xs">Members</button>
+                                <button type="button" @click="deleteResourceGroup(g)" class="rounded-lg border border-rose-200 text-rose-600 px-2 py-1 text-xs">Delete</button>
+                            </div>
+                        </div>
+                        <div class="grid grid-cols-2 gap-2 text-xs text-slate-600">
+                            <span v-text="'CPU ≤ ' + g.max_cpu + ' vCPU'"></span>
+                            <span v-text="'RAM ≤ ' + g.max_ram_g + 'G'"></span>
+                            <span v-text="'Drive ≤ ' + g.max_drive_size_gi + 'Gi'"></span>
+                            <span v-text="'GPU VRAM ≤ ' + g.max_gpu_vram_g + 'G'"></span>
+                        </div>
+                    </div>
+                </div>
+            </template>
         </section>
 
         <!-- Admin servers -->
@@ -467,11 +511,17 @@
                 <button type="button" @click="closeCreateServerModal" class="text-slate-400 hover:text-slate-700"><i class="fa fa-times text-xl"></i></button>
             </div>
             <div class="p-5 space-y-6">
+                <p v-if="resourceLimits.limited" class="rounded-lg bg-amber-50 border border-amber-200 px-3 py-2 text-xs text-amber-800">
+                    Group <strong v-text="resourceLimits.limits.group_name"></strong>:
+                    CPU ≤ <span v-text="resourceLimits.limits.max_cpu"></span> vCPU,
+                    RAM ≤ <span v-text="resourceLimits.limits.max_ram_g"></span>G,
+                    GPU VRAM ≤ <span v-text="resourceLimits.limits.max_gpu_vram_g"></span>G
+                </p>
                 <section>
                     <h4 class="mb-3 text-sm font-bold text-slate-900">Quick templates</h4>
                     <p class="mb-3 text-xs text-slate-500">Click to fill the form below.</p>
                     <div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-                        <button v-for="t in planTemplates" :key="t.name" type="button" @click="applyTemplate(t)"
+                        <button v-for="t in filteredPlanTemplates" :key="t.name" type="button" @click="applyTemplate(t)"
                                 class="flex flex-col rounded-xl border-2 border-slate-200 bg-white p-3 text-left transition hover:border-blue-400 hover:shadow-md">
                             <img :src="'/static/img/' + t.image" class="mb-2 h-8 w-8 object-contain" alt="">
                             <span class="text-sm font-semibold text-slate-800" v-text="t.name"></span>
@@ -653,6 +703,9 @@
                 <button type="button" @click="closeCreateDriveModal" class="text-slate-400 hover:text-slate-700"><i class="fa fa-times text-xl"></i></button>
             </div>
             <div class="space-y-4 px-5 py-4">
+                <p v-if="resourceLimits.limited" class="rounded-lg bg-amber-50 border border-amber-200 px-3 py-2 text-xs text-amber-800">
+                    Max drive size for your group: <strong v-text="resourceLimits.limits.max_drive_size_gi + 'Gi'"></strong>
+                </p>
                 <div>
                     <label class="block text-sm font-medium text-slate-700">Name</label>
                     <input v-model="newDrive.name" placeholder="Drive name" class="mt-1 w-full rounded-lg border px-3 py-2 text-sm">
@@ -773,6 +826,101 @@
                         <span v-if="deleteInProgress">Deleting…</span>
                         <span v-else>Delete</span>
                     </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Create / edit resource group -->
+    <div v-if="showGroupFormModal" class="fixed inset-0 z-[55] flex items-center justify-center p-4 bg-slate-900/50" @click.self="closeGroupFormModal">
+        <div class="w-full max-w-md rounded-2xl border border-slate-200 bg-white shadow-xl">
+            <div class="flex items-center justify-between border-b border-slate-100 px-5 py-4">
+                <h3 class="text-lg font-bold text-slate-900" v-text="editingGroup ? 'Edit group' : 'Create group'"></h3>
+                <button type="button" @click="closeGroupFormModal" class="text-slate-400 hover:text-slate-700"><i class="fa fa-times text-xl"></i></button>
+            </div>
+            <div class="space-y-4 px-5 py-4">
+                <div>
+                    <label class="block text-sm font-medium text-slate-700">Group name</label>
+                    <input v-model="groupForm.name" type="text" class="mt-1 w-full rounded-lg border px-3 py-2 text-sm">
+                </div>
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="block text-xs font-medium text-slate-600">Max CPU (vCPU)</label>
+                        <input v-model.number="groupForm.max_cpu" type="number" min="1" class="mt-1 w-full rounded-lg border px-3 py-2 text-sm">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-medium text-slate-600">Max RAM (GB)</label>
+                        <input v-model.number="groupForm.max_ram_g" type="number" min="1" class="mt-1 w-full rounded-lg border px-3 py-2 text-sm">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-medium text-slate-600">Max drive (Gi)</label>
+                        <input v-model.number="groupForm.max_drive_size_gi" type="number" min="1" class="mt-1 w-full rounded-lg border px-3 py-2 text-sm">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-medium text-slate-600">Max GPU VRAM (GB)</label>
+                        <input v-model.number="groupForm.max_gpu_vram_g" type="number" min="0" class="mt-1 w-full rounded-lg border px-3 py-2 text-sm">
+                    </div>
+                </div>
+                <p class="text-xs text-slate-500">Limits apply per member (each user in the group gets the same cap).</p>
+                <div class="flex justify-end gap-2">
+                    <button type="button" @click="closeGroupFormModal" class="rounded-lg border px-4 py-2 text-sm">Cancel</button>
+                    <button type="button" @click="saveResourceGroup" :disabled="groupFormLoading"
+                            class="rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50">Save</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Group members -->
+    <div v-if="groupMembersModal" class="fixed inset-0 z-[55] flex items-center justify-center p-4 bg-slate-900/50" @click.self="closeGroupMembersModal">
+        <div class="w-full max-w-lg rounded-2xl border border-slate-200 bg-white shadow-xl max-h-[90vh] overflow-y-auto">
+            <div class="flex items-center justify-between border-b border-slate-100 px-5 py-4 sticky top-0 bg-white z-10">
+                <div>
+                    <h3 class="text-lg font-bold text-slate-900" v-text="'Members — ' + groupMembersModal.name"></h3>
+                    <p class="text-xs text-slate-500 mt-0.5">Search by username or email, or paste a list of emails.</p>
+                </div>
+                <button type="button" @click="closeGroupMembersModal" class="text-slate-400 hover:text-slate-700"><i class="fa fa-times text-xl"></i></button>
+            </div>
+            <div class="space-y-4 px-5 py-4">
+                <div class="relative">
+                    <label class="block text-sm font-medium text-slate-700 mb-1">Add member</label>
+                    <input v-model="memberSearchQuery" @input="onMemberSearchInput" type="text"
+                           placeholder="Type username or email…"
+                           class="w-full rounded-lg border px-3 py-2 text-sm">
+                    <div v-if="memberSearchResults.length" class="absolute z-20 mt-1 w-full rounded-lg border bg-white shadow-lg max-h-48 overflow-y-auto">
+                        <button v-for="u in memberSearchResults" :key="u.id" type="button" @click="addGroupMember(u)"
+                                class="flex w-full items-center gap-2 px-3 py-2 text-left text-sm hover:bg-slate-50">
+                            <img :src="u.image || '/static/img/logo.png'" class="h-6 w-6 rounded-full" alt="">
+                            <span class="flex-1 min-w-0">
+                                <span class="font-medium" v-text="u.username"></span>
+                                <span v-if="u.email" class="text-slate-500" v-text="' · ' + u.email"></span>
+                                <span v-if="u.group_name" class="block text-xs text-amber-600" v-text="'In ' + u.group_name"></span>
+                            </span>
+                        </button>
+                    </div>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-slate-700 mb-1">Bulk add by email</label>
+                    <textarea v-model="memberBulkEmails" rows="3" placeholder="one@example.com, two@example.com&#10;or one per line"
+                              class="w-full rounded-lg border px-3 py-2 text-xs font-mono"></textarea>
+                    <button type="button" @click="bulkAddGroupMembers" :disabled="memberBulkLoading"
+                            class="mt-2 rounded-lg bg-indigo-600 px-3 py-1.5 text-xs font-semibold text-white disabled:opacity-50">Add all emails</button>
+                    <p v-if="memberBulkSummary" class="mt-2 text-xs text-slate-600 whitespace-pre-wrap" v-text="memberBulkSummary"></p>
+                </div>
+                <div>
+                    <p class="text-sm font-semibold text-slate-700 mb-2" v-text="'Current members (' + (groupMembersModal.members || []).length + ')'"></p>
+                    <p v-if="!(groupMembersModal.members || []).length" class="text-xs text-slate-500">No members yet.</p>
+                    <ul v-else class="space-y-2">
+                        <li v-for="m in groupMembersModal.members" :key="m.id"
+                            class="flex items-center gap-2 rounded-lg bg-slate-50 px-3 py-2 text-sm">
+                            <img :src="m.image || '/static/img/logo.png'" class="h-7 w-7 rounded-full" alt="">
+                            <div class="flex-1 min-w-0">
+                                <p class="font-medium truncate" v-text="m.username"></p>
+                                <p v-if="m.email" class="text-xs text-slate-500 truncate" v-text="m.email"></p>
+                            </div>
+                            <button type="button" @click="removeGroupMember(m)" class="text-rose-600 text-xs hover:underline">Remove</button>
+                        </li>
+                    </ul>
                 </div>
             </div>
         </div>

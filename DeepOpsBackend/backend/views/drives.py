@@ -10,6 +10,7 @@ from backend.services.drives_k8s import delete_drive_pvc, get_pvc_phase, normali
 from backend.services.bulk import bulk_drive_result, provision_user_drive
 from backend.services.k8s_status import drive_is_in_use, live_drive_status
 from backend.services.github_auth import auth
+from backend.services.resource_limits import validate_drive_size
 
 
 def _require_accepted(user):
@@ -68,6 +69,9 @@ def drive_create(request, user):
 
     name = (data.get('name') or 'My drive').strip()[:128]
     size = normalize_size(data.get('size') or '20Gi')
+    limit_err = validate_drive_size(user, size)
+    if limit_err:
+        return JsonResponse({'message': limit_err}, status=400)
 
     drive, err, logs = provision_user_drive(user, name, size)
     if err:
@@ -105,6 +109,15 @@ def drive_bulk_create(request, user):
             continue
 
         size = normalize_size(item.get('size') or '20Gi')
+        limit_err = validate_drive_size(user, size)
+        if limit_err:
+            results.append({
+                'index': i,
+                'ok': False,
+                'error': limit_err,
+                'name': name,
+            })
+            continue
         drive, err, logs = provision_user_drive(user, name, size)
         if err:
             results.append({

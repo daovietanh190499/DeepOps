@@ -1,24 +1,33 @@
 import time
 
 from django.core.paginator import Paginator
+from django.db.models import Q
 from django.http import HttpResponseRedirect, JsonResponse
 from django.shortcuts import render
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_http_methods
 
-from backend.models import User, Workspace
+from backend.models import ResourceGroupMember, User, Workspace
 from backend.services.github_auth import auth
 from backend.services.k8s import remove_codehub
+from backend.services.resource_limits import resource_limits_for_user
 
 
 def _user_payload(user: User) -> dict:
+    group_name = ''
+    try:
+        group_name = user.resource_group_membership.group.name
+    except ResourceGroupMember.DoesNotExist:
+        pass
     return {
         'id': user.id,
         'username': user.username,
+        'email': user.email or '',
         'image': user.image,
         'last_activity': user.last_activity,
         'role': user.role,
         'is_accept': user.is_accept,
+        'group_name': group_name,
     }
 
 
@@ -73,7 +82,9 @@ def user_state(request, user):
     denied = _require_user(user)
     if denied:
         return denied
-    return JsonResponse({'result': _user_payload(user)})
+    payload = _user_payload(user)
+    payload['resource_limits'] = resource_limits_for_user(user)
+    return JsonResponse({'result': payload})
 
 
 @auth.verify
@@ -88,9 +99,9 @@ def all_users(request, user):
     user_filter = (request.GET.get('user') or '').strip()
     status = (request.GET.get('status') or '').strip().lower()
 
-    qs = User.objects.order_by('username')
+    qs = User.objects.select_related('resource_group_membership__group').order_by('username')
     if user_filter:
-        qs = qs.filter(username__icontains=user_filter)
+        qs = qs.filter(Q(username__icontains=user_filter) | Q(email__icontains=user_filter))
     if status == 'accepted':
         qs = qs.filter(is_accept=True)
     elif status == 'pending':

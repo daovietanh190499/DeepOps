@@ -26,6 +26,7 @@ class User(models.Model):
 
     github_access_token = models.CharField(max_length=255, blank=True, default='')
     github_id = models.BigIntegerField(null=True, blank=True)
+    email = models.EmailField(max_length=254, blank=True, default='')
     username = models.CharField(max_length=255, unique=True)
     image = models.TextField(blank=True, default='')
     access_key = models.CharField(max_length=255, blank=True, default='')

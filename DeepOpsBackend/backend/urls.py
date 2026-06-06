@@ -3,6 +3,7 @@ from django.urls import path
 from backend import views
 from backend.views import cluster as cluster_views
 from backend.views import drives as drive_views
+from backend.views import groups as group_views
 from backend.views import ssh as ssh_views
 from backend.views import workspaces as ws_views
 
@@ -13,6 +14,14 @@ urlpatterns = [
     path('logout', views.logout, name='logout'),
     path('user_state', views.user_state, name='user-state'),
     path('all_users', views.all_users, name='all-users'),
+    path('admin/users/search', group_views.admin_user_search, name='admin-user-search'),
+    path('admin/resource_groups', group_views.admin_resource_groups, name='admin-resource-groups'),
+    path('admin/resource_groups/create', group_views.admin_resource_group_create, name='admin-resource-group-create'),
+    path('admin/resource_groups/<uuid:group_id>', group_views.admin_resource_group_detail, name='admin-resource-group-detail'),
+    path('admin/resource_groups/<uuid:group_id>/update', group_views.admin_resource_group_update, name='admin-resource-group-update'),
+    path('admin/resource_groups/<uuid:group_id>/members', group_views.admin_resource_group_add_member, name='admin-resource-group-add-member'),
+    path('admin/resource_groups/<uuid:group_id>/members/bulk', group_views.admin_resource_group_bulk_add_members, name='admin-resource-group-bulk-add'),
+    path('admin/resource_groups/<uuid:group_id>/members/<int:member_user_id>', group_views.admin_resource_group_remove_member, name='admin-resource-group-remove-member'),
     path('accept_user/<str:username>', views.accept_user, name='accept-user'),
     path('delete_user/<str:username>', views.delete_user, name='delete-user'),
     path('change_role/<str:username>/<str:role>', views.change_role, name='change-role'),

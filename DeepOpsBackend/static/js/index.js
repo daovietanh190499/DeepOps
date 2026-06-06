@@ -24,7 +24,8 @@ Vue.component('user-row', {
       <img :src="user.image || '/static/img/logo.png'" class="h-10 w-10 rounded-full border object-cover" alt="">
       <div class="flex-1 min-w-[8rem]">
         <p class="font-semibold" v-text="user.username"></p>
-        <p class="text-xs text-slate-500" v-text="user.role + ' · ' + last_activity"></p>
+        <p v-if="user.email" class="text-xs text-slate-500 truncate" v-text="user.email"></p>
+        <p class="text-xs text-slate-500" v-text="user.role + ' · ' + last_activity + (user.group_name ? ' · ' + user.group_name : '')"></p>
       </div>
       <span class="text-xs px-2 py-0.5 rounded-full" :class="user.is_accept ? 'bg-emerald-50 text-emerald-700' : 'bg-amber-50 text-amber-700'"
             v-text="user.is_accept ? 'accepted' : 'pending'"></span>
@@ -319,6 +320,29 @@ const appVue = new Vue({
         adminUserFilter: '',
         adminUserStatus: '',
         adminUserPagination: { page: 1, pages: 1, total: 0, per_page: 10 },
+        adminUsersTab: 'users',
+        resourceGroups: [],
+        showGroupFormModal: false,
+        editingGroup: null,
+        groupForm: { name: '', max_cpu: 4, max_ram_g: 8, max_drive_size_gi: 50, max_gpu_vram_g: 10 },
+        groupFormLoading: false,
+        groupMembersModal: null,
+        memberSearchQuery: '',
+        memberSearchResults: [],
+        memberSearchTimer: null,
+        memberBulkEmails: '',
+        memberBulkLoading: false,
+        memberBulkSummary: '',
+        resourceLimits: {
+            limited: false,
+            limits: null,
+            equipment: {
+                cpu: [2, 4, 8, 16, 32],
+                ram: ['2G', '4G', '8G', '16G', '32G', '64G'],
+                gpu: ['none', 'mig-2g.10gb', 'mig-3g.20gb', 'gpu', 'gpu:2'],
+                drive_sizes: ['20Gi', '50Gi', '100Gi', '200Gi', '500Gi', '1Ti'],
+            },
+        },
         is_login: typeof is_login !== 'undefined' ? is_login : 0,
         menu: 'servers',
         showCreateServerModal: false,
@@ -375,6 +399,16 @@ const appVue = new Vue({
         modalEnvKeys() {
             if (!this.modalWorkspace || !this.modalWorkspace.env_vars) return []
             return Object.keys(this.modalWorkspace.env_vars).sort()
+        },
+        filteredPlanTemplates() {
+            if (!this.resourceLimits.limited) return this.planTemplates
+            const eq = this.resourceLimits.equipment || {}
+            const cpus = eq.cpu || []
+            const rams = eq.ram || []
+            const gpus = eq.gpu || []
+            return this.planTemplates.filter((t) =>
+                cpus.includes(t.cpu) && rams.includes(t.ram) && gpus.includes(t.gpu),
+            )
         },
     },
     created() {
@@ -524,7 +558,10 @@ const appVue = new Vue({
             if (menu === 'admin-overall') this.loadClusterOverview()
             if (menu === 'admin-drives') this.loadAdminDrives(1)
             if (menu === 'admin-servers') this.loadAdminWorkspaces(1)
-            if (menu === 'admin-users') this.loadAdminUsers(1)
+            if (menu === 'admin-users') {
+                if (this.adminUsersTab === 'groups') this.loadResourceGroups()
+                else this.loadAdminUsers(1)
+            }
             if (menu === 'admin-images') this.loadAdminDockerImages()
             if (['drives', 'servers', 'admin-drives', 'admin-servers', 'admin-overall'].includes(menu)) {
                 this.startStatusPolling()
@@ -537,7 +574,10 @@ const appVue = new Vue({
             await this.loadMyDrives()
             await this.loadMyWorkspaces()
             if (this.is_admin) {
-                if (this.menu === 'admin-users') await this.loadAdminUsers(1)
+                if (this.menu === 'admin-users') {
+                    if (this.adminUsersTab === 'groups') await this.loadResourceGroups()
+                    else await this.loadAdminUsers(1)
+                }
                 await this.loadAdminDockerImages()
             }
             if (this.menu === 'admin-overall') await this.loadClusterOverview()
@@ -594,6 +634,58 @@ const appVue = new Vue({
             const u = data.result
             this.current_user = u.username
             this.is_admin = u.role === 'admin'
+            this.resourceLimits = u.resource_limits || { limited: false, limits: null, equipment: null }
+            this.applyResourceLimitsToUi()
+        },
+        applyResourceLimitsToUi() {
+            const eq = this.resourceLimits.equipment
+            if (!eq) return
+            this.equipmentList = {
+                cpu: eq.cpu || this.equipmentList.cpu,
+                ram: eq.ram || this.equipmentList.ram,
+                gpu: eq.gpu || this.equipmentList.gpu,
+            }
+            this.driveSizeOptions = eq.drive_sizes || this.driveSizeOptions
+            this.clampFormToLimits()
+            if (!this.driveSizeOptions.includes(this.newDrive.size)) {
+                this.newDrive.size = this.driveSizeOptions[this.driveSizeOptions.length - 1] || '20Gi'
+            }
+        },
+        clampFormToLimits() {
+            const eq = this.resourceLimits.equipment
+            if (!eq) return
+            if (!eq.cpu.includes(this.form.cpu)) {
+                this.form.cpu = eq.cpu[eq.cpu.length - 1] || this.form.cpu
+            }
+            if (!eq.ram.includes(this.form.ram)) {
+                this.form.ram = eq.ram[eq.ram.length - 1] || this.form.ram
+            }
+            if (!eq.gpu.includes(this.form.gpu)) {
+                this.form.gpu = eq.gpu[0] || 'none'
+            }
+        },
+        checkWorkspaceLimits(cpu, ram, gpu) {
+            if (!this.resourceLimits.limited) return null
+            const eq = this.resourceLimits.equipment || {}
+            const gpuVal = gpu === 'none' || !gpu ? 'none' : gpu
+            if (eq.cpu && !eq.cpu.includes(Number(cpu))) {
+                return `CPU exceeds group limit (${this.resourceLimits.limits.max_cpu} vCPU)`
+            }
+            if (eq.ram && !eq.ram.includes(ram)) {
+                return `RAM exceeds group limit (${this.resourceLimits.limits.max_ram_g}G)`
+            }
+            if (eq.gpu && !eq.gpu.includes(gpuVal)) {
+                return `GPU exceeds group VRAM limit (${this.resourceLimits.limits.max_gpu_vram_g}G)`
+            }
+            return null
+        },
+        checkDriveSizeLimit(size) {
+            if (!this.resourceLimits.limited) return null
+            const sizes = (this.resourceLimits.equipment || {}).drive_sizes || []
+            if (!sizes.includes(size)) {
+                return `Drive size exceeds group limit (${this.resourceLimits.limits.max_drive_size_gi}Gi)`
+            }
+            return null
         },
         async loadDockerImages() {
             const res = await fetch('docker_images')
@@ -615,6 +707,11 @@ const appVue = new Vue({
             }
         },
         applyTemplate(t) {
+            const err = this.checkWorkspaceLimits(t.cpu, t.ram, t.gpu)
+            if (err) {
+                this.showToast(err)
+                return
+            }
             this.form.cpu = t.cpu
             this.form.ram = t.ram
             this.form.gpu = t.gpu
@@ -703,6 +800,7 @@ const appVue = new Vue({
                 const data = await res.json().catch(() => ({}))
                 if (res.status !== 200) {
                     this.bulkSummary = data.message || 'Bulk create failed'
+                    this.showToast(data.message || 'Bulk create failed')
                     return
                 }
                 this.bulkSummary = formatBulkSummary(data, items.length)
@@ -738,6 +836,7 @@ const appVue = new Vue({
                 const data = await res.json().catch(() => ({}))
                 if (res.status !== 200) {
                     this.driveBulkSummary = data.message || 'Bulk create failed'
+                    this.showToast(data.message || 'Bulk create failed')
                     return
                 }
                 this.driveBulkSummary = formatBulkSummary(data, items.length)
@@ -780,6 +879,11 @@ const appVue = new Vue({
             this.showBulkCreateDriveModal = false
         },
         async createDrive() {
+            const limitErr = this.checkDriveSizeLimit(this.newDrive.size)
+            if (limitErr) {
+                this.showToast(limitErr)
+                return
+            }
             this.driveCreateLoading = true
             const res = await fetch('drives/create', {
                 method: 'POST',
@@ -841,6 +945,12 @@ const appVue = new Vue({
                 this.runError = 'Select a drive to mount'
                 return
             }
+            const limitErr = this.checkWorkspaceLimits(this.form.cpu, this.form.ram, this.form.gpu)
+            if (limitErr) {
+                this.runError = limitErr
+                this.showToast(limitErr)
+                return
+            }
             this.runLoading = true
             this.runError = ''
             this.addEnv()
@@ -853,6 +963,7 @@ const appVue = new Vue({
             this.runLoading = false
             if (res.status !== 200) {
                 this.runError = data.logs || data.message || 'Start failed'
+                this.showToast(data.message || 'Start failed')
                 return
             }
             await this.loadMyWorkspaces()
@@ -928,6 +1039,166 @@ const appVue = new Vue({
         adminChangeRole(u, role) {
             fetch('change_role/' + u.username + '/' + role, { method: 'PUT' })
                 .then(() => this.loadAdminUsers(this.adminUserPagination.page))
+        },
+        switchAdminUsersTab(tab) {
+            this.adminUsersTab = tab
+            if (tab === 'groups') this.loadResourceGroups()
+            else this.loadAdminUsers(1)
+        },
+        async loadResourceGroups() {
+            const res = await fetch('admin/resource_groups')
+            if (res.status !== 200) return
+            const data = await res.json()
+            this.resourceGroups = data.result || []
+        },
+        openCreateGroupModal() {
+            this.editingGroup = null
+            this.groupForm = { name: '', max_cpu: 4, max_ram_g: 8, max_drive_size_gi: 50, max_gpu_vram_g: 10 }
+            this.showGroupFormModal = true
+        },
+        openEditGroupModal(g) {
+            this.editingGroup = g
+            this.groupForm = {
+                name: g.name,
+                max_cpu: g.max_cpu,
+                max_ram_g: g.max_ram_g,
+                max_drive_size_gi: g.max_drive_size_gi,
+                max_gpu_vram_g: g.max_gpu_vram_g,
+            }
+            this.showGroupFormModal = true
+        },
+        closeGroupFormModal() {
+            this.showGroupFormModal = false
+            this.editingGroup = null
+        },
+        async saveResourceGroup() {
+            this.groupFormLoading = true
+            try {
+                const url = this.editingGroup
+                    ? 'admin/resource_groups/' + this.editingGroup.id + '/update'
+                    : 'admin/resource_groups/create'
+                const res = await fetch(url, {
+                    method: this.editingGroup ? 'PUT' : 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(this.groupForm),
+                })
+                const data = await res.json().catch(() => ({}))
+                if (res.status !== 200 && res.status !== 201) {
+                    this.showToast(data.message || 'Save failed')
+                    return
+                }
+                this.closeGroupFormModal()
+                await this.loadResourceGroups()
+                this.showToast('Group saved')
+            } finally {
+                this.groupFormLoading = false
+            }
+        },
+        async deleteResourceGroup(g) {
+            if (!confirm('Delete group "' + g.name + '"? Members will lose limits.')) return
+            const res = await fetch('admin/resource_groups/' + g.id + '/update', { method: 'DELETE' })
+            if (res.status !== 200) {
+                const data = await res.json().catch(() => ({}))
+                this.showToast(data.message || 'Delete failed')
+                return
+            }
+            await this.loadResourceGroups()
+            this.showToast('Group deleted')
+        },
+        async openGroupMembersModal(g) {
+            const res = await fetch('admin/resource_groups/' + g.id)
+            if (res.status !== 200) {
+                this.showToast('Could not load members')
+                return
+            }
+            const data = await res.json()
+            this.groupMembersModal = data.result || { ...g, members: [] }
+            this.memberSearchQuery = ''
+            this.memberSearchResults = []
+            this.memberBulkEmails = ''
+            this.memberBulkSummary = ''
+        },
+        closeGroupMembersModal() {
+            this.groupMembersModal = null
+            this.memberSearchQuery = ''
+            this.memberSearchResults = []
+            if (this.memberSearchTimer) clearTimeout(this.memberSearchTimer)
+        },
+        onMemberSearchInput() {
+            if (this.memberSearchTimer) clearTimeout(this.memberSearchTimer)
+            const q = (this.memberSearchQuery || '').trim()
+            if (!q || !this.groupMembersModal) {
+                this.memberSearchResults = []
+                return
+            }
+            this.memberSearchTimer = setTimeout(() => this.searchGroupMembers(q), 250)
+        },
+        async searchGroupMembers(q) {
+            const params = new URLSearchParams({ q, exclude_group: this.groupMembersModal.id })
+            const res = await fetch('admin/users/search?' + params)
+            if (res.status !== 200) return
+            const data = await res.json()
+            this.memberSearchResults = data.result || []
+        },
+        async addGroupMember(u) {
+            if (!this.groupMembersModal) return
+            const res = await fetch('admin/resource_groups/' + this.groupMembersModal.id + '/members', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ user_id: u.id }),
+            })
+            const data = await res.json().catch(() => ({}))
+            if (res.status !== 200 && res.status !== 201) {
+                this.showToast(data.message || 'Add failed')
+                return
+            }
+            this.memberSearchQuery = ''
+            this.memberSearchResults = []
+            await this.openGroupMembersModal({ id: this.groupMembersModal.id, name: this.groupMembersModal.name })
+            await this.loadResourceGroups()
+            this.showToast('Added ' + u.username)
+        },
+        async removeGroupMember(m) {
+            if (!this.groupMembersModal) return
+            const res = await fetch(
+                'admin/resource_groups/' + this.groupMembersModal.id + '/members/' + m.user_id,
+                { method: 'DELETE' },
+            )
+            if (res.status !== 200) {
+                const data = await res.json().catch(() => ({}))
+                this.showToast(data.message || 'Remove failed')
+                return
+            }
+            await this.openGroupMembersModal({ id: this.groupMembersModal.id, name: this.groupMembersModal.name })
+            await this.loadResourceGroups()
+            this.showToast('Member removed')
+        },
+        async bulkAddGroupMembers() {
+            if (!this.groupMembersModal) return
+            this.memberBulkLoading = true
+            this.memberBulkSummary = ''
+            try {
+                const res = await fetch('admin/resource_groups/' + this.groupMembersModal.id + '/members/bulk', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ emails_text: this.memberBulkEmails }),
+                })
+                const data = await res.json().catch(() => ({}))
+                if (res.status !== 200) {
+                    this.memberBulkSummary = data.message || 'Bulk add failed'
+                    return
+                }
+                const failed = (data.results || []).filter((r) => !r.ok)
+                this.memberBulkSummary = `Matched ${data.matched}, added ${data.added}, failed ${data.failed}`
+                if (failed.length) {
+                    this.memberBulkSummary += '\n' + failed.map((r) => r.email + ': ' + (r.error || 'failed')).join('\n')
+                }
+                await this.openGroupMembersModal({ id: this.groupMembersModal.id, name: this.groupMembersModal.name })
+                await this.loadResourceGroups()
+                this.showToast('Bulk add finished')
+            } finally {
+                this.memberBulkLoading = false
+            }
         },
         async loadAdminDockerImages() {
             const res = await fetch('admin/docker_images')

@@ -21,7 +21,7 @@ class GitHubAuth:
     def oauth_login(self, request):
         params = urlencode({
             'client_id': self.client_id,
-            'scope': 'read:user',
+            'scope': 'read:user user:email',
             'state': 'dohub',
             'allow_signup': 'true',
         })
@@ -84,6 +84,31 @@ class GitHubAuth:
         response.delete_cookie('user_access_key')
         return response
 
+    def _resolve_github_email(self, github_user: dict) -> str:
+        email = (github_user.get('email') or '').strip()
+        if email:
+            return email
+        access_token = github_user.get('access_token')
+        if not access_token:
+            return ''
+        try:
+            resp = requests.get(
+                f'{self.BASE_URL}user/emails',
+                headers={'Authorization': f'token {access_token}'},
+                timeout=30,
+            )
+            if resp.status_code != 200:
+                return ''
+            for entry in resp.json():
+                if entry.get('primary') and entry.get('verified'):
+                    return (entry.get('email') or '').strip()
+            for entry in resp.json():
+                if entry.get('verified'):
+                    return (entry.get('email') or '').strip()
+        except requests.RequestException:
+            return ''
+        return ''
+
     def register_or_update_user(self, github_user: dict) -> User:
         username = github_user['login']
         is_admin = username in self.admin_users
@@ -98,6 +123,7 @@ class GitHubAuth:
         user.github_access_token = github_user['access_token']
         user.github_id = int(github_user['id'])
         user.image = github_user.get('avatar_url', user.image)
+        user.email = self._resolve_github_email(github_user) or user.email
         user.save()
         return user
 
