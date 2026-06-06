@@ -44,9 +44,16 @@ Vue.component('user-row', {
 Vue.component('workspace-card', {
     props: ['ws', 'showOwner'],
     computed: {
+        k8sDisplay() {
+            return (this.ws.k8s_status && this.ws.k8s_status.display) || this.ws.state
+        },
         stateClass() {
-            if (this.ws.state === 'running') return 'bg-emerald-100 text-emerald-700'
-            if (this.ws.state === 'offline') return 'bg-slate-100 text-slate-600'
+            const d = this.k8sDisplay.toLowerCase()
+            if (d === 'running') return 'bg-emerald-100 text-emerald-700'
+            if (d === 'terminating') return 'bg-rose-100 text-rose-700'
+            if (d === 'scaled down' || d === 'not deployed' || this.ws.state === 'offline') {
+                return 'bg-slate-100 text-slate-600'
+            }
             return 'bg-amber-100 text-amber-700'
         },
         canStart() {
@@ -56,7 +63,7 @@ Vue.component('workspace-card', {
             return ['running', 'pending_start', 'pending_stop'].includes(this.ws.state)
         },
         canOpen() {
-            return this.ws.state === 'running'
+            return this.ws.state === 'running' && this.k8sDisplay.toLowerCase() === 'running'
         },
         canDelete() {
             return this.ws.state === 'offline'
@@ -84,7 +91,7 @@ Vue.component('workspace-card', {
             </button>
           </div>
         </div>
-        <span class="shrink-0 rounded-full px-2 py-0.5 text-xs font-bold uppercase" :class="stateClass" v-text="ws.state"></span>
+        <span class="shrink-0 rounded-full px-2 py-0.5 text-xs font-bold" :class="stateClass" v-text="k8sDisplay"></span>
       </div>
       <div class="text-xs text-slate-600 space-y-0.5 pointer-events-none">
         <p v-text="ws.cpu + ' vCPU · ' + ws.ram"></p>
@@ -399,6 +406,23 @@ const appVue = new Vue({
         modalEnvKeys() {
             if (!this.modalWorkspace || !this.modalWorkspace.env_vars) return []
             return Object.keys(this.modalWorkspace.env_vars).sort()
+        },
+        modalK8sDisplay() {
+            if (!this.modalWorkspace) return ''
+            return (this.modalWorkspace.k8s_status && this.modalWorkspace.k8s_status.display)
+                || this.modalWorkspace.state
+                || ''
+        },
+        modalDeploymentSummary() {
+            const dep = this.modalWorkspace && this.modalWorkspace.k8s_status
+                && this.modalWorkspace.k8s_status.deployment
+            if (!dep) return '—'
+            return `${dep.ready}/${dep.desired} ready · ${dep.available} available`
+        },
+        modalPods() {
+            const pods = this.modalWorkspace && this.modalWorkspace.k8s_status
+                && this.modalWorkspace.k8s_status.pods
+            return pods || []
         },
         filteredPlanTemplates() {
             if (!this.resourceLimits.limited) return this.planTemplates

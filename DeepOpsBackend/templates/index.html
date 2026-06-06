@@ -428,11 +428,17 @@
                         <i class="fa fa-copy"></i>
                     </button>
                 </div>
-                <span class="inline-block rounded-full px-2 py-0.5 text-xs font-bold uppercase"
-                      :class="modalWorkspace.state==='running' ? 'bg-emerald-100 text-emerald-700' : modalWorkspace.state==='offline' ? 'bg-slate-100 text-slate-600' : 'bg-amber-100 text-amber-700'"
-                      v-text="modalWorkspace.state"></span>
+                <span class="inline-block rounded-full px-2 py-0.5 text-xs font-bold"
+                      :class="modalK8sDisplay.toLowerCase()==='running' ? 'bg-emerald-100 text-emerald-700' : modalK8sDisplay.toLowerCase()==='terminating' ? 'bg-rose-100 text-rose-700' : modalWorkspace.state==='offline' ? 'bg-slate-100 text-slate-600' : 'bg-amber-100 text-amber-700'"
+                      v-text="modalK8sDisplay"></span>
                 <div class="rounded-xl bg-slate-50 px-4 py-2">
                     <spec-row label="Owner" :value="modalWorkspace.owner || modalWorkspace.username"></spec-row>
+                    <spec-row v-if="modalWorkspace.k8s_status && modalWorkspace.k8s_status.deployment"
+                              label="Deployment"
+                              :value="modalDeploymentSummary"></spec-row>
+                    <spec-row v-for="pod in modalPods" :key="pod.name"
+                              :label="'Pod ' + pod.name"
+                              :value="pod.display + ' · ' + pod.ready + ' ready'"></spec-row>
                     <spec-row label="Slug" :value="modalWorkspace.slug"></spec-row>
                     <spec-row label="CPU" :value="modalWorkspace.cpu + ' vCPU'"></spec-row>
                     <spec-row label="RAM" :value="modalWorkspace.ram"></spec-row>
@@ -501,7 +507,7 @@
                 </div>
 
                 <div class="flex flex-wrap gap-2 pt-2">
-                    <button v-if="modalWorkspace.state==='running'" @click="openWorkspace(modalWorkspace); closeWorkspaceModal()"
+                    <button v-if="modalWorkspace.state==='running' && modalK8sDisplay.toLowerCase()==='running'" @click="openWorkspace(modalWorkspace); closeWorkspaceModal()"
                             class="flex-1 rounded-lg border border-blue-600 text-blue-600 py-2 text-xs font-semibold">Open</button>
                     <button @click="exportWorkspace(modalWorkspace)" class="rounded-lg border px-4 py-2 text-xs font-semibold">Export JSON</button>
                     <button @click="exportModalConfig" class="rounded-lg border px-4 py-2 text-xs font-semibold">Download config</button>

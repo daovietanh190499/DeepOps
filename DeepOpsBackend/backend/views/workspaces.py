@@ -14,7 +14,12 @@ from backend.services.bulk import (
     resolve_user_drive,
     spawn_workspace,
 )
-from backend.services.k8s_status import live_workspace_state, workspace_is_active
+from backend.services.k8s_status import (
+    derive_workspace_state,
+    live_workspace_k8s_status,
+    live_workspace_state,
+    workspace_is_active,
+)
 from backend.services.resource_limits import validate_server_count, validate_workspace_resources
 from backend.services.ssh_keys import ssh_info_payload
 
@@ -45,7 +50,9 @@ def _require_accepted(user):
 
 def _workspace_payload(ws: Workspace, include_log: bool = False) -> dict:
     data = ws.to_config_dict()
-    data['state'] = live_workspace_state(ws)
+    k8s_status = live_workspace_k8s_status(ws)
+    data['k8s_status'] = k8s_status
+    data['state'] = derive_workspace_state(k8s_status)
     data['user_id'] = ws.user_id
     data['owner'] = ws.user.username
     data['created_at'] = ws.created_at.isoformat()
