@@ -204,9 +204,10 @@ def workspace_detail(request, user, workspace_id):
         return err
 
     if request.method == 'DELETE':
-        if workspace_is_active(live_workspace_state(ws)):
-            if settings.DEFAULT_SPAWNER == 'k8s':
-                remove_codehub(ws.release_name)
+        if settings.DEFAULT_SPAWNER == 'k8s':
+            exit_code = remove_codehub(ws.release_name)
+            if exit_code != 0:
+                return JsonResponse({'message': 'helm uninstall failed'}, status=500)
         ws.delete()
         return JsonResponse({'message': 'success'})
 

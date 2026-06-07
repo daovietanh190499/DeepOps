@@ -134,12 +134,13 @@ def accept_user(request, user, username):
     return JsonResponse({'message': 'success'})
 
 
-def _stop_all_workspaces(target: User):
-    from backend.services.k8s_status import live_workspace_state, workspace_is_active
+def _remove_all_workspace_releases(target: User):
+    from django.conf import settings
 
+    if settings.DEFAULT_SPAWNER != 'k8s':
+        return
     for ws in Workspace.objects.filter(user=target):
-        if workspace_is_active(live_workspace_state(ws)):
-            remove_codehub(ws.release_name)
+        remove_codehub(ws.release_name)
 
 
 @auth.verify
@@ -153,7 +154,7 @@ def delete_user(request, user, username):
     if not target:
         return JsonResponse({'message': 'not found'}, status=404)
     try:
-        _stop_all_workspaces(target)
+        _remove_all_workspace_releases(target)
     except Exception:
         return JsonResponse({'message': 'action failed'}, status=500)
     target.delete()

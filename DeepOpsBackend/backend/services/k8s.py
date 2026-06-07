@@ -209,6 +209,11 @@ def stop_codehub(release_name: str) -> tuple[str, int]:
 
 
 def remove_codehub(release_name: str) -> int:
+    """Remove a workspace Helm release. No-op if the release does not exist."""
+    from .k8s_status import helm_release_exists
+
+    if not helm_release_exists(release_name):
+        return 0
     return subprocess.call([
         'helm', 'uninstall', '-n', NAMESPACE, release_name,
     ])
