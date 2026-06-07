@@ -248,7 +248,109 @@
                      v-text="clusterOverview.directpv.raw"></pre>
                 <p v-else class="text-sm text-slate-500">No DirectPV drives listed.</p>
             </section>
+
+            <section class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm space-y-4">
+                <div class="flex flex-wrap items-start justify-between gap-3">
+                    <div>
+                        <h3 class="font-bold text-slate-900">DirectPV discover</h3>
+                        <p class="text-xs text-slate-500 mt-1">
+                            Runs <code class="rounded bg-slate-100 px-1">kubectl directpv discover --output-file</code>
+                            and lets you choose drives to initialize.
+                        </p>
+                        <p v-if="directpvDiscoverPath" class="text-xs font-mono text-slate-400 mt-1" v-text="directpvDiscoverPath"></p>
+                    </div>
+                    <div class="flex flex-wrap items-center gap-2">
+                        <button type="button" @click="runDirectpvDiscover" :disabled="directpvDiscoverLoading || directpvInitLoading"
+                                class="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-700 disabled:opacity-50">
+                            <span v-if="directpvDiscoverLoading">Discovering…</span>
+                            <span v-else>Discover</span>
+                        </button>
+                        <button type="button" @click="openDirectpvInitConfirm"
+                                :disabled="!directpvDiscover || !directpvDiscoverSelectedCount || directpvDiscoverLoading || directpvInitLoading || directpvDiscoverSaving"
+                                class="rounded-lg bg-rose-600 px-4 py-2 text-sm font-semibold text-white hover:bg-rose-700 disabled:opacity-40">
+                            <span v-if="directpvInitLoading">Initializing…</span>
+                            <span v-else>Init drives</span>
+                        </button>
+                    </div>
+                </div>
+
+                <p v-if="directpvDiscoverMessage && !directpvDiscoverError" class="text-sm text-emerald-700" v-text="directpvDiscoverMessage"></p>
+                <p v-if="directpvDiscoverError" class="text-sm text-rose-600" v-text="directpvDiscoverError"></p>
+                <p v-if="directpvDiscoverSaving" class="text-xs text-slate-500">Saving selection…</p>
+
+                <template v-if="directpvDiscover && directpvDiscover.nodes && directpvDiscover.nodes.length">
+                    <p class="text-xs text-slate-500">
+                        Toggle <strong>select</strong> to choose drives for init.
+                        <span v-text="directpvDiscoverSelectedCount + ' selected'"></span>
+                    </p>
+                    <div v-for="(node, nIdx) in directpvDiscover.nodes" :key="node.name || nIdx"
+                         class="rounded-xl border border-slate-100 overflow-hidden">
+                        <div class="bg-slate-50 px-4 py-2 text-sm font-semibold text-slate-800" v-text="node.name || 'Unknown node'"></div>
+                        <div class="overflow-x-auto">
+                            <table class="w-full min-w-[720px] text-sm text-left">
+                                <thead>
+                                    <tr class="border-b border-slate-200 text-xs uppercase tracking-wide text-slate-500">
+                                        <th class="py-2 px-4">Name</th>
+                                        <th class="py-2 pr-3">Size</th>
+                                        <th class="py-2 pr-3">Make</th>
+                                        <th class="py-2 pr-3">FS</th>
+                                        <th class="py-2 pr-3">ID</th>
+                                        <th class="py-2 pr-3">Select</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr v-for="(drive, dIdx) in (node.drives || [])" :key="drive.id || dIdx"
+                                        class="border-b border-slate-100 hover:bg-slate-50/80">
+                                        <td class="py-2 px-4 font-mono text-xs" v-text="drive.name || '—'"></td>
+                                        <td class="py-2 pr-3 text-xs" v-text="formatDriveBytes(drive.size)"></td>
+                                        <td class="py-2 pr-3 text-xs max-w-[14rem] truncate" :title="drive.make || ''" v-text="drive.make || '—'"></td>
+                                        <td class="py-2 pr-3 text-xs" v-text="drive.fs || '—'"></td>
+                                        <td class="py-2 pr-3 font-mono text-xs max-w-[12rem] truncate" :title="drive.id || ''" v-text="drive.id || '—'"></td>
+                                        <td class="py-2 pr-3">
+                                            <button type="button" @click="toggleDirectpvDriveSelect(nIdx, dIdx)"
+                                                    :disabled="directpvDiscoverSaving"
+                                                    class="rounded-full px-3 py-1 text-xs font-bold disabled:opacity-50"
+                                                    :class="drive.select==='yes' ? 'bg-emerald-100 text-emerald-800 hover:bg-emerald-200' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'"
+                                                    v-text="drive.select==='yes' ? 'yes' : 'no'"></button>
+                                        </td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </template>
+                <p v-else-if="!directpvDiscoverLoading" class="text-sm text-slate-500">
+                    No discover file yet. Click <strong>Discover</strong> to scan cluster nodes for available drives.
+                </p>
+                <pre v-if="directpvDiscoverRaw"
+                     class="overflow-x-auto rounded-lg bg-slate-50 p-3 text-xs text-slate-600 whitespace-pre-wrap"
+                     v-text="directpvDiscoverRaw"></pre>
+            </section>
         </section>
+
+        <!-- DirectPV init confirm -->
+        <div v-if="showDirectpvInitConfirm" class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" @click.self="closeDirectpvInitConfirm">
+            <div class="w-full max-w-md rounded-2xl border border-rose-200 bg-white p-6 shadow-xl">
+                <h3 class="text-lg font-bold text-rose-700">Initialize DirectPV drives?</h3>
+                <p class="mt-2 text-sm text-slate-600">
+                    This runs <code class="rounded bg-slate-100 px-1">kubectl directpv init … --dangerous</code>
+                    and will <strong>format</strong> the selected drives. Data on those disks will be destroyed.
+                </p>
+                <p class="mt-2 text-sm font-semibold text-slate-800"
+                   v-text="directpvDiscoverSelectedCount + ' drive(s) selected for init'"></p>
+                <p v-if="directpvInitError" class="mt-2 text-sm text-rose-600" v-text="directpvInitError"></p>
+                <pre v-if="directpvInitResult" class="mt-2 overflow-x-auto rounded-lg bg-slate-50 p-2 text-xs text-slate-600 whitespace-pre-wrap" v-text="directpvInitResult"></pre>
+                <div class="mt-5 flex justify-end gap-2">
+                    <button type="button" @click="closeDirectpvInitConfirm" :disabled="directpvInitLoading"
+                            class="rounded-lg border px-4 py-2 text-sm font-semibold hover:bg-slate-50 disabled:opacity-50">Cancel</button>
+                    <button type="button" @click="confirmDirectpvInit" :disabled="directpvInitLoading"
+                            class="rounded-lg bg-rose-600 px-4 py-2 text-sm font-semibold text-white hover:bg-rose-700 disabled:opacity-50">
+                        <span v-if="directpvInitLoading">Initializing…</span>
+                        <span v-else>Yes, init drives</span>
+                    </button>
+                </div>
+            </div>
+        </div>
 
         <!-- Admin drives -->
         <section v-if="is_login && menu==='admin-drives' && is_admin" class="space-y-4">

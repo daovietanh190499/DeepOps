@@ -1,0 +1,5 @@
+# helm upgrade --install directpv minio/directpv -f directpv-install.yaml --namespace directpv --create-namespace
+# This is the path to the kubelet directory on the host machine (Microk8s).
+kubeletDirPath: "/var/snap/microk8s/common/var/lib/kubelet/"
+images:
+  directpv: quay.io/minio/directpv:v5.1.1 # Make sure plugin version is matching the version installed in the kubernetes cluster.

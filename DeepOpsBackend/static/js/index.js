@@ -350,6 +350,17 @@ const appVue = new Vue({
         joinCommandRaw: '',
         joinCommandLoading: false,
         joinCommandError: '',
+        directpvDiscover: null,
+        directpvDiscoverPath: '',
+        directpvDiscoverLoading: false,
+        directpvDiscoverSaving: false,
+        directpvDiscoverError: '',
+        directpvDiscoverMessage: '',
+        directpvDiscoverRaw: '',
+        directpvInitLoading: false,
+        directpvInitError: '',
+        directpvInitResult: '',
+        showDirectpvInitConfirm: false,
         sshGenerateLoading: false,
         sshPrivateKeyOnce: '',
         userList: [],
@@ -427,6 +438,13 @@ const appVue = new Vue({
                 { id: 'admin-servers', label: 'Servers' },
                 { id: 'admin-images', label: 'Images' },
             ]
+        },
+        directpvDiscoverSelectedCount() {
+            if (!this.directpvDiscover || !this.directpvDiscover.nodes) return 0
+            return this.directpvDiscover.nodes.reduce((sum, node) => {
+                const yes = (node.drives || []).filter((d) => d.select === 'yes').length
+                return sum + yes
+            }, 0)
         },
         directpvColumns() {
             const dp = this.clusterOverview && this.clusterOverview.directpv
@@ -626,7 +644,10 @@ const appVue = new Vue({
             window.history.replaceState({}, '', '/?tab=' + menu)
             if (menu === 'drives') this.loadMyDrives(1)
             if (menu === 'servers') this.loadMyWorkspaces(1)
-            if (menu === 'admin-overall') this.loadClusterOverview()
+            if (menu === 'admin-overall') {
+                this.loadClusterOverview()
+                this.loadDirectpvDiscover()
+            }
             if (menu === 'admin-drives') {
                 if (this.adminDrivesTab === 'catalog') this.loadAdminPlatformCatalog()
                 else this.loadAdminDrives(1)
@@ -659,7 +680,10 @@ const appVue = new Vue({
                 }
                 await this.loadAdminDockerImages()
             }
-            if (this.menu === 'admin-overall') await this.loadClusterOverview()
+            if (this.menu === 'admin-overall') {
+                await this.loadClusterOverview()
+                await this.loadDirectpvDiscover()
+            }
             if (['drives', 'servers', 'admin-drives', 'admin-servers', 'admin-overall'].includes(this.menu)) {
                 this.startStatusPolling()
             }
@@ -673,6 +697,125 @@ const appVue = new Vue({
                 this.clusterOverview = data.result || null
             } finally {
                 this.clusterLoading = false
+            }
+        },
+        formatDriveBytes(bytes) {
+            const n = Number(bytes)
+            if (!n || Number.isNaN(n)) return '—'
+            const units = ['B', 'KiB', 'MiB', 'GiB', 'TiB']
+            let size = n
+            let unit = 0
+            while (size >= 1024 && unit < units.length - 1) {
+                size /= 1024
+                unit += 1
+            }
+            return (unit === 0 ? size : size.toFixed(1)) + ' ' + units[unit]
+        },
+        async loadDirectpvDiscover() {
+            const res = await fetch('admin/cluster/directpv/discover')
+            if (res.status !== 200) return
+            const data = await res.json()
+            const result = data.result || {}
+            this.directpvDiscoverPath = result.path || ''
+            if (!result.ok) {
+                this.directpvDiscoverError = result.error || 'Failed to load discover file'
+                this.directpvDiscover = null
+                return
+            }
+            this.directpvDiscoverError = ''
+            this.directpvDiscover = result.data || null
+        },
+        async runDirectpvDiscover() {
+            this.directpvDiscoverLoading = true
+            this.directpvDiscoverError = ''
+            this.directpvDiscoverMessage = ''
+            this.directpvDiscoverRaw = ''
+            try {
+                const res = await fetch('admin/cluster/directpv/discover/run', { method: 'POST' })
+                const data = await res.json().catch(() => ({}))
+                const result = data.result || {}
+                this.directpvDiscoverRaw = result.raw || ''
+                this.directpvDiscoverPath = result.path || this.directpvDiscoverPath
+                if (!result.ok) {
+                    this.directpvDiscoverError = result.error || data.message || 'Discover failed'
+                    return
+                }
+                this.directpvDiscover = result.data || null
+                this.directpvDiscoverMessage = result.message || (result.data ? 'Drives discovered' : 'No drives discovered')
+                this.showToast(this.directpvDiscoverMessage)
+            } catch (e) {
+                this.directpvDiscoverError = e.message || String(e)
+            } finally {
+                this.directpvDiscoverLoading = false
+            }
+        },
+        async toggleDirectpvDriveSelect(nodeIndex, driveIndex) {
+            if (!this.directpvDiscover || !this.directpvDiscover.nodes) return
+            const node = this.directpvDiscover.nodes[nodeIndex]
+            const drive = node && node.drives && node.drives[driveIndex]
+            if (!drive) return
+            const prev = drive.select === 'yes' ? 'yes' : 'no'
+            const next = prev === 'yes' ? 'no' : 'yes'
+            this.$set(drive, 'select', next)
+            this.directpvDiscoverSaving = true
+            this.directpvDiscoverError = ''
+            try {
+                const res = await fetch('admin/cluster/directpv/discover/save', {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ data: this.directpvDiscover }),
+                })
+                const data = await res.json().catch(() => ({}))
+                const result = data.result || {}
+                if (!result.ok) {
+                    this.directpvDiscoverError = result.error || data.message || 'Save failed'
+                    this.$set(drive, 'select', prev)
+                    this.showToast(this.directpvDiscoverError)
+                    return
+                }
+                if (result.data) this.directpvDiscover = result.data
+            } catch (e) {
+                this.$set(drive, 'select', prev)
+                this.directpvDiscoverError = e.message || String(e)
+                this.showToast(this.directpvDiscoverError)
+            } finally {
+                this.directpvDiscoverSaving = false
+            }
+        },
+        openDirectpvInitConfirm() {
+            if (!this.directpvDiscover || !this.directpvDiscoverSelectedCount) {
+                this.showToast('Select at least one drive to init')
+                return
+            }
+            this.showDirectpvInitConfirm = true
+            this.directpvInitError = ''
+            this.directpvInitResult = ''
+        },
+        closeDirectpvInitConfirm() {
+            this.showDirectpvInitConfirm = false
+        },
+        async confirmDirectpvInit() {
+            this.directpvInitLoading = true
+            this.directpvInitError = ''
+            this.directpvInitResult = ''
+            try {
+                const res = await fetch('admin/cluster/directpv/init', { method: 'POST' })
+                const data = await res.json().catch(() => ({}))
+                const result = data.result || {}
+                this.directpvInitResult = result.raw || result.message || ''
+                if (!result.ok) {
+                    this.directpvInitError = result.error || data.message || 'Init failed'
+                    this.showToast(this.directpvInitError)
+                    return
+                }
+                this.showDirectpvInitConfirm = false
+                this.showToast(result.message || 'DirectPV init completed')
+                await this.loadClusterOverview()
+            } catch (e) {
+                this.directpvInitError = e.message || String(e)
+                this.showToast(this.directpvInitError)
+            } finally {
+                this.directpvInitLoading = false
             }
         },
         async fetchJoinCommand() {
