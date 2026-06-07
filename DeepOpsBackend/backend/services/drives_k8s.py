@@ -6,7 +6,7 @@ import tempfile
 from .config import get_hub_config
 from .storage import drive_label_to_size
 
-NAMESPACE = os.environ.get('NAMESPACE', 'dohub')
+from .k8s_env import NAMESPACE
 
 
 def _storage_class() -> str:

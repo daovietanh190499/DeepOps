@@ -9,11 +9,7 @@ from django.views.decorators.http import require_http_methods
 from backend.models import DockerImage, User, UserDrive, Workspace
 from backend.services.github_auth import auth
 from backend.services.k8s import get_codehub_workspace, remove_codehub, stop_codehub
-from backend.services.bulk import (
-    bulk_workspace_result,
-    resolve_user_drive,
-    spawn_workspace,
-)
+from backend.services.bulk import bulk_workspace_result, spawn_workspace
 from backend.services.k8s_status import (
     derive_workspace_state,
     live_workspace_k8s_status,
@@ -22,6 +18,11 @@ from backend.services.k8s_status import (
 )
 from backend.services.resource_limits import validate_server_count, validate_workspace_resources
 from backend.services.ssh_keys import ssh_info_payload
+from backend.services.workspace_mounts import (
+    apply_drive_mounts_from_data,
+    drive_mounts_payload,
+    persist_pending_drive_mounts,
+)
 
 
 def _require_user(user):
@@ -57,6 +58,7 @@ def _workspace_payload(ws: Workspace, include_log: bool = False) -> dict:
     data['owner'] = ws.user.username
     data['created_at'] = ws.created_at.isoformat()
     data['updated_at'] = ws.updated_at.isoformat()
+    data['drive_mounts'] = drive_mounts_payload(ws)
     if include_log:
         data['pod_status'] = get_codehub_workspace(ws)
     data.update(ssh_info_payload(ws))
@@ -87,16 +89,18 @@ def _validate_workspace_limits(user: User, data: dict, ws: Workspace | None = No
     return validate_workspace_resources(user, cpu=cpu, ram=ram, gpu=gpu)
 
 
-def _apply_workspace_fields(ws: Workspace, data: dict, owner: User | None = None):
+def _apply_workspace_fields(ws: Workspace, data: dict, owner: User | None = None) -> str | None:
     owner = owner or ws.user
     for field in ('name', 'cpu', 'ram', 'gpu', 'docker_repository', 'docker_tag'):
         if field in data and data[field] is not None:
             setattr(ws, field, data[field])
-    if 'mount_path' in data and data['mount_path']:
-        ws.mount_path = str(data['mount_path']).strip()[:256] or '/home/coder'
-    drive = resolve_user_drive(owner, data)
-    if drive:
-        ws.user_drive = drive
+    mount_fields = (
+        'drive_mounts', 'drive_id', 'user_drive_id', 'drive_name', 'drive_slug', 'drive', 'mount_path',
+    )
+    if any(key in data for key in mount_fields):
+        err = apply_drive_mounts_from_data(ws, owner, data)
+        if err:
+            return err
     if 'env_vars' in data and isinstance(data['env_vars'], dict):
         ws.env_vars = data['env_vars']
     if 'exposed_ports' in data and isinstance(data['exposed_ports'], list):
@@ -107,6 +111,7 @@ def _apply_workspace_fields(ws: Workspace, data: dict, owner: User | None = None
             ws.container_command = [c for c in cmd.split() if c]
         elif isinstance(cmd, list):
             ws.container_command = [str(c) for c in cmd]
+    return None
 
 
 @auth.verify
@@ -161,10 +166,13 @@ def workspace_create(request, user):
         return JsonResponse({'message': limit_err}, status=400)
 
     ws = Workspace(user=user, name=name)
-    _apply_workspace_fields(ws, data, owner=user)
+    err = _apply_workspace_fields(ws, data, owner=user)
+    if err:
+        return JsonResponse({'message': err}, status=400)
     if not ws.user_drive_id:
-        return JsonResponse({'message': 'drive_id required'}, status=400)
+        return JsonResponse({'message': 'at least one drive mount required'}, status=400)
     ws.save()
+    persist_pending_drive_mounts(ws)
     return JsonResponse({'result': _workspace_payload(ws)}, status=201)
 
 
@@ -195,7 +203,9 @@ def workspace_detail(request, user, workspace_id):
     limit_err = _validate_workspace_limits(ws.user, data, ws=ws)
     if limit_err:
         return JsonResponse({'message': limit_err}, status=400)
-    _apply_workspace_fields(ws, data)
+    err = _apply_workspace_fields(ws, data)
+    if err:
+        return JsonResponse({'message': err}, status=400)
     if data.get('name'):
         ws.name = data['name'].strip()[:128]
     ws.save()
@@ -289,10 +299,13 @@ def workspace_run(request, user):
     if limit_err:
         return JsonResponse({'message': limit_err}, status=400)
     ws = Workspace(user=user, name=name)
-    _apply_workspace_fields(ws, data, owner=user)
+    err = _apply_workspace_fields(ws, data, owner=user)
+    if err:
+        return JsonResponse({'message': err}, status=400)
     if not ws.user_drive_id:
-        return JsonResponse({'message': 'drive_id required'}, status=400)
+        return JsonResponse({'message': 'at least one drive mount required'}, status=400)
     ws.save()
+    persist_pending_drive_mounts(ws)
     return _start_workspace(ws)
 
 
@@ -326,17 +339,21 @@ def workspace_bulk_run(request, user):
             results.append({'index': i, 'ok': False, 'error': limit_err, 'name': name})
             continue
         ws = Workspace(user=user, name=name)
-        _apply_workspace_fields(ws, item, owner=user)
+        err = _apply_workspace_fields(ws, item, owner=user)
+        if err:
+            results.append({'index': i, 'ok': False, 'error': err, 'name': name})
+            continue
 
         if not ws.user_drive_id:
             drive_ref = item.get('drive_id') or item.get('drive_name') or item.get('drive_slug')
-            err = 'drive_id, drive_name, or drive_slug required'
+            err_msg = 'at least one drive mount required'
             if drive_ref:
-                err = f'drive not found: {drive_ref}'
-            results.append({'index': i, 'ok': False, 'error': err})
+                err_msg = f'drive not found: {drive_ref}'
+            results.append({'index': i, 'ok': False, 'error': err_msg})
             continue
 
         ws.save()
+        persist_pending_drive_mounts(ws)
         entry = bulk_workspace_result(ws, i, auto_start=auto_start)
 
         if auto_start:

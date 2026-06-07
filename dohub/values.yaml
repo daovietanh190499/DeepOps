@@ -56,14 +56,14 @@ ingress:
     nginx.ingress.kubernetes.io/proxy-send-timeout: "600"
   # kubernetes.io/tls-acme: "true"
   hosts:
-    - host: iai-hub.uet.vnu.edu.vn
+    - host: iaihub.uet.edu.vn
       paths:
         - path: /
           pathType: Prefix
   tls:
   - secretName: tls-dohub-secret
     hosts:
-    - iai-hub.uet.vnu.edu.vn
+    - iaihub.uet.edu.vn
 
 # resources:
   # limits:

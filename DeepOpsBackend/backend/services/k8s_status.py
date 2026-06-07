@@ -6,7 +6,7 @@ import subprocess
 from backend.models import Workspace
 
 from .drives_k8s import get_pvc_phase
-from .k8s import NAMESPACE, get_codehub_workspace
+from .k8s_env import NAMESPACE
 
 # Re-export model states for mapping
 STATE_OFFLINE = Workspace.STATE_OFFLINE
@@ -152,6 +152,8 @@ def _workspace_k8s_display(deployment: dict | None, pod_rows: list[dict], releas
 
 def live_workspace_k8s_status(workspace: Workspace) -> dict:
     """Live Kubernetes status for a workspace (pods + deployment)."""
+    from .k8s import get_codehub_workspace
+
     try:
         pods_data = get_codehub_workspace(workspace)
         items = pods_data.get('items') or []
@@ -225,8 +227,20 @@ def workspace_is_active(state: str) -> bool:
     return state in (STATE_RUNNING, STATE_PENDING_START, STATE_PENDING_STOP)
 
 
-def drive_is_in_use(drive) -> bool:
-    for ws in Workspace.objects.filter(user_drive=drive).only('id', 'slug', 'user_id'):
+def drive_is_in_use(drive, exclude_workspace_id=None) -> bool:
+    qs = Workspace.objects.filter(user_drive=drive)
+    if exclude_workspace_id:
+        qs = qs.exclude(id=exclude_workspace_id)
+    for ws in qs.only('id', 'slug', 'user_id'):
         if workspace_is_active(live_workspace_state(ws)):
+            return True
+
+    from backend.models import WorkspaceDriveMount
+
+    mount_qs = WorkspaceDriveMount.objects.filter(user_drive=drive).select_related('workspace')
+    if exclude_workspace_id:
+        mount_qs = mount_qs.exclude(workspace_id=exclude_workspace_id)
+    for mount in mount_qs:
+        if workspace_is_active(live_workspace_state(mount.workspace)):
             return True
     return False

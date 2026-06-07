@@ -34,6 +34,29 @@ class DockerImage(models.Model):
         return f'{self.label} ({self.repository}:{self.default_tag})'
 
 
+class WorkspaceDriveMount(models.Model):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    workspace = models.ForeignKey(
+        'Workspace',
+        on_delete=models.CASCADE,
+        related_name='extra_drive_mounts',
+    )
+    user_drive = models.ForeignKey(UserDrive, on_delete=models.PROTECT, related_name='extra_workspace_mounts')
+    mount_path = models.CharField(max_length=256)
+    sort_order = models.PositiveIntegerField(default=0)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['sort_order', 'created_at']
+        unique_together = (
+            ('workspace', 'user_drive'),
+            ('workspace', 'mount_path'),
+        )
+
+    def __str__(self):
+        return f'{self.workspace.slug}:{self.mount_path}'
+
+
 class Workspace(models.Model):
     STATE_OFFLINE = 'offline'
     STATE_RUNNING = 'running'

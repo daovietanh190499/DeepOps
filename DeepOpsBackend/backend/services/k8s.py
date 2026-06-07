@@ -3,17 +3,8 @@ import os
 import subprocess
 
 from .config import get_hub_config
+from .k8s_env import CODEHUB_CHART_PATH, DEFAULT_PORT, DOMAIN_NAME, NAMESPACE
 from .ssh_keys import get_or_none, ssh_secret_name
-
-NAMESPACE = os.environ.get('NAMESPACE', 'dohub')
-DOMAIN_NAME = os.environ.get('DOMAIN_NAME', 'dohub.com')
-DEFAULT_PORT = os.environ.get('DEFAULT_PORT', '8080')
-CODEHUB_CHART_PATH = os.environ.get(
-    'CODEHUB_CHART_PATH',
-    os.path.abspath(
-        os.path.join(os.path.dirname(__file__), '..', '..', '..', 'charts', 'codehub')
-    ),
-)
 
 
 def _storage_class() -> str:
@@ -21,6 +12,8 @@ def _storage_class() -> str:
 
 
 def build_spawn_config(workspace) -> dict:
+    from .workspace_mounts import spawn_drive_mounts
+
     gpu = workspace.gpu or ''
     not_use_gpu = not gpu or gpu in ('null', 'none', '')
     gpu_type = 'nvidia.com/' + (gpu.split(':')[0] if ':' in gpu else gpu)
@@ -35,11 +28,11 @@ def build_spawn_config(workspace) -> dict:
 
     user = workspace.user
     slug = workspace.slug
-    drive = workspace.user_drive
-    if not drive:
+    mounts = spawn_drive_mounts(workspace)
+    if not mounts:
         raise ValueError('workspace has no drive assigned')
 
-    mount_path = (workspace.mount_path or '/home/coder').strip() or '/home/coder'
+    primary = mounts[0]
     ssh_record = get_or_none(workspace)
 
     return {
@@ -62,8 +55,9 @@ def build_spawn_config(workspace) -> dict:
         'env_vars': dict(workspace.env_vars or {}),
         'container_command': list(workspace.container_command or []),
         'storage_class': _storage_class(),
-        'claim_name': drive.claim_name,
-        'mount_path': mount_path,
+        'claim_name': primary['claim_name'],
+        'mount_path': primary['mount_path'],
+        'extra_mounts': mounts[1:],
         'secret_name': f'{user.username}-{slug}-secret',
         'ssh_enabled': ssh_record is not None,
         'ssh_secret_name': ssh_secret_name(workspace),
@@ -116,8 +110,6 @@ def _helm_base_cmd(config: dict) -> list[str]:
         '--set', f'persistence.claimName={config["claim_name"]}',
         '--set', f'mainVolume.claimName={config["claim_name"]}',
         '--set', f'persistence.mountPath={config["mount_path"]}',
-        '--set', 'volumes[0].name=shm-volume',
-        '--set', 'volumes[0].emptyDir.medium=Memory',
         '--set', f'resources.limits.cpu={config["max_cpu"]}',
         '--set', f'resources.limits.memory={config["max_ram"]}',
         '--set', f'resources.requests.cpu={config["cpu"]}',
@@ -149,6 +141,20 @@ def _helm_base_cmd(config: dict) -> list[str]:
     command = config.get('container_command') or []
     if command:
         cmd.extend(['--set-json', f'container.command={json.dumps(command)}'])
+
+    volumes = [{'name': 'shm-volume', 'emptyDir': {'medium': 'Memory'}}]
+    volume_mounts = [{'name': 'shm-volume', 'mountPath': '/dev/shm'}]
+    for extra in config.get('extra_mounts') or []:
+        volumes.append({
+            'name': extra['volume_name'],
+            'persistentVolumeClaim': {'claimName': extra['claim_name']},
+        })
+        volume_mounts.append({
+            'name': extra['volume_name'],
+            'mountPath': extra['mount_path'],
+        })
+    cmd.extend(['--set-json', f'volumes={json.dumps(volumes)}'])
+    cmd.extend(['--set-json', f'volumeMounts={json.dumps(volume_mounts)}'])
 
     if config.get('ssh_enabled') and config.get('ssh_secret_name'):
         bridge_image = os.environ.get('SSH_BRIDGE_IMAGE', 'localhost:32000/ssh-bridge')

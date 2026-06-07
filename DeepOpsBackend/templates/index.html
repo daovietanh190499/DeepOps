@@ -442,8 +442,11 @@
                     <spec-row label="Slug" :value="modalWorkspace.slug"></spec-row>
                     <spec-row label="CPU" :value="modalWorkspace.cpu + ' vCPU'"></spec-row>
                     <spec-row label="RAM" :value="modalWorkspace.ram"></spec-row>
-                    <spec-row label="Drive" :value="modalWorkspace.drive_name || '—'"></spec-row>
-                    <spec-row label="Mount path" :value="modalWorkspace.mount_path"></spec-row>
+                    <spec-row v-for="(m, midx) in (modalWorkspace.drive_mounts || [])" :key="m.drive_id || midx"
+                              :label="'Drive ' + (midx + 1)"
+                              :value="(m.drive_name || '—') + ' → ' + m.mount_path"></spec-row>
+                    <spec-row v-if="!(modalWorkspace.drive_mounts || []).length"
+                              label="Drive" :value="(modalWorkspace.drive_name || '—') + ' → ' + (modalWorkspace.mount_path || '/home/coder')"></spec-row>
                     <spec-row label="GPU" :value="modalWorkspace.gpu || 'none'"></spec-row>
                     <spec-row label="Image" :value="modalWorkspace.docker_repository + ':' + modalWorkspace.docker_tag"></spec-row>
                     <spec-row label="Ports" :value="(modalWorkspace.exposed_ports || []).join(', ') || '8080'"></spec-row>
@@ -563,17 +566,31 @@
                                 <select v-model="form.ram" class="mt-1 w-full rounded-lg border px-3 py-2 text-sm">
                                     <option v-for="r in equipmentList.ram" :key="r" :value="r" v-text="r"></option>
                                 </select></div>
-                            <div><label class="text-sm font-medium text-slate-600">Mount drive (DirectPV)</label>
-                                <select v-model="form.drive_id" class="mt-1 w-full rounded-lg border px-3 py-2 text-sm">
-                                    <option value="">— Select your drive —</option>
-                                    <option v-for="d in myDrives" :key="d.id" :value="d.id"
-                                            v-text="d.name + ' (' + d.size + ') · ' + d.status"></option>
-                                </select>
-                                <p v-if="!myDrives.length" class="mt-1 text-xs text-amber-700">No drives yet. Create one in the <strong>Drives</strong> tab.</p>
+                            <div class="sm:col-span-2 space-y-2">
+                                <div class="flex items-center justify-between gap-2">
+                                    <label class="text-sm font-medium text-slate-600">Mount drives (DirectPV)</label>
+                                    <button type="button" @click="addDriveMount"
+                                            class="rounded-lg border border-blue-200 bg-blue-50 px-2.5 py-1 text-xs font-semibold text-blue-700 hover:bg-blue-100">
+                                        + Add
+                                    </button>
+                                </div>
+                                <p v-if="!myDrives.length" class="text-xs text-amber-700">No drives yet. Create one in the <strong>Drives</strong> tab.</p>
+                                <div v-for="(mount, idx) in form.drive_mounts" :key="'mount-' + idx"
+                                     class="rounded-lg border border-slate-200 bg-slate-50/60 p-3 space-y-2">
+                                    <div class="flex items-center justify-between gap-2">
+                                        <span class="text-xs font-semibold text-slate-500" v-text="'Drive ' + (idx + 1)"></span>
+                                        <button v-if="form.drive_mounts.length > 1" type="button" @click="removeDriveMount(idx)"
+                                                class="text-xs text-rose-600 hover:underline">Remove</button>
+                                    </div>
+                                    <select v-model="mount.drive_id" class="w-full rounded-lg border px-3 py-2 text-sm bg-white">
+                                        <option value="">— Select drive (not in use) —</option>
+                                        <option v-for="d in drivesForMountRow(idx)" :key="d.id" :value="d.id"
+                                                v-text="d.name + ' (' + d.size + ') · ' + d.status"></option>
+                                    </select>
+                                    <input v-model="mount.mount_path" type="text" placeholder="/home/coder"
+                                           class="w-full rounded-lg border px-3 py-2 text-sm font-mono bg-white">
+                                </div>
                             </div>
-                            <div><label class="text-sm font-medium text-slate-600">Mount path</label>
-                                <input v-model="form.mount_path" type="text" placeholder="/home/coder"
-                                       class="mt-1 w-full rounded-lg border px-3 py-2 text-sm font-mono"></div>
                             <div class="sm:col-span-2"><label class="text-sm font-medium text-slate-600">GPU</label>
                                 <select v-model="form.gpu" class="mt-1 w-full rounded-lg border px-3 py-2 text-sm">
                                     <option v-for="g in equipmentList.gpu" :key="g" :value="g" v-text="g"></option>
@@ -627,8 +644,7 @@
                             <spec-row label="Name" :value="form.name"></spec-row>
                             <spec-row label="CPU" :value="form.cpu + ' vCPU'"></spec-row>
                             <spec-row label="RAM" :value="form.ram"></spec-row>
-                            <spec-row label="Drive" :value="selectedDriveLabel"></spec-row>
-                            <spec-row label="Mount path" :value="form.mount_path"></spec-row>
+                            <spec-row label="Drives" :value="selectedDrivesLabel"></spec-row>
                             <spec-row label="GPU" :value="form.gpu || 'none'"></spec-row>
                             <spec-row label="Image" :value="form.docker_repository + ':' + form.docker_tag"></spec-row>
                             <spec-row label="Ports" :value="form.ports_text || '8080'"></spec-row>
@@ -681,7 +697,7 @@
                 </div>
                 <p class="text-xs text-slate-500" v-if="bulkMode==='json'">
                     Example:
-                    <code class="block mt-1 rounded bg-slate-100 p-2 text-[10px] overflow-x-auto">[{"name":"ws1","cpu":2,"ram":"4G","drive_id":"&lt;uuid&gt;","mount_path":"/home/coder","docker_repository":"codercom/code-server","docker_tag":"4.89.0-ubuntu","env_vars":{"PASSWORD":"secret"}}]</code>
+                    <code class="block mt-1 rounded bg-slate-100 p-2 text-[10px] overflow-x-auto">[{"name":"ws1","cpu":2,"ram":"4G","drive_mounts":[{"drive_id":"&lt;uuid-or-claim-name&gt;","mount_path":"/home/coder"},{"drive_id":"drive-dohub-user-slug","mount_path":"/data"}],"docker_repository":"codercom/code-server","docker_tag":"4.89.0-ubuntu"}]</code>
                     Use <code class="text-[10px]">drive_name</code> or <code class="text-[10px]">drive_slug</code> instead of <code class="text-[10px]">drive_id</code> if you prefer.
                 </p>
                 <p class="text-xs text-slate-500" v-else>

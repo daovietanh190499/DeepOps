@@ -3,7 +3,7 @@ from .groups import ResourceGroup, ResourceGroupMember
 from .servers import ServerOption
 from .users import User, UserServer
 from .ssh_keys import WorkspaceSSHKey
-from .workspaces import DockerImage, Workspace
+from .workspaces import DockerImage, Workspace, WorkspaceDriveMount
 
 __all__ = [
     'ServerOption',
@@ -11,6 +11,7 @@ __all__ = [
     'UserServer',
     'DockerImage',
     'Workspace',
+    'WorkspaceDriveMount',
     'UserDrive',
     'WorkspaceSSHKey',
     'ResourceGroup',

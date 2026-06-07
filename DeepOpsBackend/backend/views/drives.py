@@ -5,7 +5,7 @@ from django.http import JsonResponse
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_http_methods
 
-from backend.models import User, UserDrive, Workspace
+from backend.models import User, UserDrive, Workspace, WorkspaceDriveMount
 from backend.services.drives_k8s import delete_drive_pvc, get_pvc_phase, normalize_size
 from backend.services.bulk import bulk_drive_result, provision_user_drive
 from backend.services.k8s_status import drive_is_in_use, live_drive_status
@@ -41,7 +41,11 @@ def _drive_payload(drive: UserDrive) -> dict:
     data['status'] = live_drive_status(drive.claim_name)
     data['pvc_phase'] = get_pvc_phase(drive.claim_name)
     data['in_use'] = drive_is_in_use(drive)
-    data['workspace_count'] = Workspace.objects.filter(user_drive=drive).count()
+    ws_ids = set(Workspace.objects.filter(user_drive=drive).values_list('id', flat=True))
+    ws_ids.update(
+        WorkspaceDriveMount.objects.filter(user_drive=drive).values_list('workspace_id', flat=True),
+    )
+    data['workspace_count'] = len(ws_ids)
     return data
 
 
@@ -159,6 +163,7 @@ def drive_delete(request, user, drive_id):
 
     delete_drive_pvc(drive.claim_name)
     Workspace.objects.filter(user_drive=drive).update(user_drive=None)
+    WorkspaceDriveMount.objects.filter(user_drive=drive).delete()
     drive.delete()
     return JsonResponse({'message': 'success'})
 

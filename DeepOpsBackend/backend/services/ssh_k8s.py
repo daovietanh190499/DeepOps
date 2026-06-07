@@ -5,7 +5,8 @@ import subprocess
 import tempfile
 
 from backend.models import Workspace
-from backend.services.k8s import NAMESPACE, build_spawn_config
+from backend.services.k8s import build_spawn_config
+from backend.services.k8s_env import NAMESPACE
 from backend.services.k8s_status import live_workspace_state, workspace_is_active
 from backend.services.ssh_keys import (
     ensure_host_key_material,

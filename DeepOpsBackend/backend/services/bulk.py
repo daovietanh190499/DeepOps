@@ -1,6 +1,9 @@
 """Shared helpers for bulk drive / workspace import."""
 
+import uuid
+
 from django.conf import settings
+from django.utils.text import slugify
 
 from backend.models import User, UserDrive, Workspace
 from backend.services.drives_k8s import create_drive_pvc, normalize_size
@@ -8,28 +11,58 @@ from backend.services.k8s import build_spawn_config, create_codehub
 from backend.services.k8s_status import live_drive_status, live_workspace_state
 
 
-def resolve_user_drive(user: User, data: dict) -> UserDrive | None:
-    drive_id = data.get('drive_id') or data.get('user_drive_id')
-    if drive_id:
-        drive = UserDrive.objects.filter(id=drive_id, user=user).first()
+def _is_uuid(value: str) -> bool:
+    try:
+        uuid.UUID(str(value))
+        return True
+    except (TypeError, ValueError):
+        return False
+
+
+def resolve_user_drive_ref(user: User, ref: str) -> UserDrive | None:
+    """Resolve a drive by UUID, PVC claim name, slug, or display name."""
+    text = (ref or '').strip()
+    if not text:
+        return None
+
+    if _is_uuid(text):
+        drive = UserDrive.objects.filter(id=text, user=user).first()
         if not drive and user.role == User.ROLE_ADMIN:
-            drive = UserDrive.objects.filter(id=drive_id).first()
+            drive = UserDrive.objects.filter(id=text).first()
         return drive
 
-    drive_slug = (data.get('drive_slug') or '').strip()
-    if drive_slug:
-        return UserDrive.objects.filter(user=user, slug=drive_slug).first()
-
-    drive_name = (data.get('drive_name') or data.get('drive') or '').strip()
-    if drive_name:
-        drive = UserDrive.objects.filter(user=user, name__iexact=drive_name).first()
-        if drive:
+    qs = UserDrive.objects.filter(user=user)
+    if user.role == User.ROLE_ADMIN:
+        qs = UserDrive.objects.all()
+    for drive in qs:
+        if drive.claim_name == text:
             return drive
-        from django.utils.text import slugify
 
-        slug = slugify(drive_name)
-        if slug:
-            return UserDrive.objects.filter(user=user, slug=slug).first()
+    drive = UserDrive.objects.filter(user=user, slug=text).first()
+    if drive:
+        return drive
+
+    drive = UserDrive.objects.filter(user=user, name__iexact=text).first()
+    if drive:
+        return drive
+
+    slug = slugify(text)
+    if slug:
+        return UserDrive.objects.filter(user=user, slug=slug).first()
+    return None
+
+
+def resolve_user_drive(user: User, data: dict) -> UserDrive | None:
+    drive_ref = (
+        data.get('drive_id')
+        or data.get('user_drive_id')
+        or data.get('claim_name')
+        or data.get('drive_slug')
+        or data.get('drive_name')
+        or data.get('drive')
+    )
+    if drive_ref:
+        return resolve_user_drive_ref(user, str(drive_ref))
     return None
 
 

@@ -46,7 +46,7 @@ Environment / flags:
   DOMAIN_NAME       default from .env
   CODEHUB_CHART_PATH  default: ./charts/codehub
   ENV_FILE          default: ./dohub/secrets/.env
-  HUB_URL           for api-start, e.g. https://iai-hub.uet.vnu.edu.vn
+  HUB_URL           for api-start, e.g. https://iaihub.uet.edu.vn
   COOKIE            user_access_key value for api-start
   SKIP_HELM=1       Print helm command only (spawn / hub-exec)
 
