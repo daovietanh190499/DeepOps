@@ -1,6 +1,7 @@
 from django.urls import path
 
 from backend import views
+from backend.views import catalog as catalog_views
 from backend.views import cluster as cluster_views
 from backend.views import drives as drive_views
 from backend.views import groups as group_views
@@ -34,6 +35,12 @@ urlpatterns = [
     path('admin/cluster/join-command', cluster_views.admin_cluster_join_command, name='admin-cluster-join'),
     path('admin/drives', drive_views.admin_drives, name='admin-drives'),
 
+    path('platform/catalog', catalog_views.platform_catalog, name='platform-catalog'),
+    path('admin/platform/catalog', catalog_views.admin_platform_catalog, name='admin-platform-catalog'),
+    path('admin/platform/options', catalog_views.admin_platform_option_create, name='admin-platform-option-create'),
+    path('admin/platform/options/<int:option_id>', catalog_views.admin_platform_option_detail, name='admin-platform-option-detail'),
+    path('admin/platform/templates', catalog_views.admin_platform_template_create, name='admin-platform-template-create'),
+    path('admin/platform/templates/<int:template_id>', catalog_views.admin_platform_template_detail, name='admin-platform-template-detail'),
     path('docker_images', ws_views.docker_images_list, name='docker-images'),
     path('workspaces/run', ws_views.workspace_run, name='workspace-run'),
     path('workspaces/bulk_run', ws_views.workspace_bulk_run, name='workspace-bulk-run'),

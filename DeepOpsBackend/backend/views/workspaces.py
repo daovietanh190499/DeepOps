@@ -139,9 +139,25 @@ def my_workspaces(request, user):
     denied = _require_accepted(user)
     if denied:
         return denied
-    qs = Workspace.objects.filter(user=user).select_related('user', 'user_drive')
+
+    page = max(1, int(request.GET.get('page', 1)))
+    per_page = min(500, max(6, int(request.GET.get('per_page', 12))))
+    name_filter = (request.GET.get('name') or '').strip()
+
+    qs = Workspace.objects.filter(user=user).select_related('user', 'user_drive').order_by('-updated_at')
+    if name_filter:
+        qs = qs.filter(name__icontains=name_filter)
+
+    paginator = Paginator(qs, per_page)
+    page_obj = paginator.get_page(page)
     return JsonResponse({
-        'result': [_workspace_payload(ws) for ws in qs],
+        'result': [_workspace_payload(ws) for ws in page_obj.object_list],
+        'pagination': {
+            'page': page_obj.number,
+            'per_page': per_page,
+            'total': paginator.count,
+            'pages': paginator.num_pages or 1,
+        },
     })
 
 

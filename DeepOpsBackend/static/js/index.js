@@ -123,28 +123,18 @@ function randomToken(len) {
     return s
 }
 
-const PLAN_TEMPLATES = [
-    {
-        name: 'Lollipop', image: 'lollipop.png', cpu: 2, ram: '4G', gpu: 'none',
-        env_defaults: { PASSWORD: () => 'lollipop-' + randomToken(6), PWA_APPNAME: 'Lollipop' },
-    },
-    {
-        name: 'Oreo', image: 'oreo.png', cpu: 4, ram: '8G', gpu: 'mig-2g.10gb',
-        env_defaults: { PASSWORD: () => 'oreo-' + randomToken(6), PWA_APPNAME: 'Oreo' },
-    },
-    {
-        name: 'Popeyes', image: 'popeyes.png', cpu: 8, ram: '16G', gpu: 'mig-3g.20gb',
-        env_defaults: { PASSWORD: () => 'popeyes-' + randomToken(6), PWA_APPNAME: 'Popeyes' },
-    },
-    {
-        name: 'Pizza', image: 'pizza.png', cpu: 8, ram: '32G', gpu: 'gpu',
-        env_defaults: { PASSWORD: () => 'pizza-' + randomToken(6), PWA_APPNAME: 'Pizza' },
-    },
-    {
-        name: 'Spagetti', image: 'spagetti.png', cpu: 16, ram: '64G', gpu: 'gpu:2',
-        env_defaults: { PASSWORD: () => 'spagetti-' + randomToken(6), PWA_APPNAME: 'Spagetti' },
-    },
-]
+function resolveTemplateEnv(envDefaults) {
+    const out = {}
+    if (!envDefaults) return out
+    if (envDefaults.PASSWORD_PREFIX) {
+        out.PASSWORD = envDefaults.PASSWORD_PREFIX + randomToken(6)
+    }
+    Object.keys(envDefaults).forEach((k) => {
+        if (k === 'PASSWORD_PREFIX') return
+        out[k] = String(envDefaults[k])
+    })
+    return out
+}
 
 function defaultDriveMount() {
     return { drive_id: '', mount_path: '/home/coder' }
@@ -304,13 +294,21 @@ function downloadJson(obj, filename) {
 const appVue = new Vue({
     el: '#root',
     data: {
-        equipmentList: {
-            cpu: [2, 4, 8, 16, 32],
-            ram: ['2G', '4G', '8G', '16G', '32G', '64G'],
-            gpu: ['none', 'mig-2g.10gb', 'mig-3g.20gb', 'gpu', 'gpu:2'],
+        fullEquipmentList: { cpu: [], ram: [], gpu: [], drive_sizes: [] },
+        equipmentList: { cpu: [], ram: [], gpu: [] },
+        driveSizeOptions: [],
+        adminCatalogOptions: [],
+        adminPlanTemplates: [],
+        newCatalogOption: { category: 'cpu', value: '', vram_g: 0 },
+        newPlanTemplate: {
+            name: '', image: 'logo.png', cpu: 2, ram: '4G', gpu: 'none',
+            env_defaults_text: '{"PASSWORD_PREFIX":"my-","PWA_APPNAME":"Workspace"}',
+            sort_order: 0, is_active: true,
         },
-        driveSizeOptions: ['20Gi', '50Gi', '100Gi', '200Gi', '500Gi', '1Ti'],
         myDrives: [],
+        myDrivesAll: [],
+        myDriveFilter: '',
+        myDrivePagination: { page: 1, pages: 1, total: 0, per_page: 12 },
         adminDrives: [],
         adminDrivePagination: { page: 1, pages: 1, total: 0, per_page: 12 },
         adminDriveFilter: '',
@@ -322,7 +320,7 @@ const appVue = new Vue({
         deleteModalDriveIsAdmin: false,
         deleteDriveConfirmInput: '',
         deleteDriveInProgress: false,
-        planTemplates: PLAN_TEMPLATES,
+        planTemplates: [],
         form: defaultForm(),
         envKey: '',
         envValue: '',
@@ -339,6 +337,8 @@ const appVue = new Vue({
         driveBulkSummary: '',
         dockerImages: [],
         myWorkspaces: [],
+        myServerFilter: '',
+        myServerPagination: { page: 1, pages: 1, total: 0, per_page: 12 },
         adminWorkspaces: [],
         adminPagination: { page: 1, pages: 1, total: 0, per_page: 12 },
         adminServerFilter: '',
@@ -357,6 +357,8 @@ const appVue = new Vue({
         adminUserStatus: '',
         adminUserPagination: { page: 1, pages: 1, total: 0, per_page: 10 },
         adminUsersTab: 'users',
+        adminServersTab: 'servers',
+        adminDrivesTab: 'drives',
         resourceGroups: [],
         showGroupFormModal: false,
         editingGroup: null,
@@ -407,7 +409,7 @@ const appVue = new Vue({
             const mounts = (this.form.drive_mounts || []).filter((m) => m.drive_id)
             if (!mounts.length) return '—'
             return mounts.map((m) => {
-                const d = this.myDrives.find((x) => x.id === m.drive_id)
+                const d = this.myDrivesAll.find((x) => x.id === m.drive_id)
                 return (d ? d.name + ' (' + d.size + ')' : '?') + ' → ' + (m.mount_path || '/home/coder')
             }).join(', ')
         },
@@ -470,13 +472,13 @@ const appVue = new Vue({
         canCreateMoreServers() {
             const l = this.resourceLimits.limits
             if (!this.resourceLimits.limited || !l || !l.max_servers) return true
-            const count = l.server_count ?? this.myWorkspaces.length
+            const count = l.server_count ?? this.myServerPagination.total ?? this.myWorkspaces.length
             return count < l.max_servers
         },
         canCreateMoreDrives() {
             const l = this.resourceLimits.limits
             if (!this.resourceLimits.limited || !l || !l.max_drives) return true
-            const count = l.drive_count ?? this.myDrives.length
+            const count = l.drive_count ?? this.myDrivePagination.total ?? this.myDrives.length
             return count < l.max_drives
         },
     },
@@ -503,8 +505,8 @@ const appVue = new Vue({
         },
         async pollStatuses() {
             const m = this.menu
-            if (m === 'drives' || m === 'servers') await this.loadMyDrives()
-            if (m === 'servers') await this.loadMyWorkspaces()
+            if (m === 'drives' || m === 'servers') await this.loadMyDrives(this.myDrivePagination.page)
+            if (m === 'servers') await this.loadMyWorkspaces(this.myServerPagination.page)
             if (m === 'admin-drives') await this.loadAdminDrives(this.adminDrivePagination.page)
             if (m === 'admin-servers') await this.loadAdminWorkspaces(this.adminPagination.page)
             if (m === 'admin-overall') await this.loadClusterOverview()
@@ -622,11 +624,17 @@ const appVue = new Vue({
             this.stopStatusPolling()
             this.menu = menu
             window.history.replaceState({}, '', '/?tab=' + menu)
-            if (menu === 'drives') this.loadMyDrives()
-            if (menu === 'servers') this.loadMyWorkspaces()
+            if (menu === 'drives') this.loadMyDrives(1)
+            if (menu === 'servers') this.loadMyWorkspaces(1)
             if (menu === 'admin-overall') this.loadClusterOverview()
-            if (menu === 'admin-drives') this.loadAdminDrives(1)
-            if (menu === 'admin-servers') this.loadAdminWorkspaces(1)
+            if (menu === 'admin-drives') {
+                if (this.adminDrivesTab === 'catalog') this.loadAdminPlatformCatalog()
+                else this.loadAdminDrives(1)
+            }
+            if (menu === 'admin-servers') {
+                if (this.adminServersTab === 'catalog') this.loadAdminPlatformCatalog()
+                else this.loadAdminWorkspaces(1)
+            }
             if (menu === 'admin-users') {
                 if (this.adminUsersTab === 'groups') this.loadResourceGroups()
                 else this.loadAdminUsers(1)
@@ -639,9 +647,11 @@ const appVue = new Vue({
         async init() {
             if (!this.is_login) return
             await this.getCurrentUserState()
+            await this.loadPlatformCatalog()
             await this.loadDockerImages()
-            await this.loadMyDrives()
-            await this.loadMyWorkspaces()
+            await this.loadMyDrives(1)
+            await this.loadMyDrivesAll()
+            await this.loadMyWorkspaces(1)
             if (this.is_admin) {
                 if (this.menu === 'admin-users') {
                     if (this.adminUsersTab === 'groups') await this.loadResourceGroups()
@@ -704,21 +714,156 @@ const appVue = new Vue({
             this.current_user = u.username
             this.is_admin = u.role === 'admin'
             this.resourceLimits = u.resource_limits || { limited: false, limits: null, equipment: null }
-            this.applyResourceLimitsToUi()
+            this.refreshEquipmentFromLimits()
         },
-        applyResourceLimitsToUi() {
-            const eq = this.resourceLimits.equipment
-            if (!eq) return
-            this.equipmentList = {
-                cpu: eq.cpu || this.equipmentList.cpu,
-                ram: eq.ram || this.equipmentList.ram,
-                gpu: eq.gpu || this.equipmentList.gpu,
+        applyPlatformCatalog(catalog) {
+            if (!catalog) return
+            const eq = catalog.equipment || {}
+            this.fullEquipmentList = {
+                cpu: eq.cpu || [],
+                ram: eq.ram || [],
+                gpu: eq.gpu || [],
+                drive_sizes: eq.drive_sizes || [],
             }
-            this.driveSizeOptions = eq.drive_sizes || this.driveSizeOptions
+            this.planTemplates = catalog.templates || []
+            this.refreshEquipmentFromLimits()
+        },
+        refreshEquipmentFromLimits() {
+            const base = this.fullEquipmentList
+            if (!this.resourceLimits.limited) {
+                this.equipmentList = { cpu: base.cpu || [], ram: base.ram || [], gpu: base.gpu || [] }
+                this.driveSizeOptions = base.drive_sizes || []
+            } else {
+                const eq = this.resourceLimits.equipment || {}
+                this.equipmentList = {
+                    cpu: eq.cpu || base.cpu || [],
+                    ram: eq.ram || base.ram || [],
+                    gpu: eq.gpu || base.gpu || [],
+                }
+                this.driveSizeOptions = eq.drive_sizes || base.drive_sizes || []
+            }
             this.clampFormToLimits()
-            if (!this.driveSizeOptions.includes(this.newDrive.size)) {
-                this.newDrive.size = this.driveSizeOptions[this.driveSizeOptions.length - 1] || '20Gi'
+            if (this.driveSizeOptions.length && !this.driveSizeOptions.includes(this.newDrive.size)) {
+                this.newDrive.size = this.driveSizeOptions[0]
             }
+        },
+        async loadPlatformCatalog() {
+            const res = await fetch('platform/catalog')
+            if (res.status !== 200) return
+            const data = await res.json()
+            this.applyPlatformCatalog(data.result)
+        },
+        async loadAdminPlatformCatalog() {
+            if (!this.is_admin) return
+            const res = await fetch('admin/platform/catalog')
+            if (res.status !== 200) return
+            const data = await res.json()
+            const result = data.result || {}
+            this.adminCatalogOptions = result.options || []
+            this.adminPlanTemplates = result.templates || []
+            this.applyPlatformCatalog(result)
+        },
+        catalogOptionsFor(category) {
+            return (this.adminCatalogOptions || [])
+                .filter((o) => o.category === category)
+                .sort((a, b) => a.sort_order - b.sort_order || a.value.localeCompare(b.value))
+        },
+        async addCatalogOption() {
+            const payload = { ...this.newCatalogOption }
+            if (!payload.value || !String(payload.value).trim()) {
+                this.showToast('Value required')
+                return
+            }
+            const res = await fetch('admin/platform/options', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload),
+            })
+            const data = await res.json().catch(() => ({}))
+            if (res.status !== 201) {
+                this.showToast(data.message || 'Add failed')
+                return
+            }
+            this.newCatalogOption.value = ''
+            this.newCatalogOption.vram_g = 0
+            await this.loadAdminPlatformCatalog()
+            this.showToast('Option added')
+        },
+        async deleteCatalogOption(option) {
+            if (!confirm('Delete option ' + option.value + '?')) return
+            const res = await fetch('admin/platform/options/' + option.id, { method: 'DELETE' })
+            if (res.status !== 200) {
+                this.showToast('Delete failed')
+                return
+            }
+            await this.loadAdminPlatformCatalog()
+            this.showToast('Option deleted')
+        },
+        async toggleCatalogOption(option) {
+            const res = await fetch('admin/platform/options/' + option.id, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ is_active: !option.is_active }),
+            })
+            if (res.status !== 200) {
+                this.showToast('Update failed')
+                return
+            }
+            await this.loadAdminPlatformCatalog()
+        },
+        async savePlanTemplate() {
+            let env_defaults = {}
+            try {
+                env_defaults = JSON.parse(this.newPlanTemplate.env_defaults_text || '{}')
+            } catch {
+                this.showToast('env_defaults must be valid JSON')
+                return
+            }
+            const payload = {
+                name: this.newPlanTemplate.name,
+                image: this.newPlanTemplate.image,
+                cpu: this.newPlanTemplate.cpu,
+                ram: this.newPlanTemplate.ram,
+                gpu: this.newPlanTemplate.gpu,
+                env_defaults,
+                sort_order: this.newPlanTemplate.sort_order,
+                is_active: this.newPlanTemplate.is_active,
+            }
+            const res = await fetch('admin/platform/templates', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload),
+            })
+            const data = await res.json().catch(() => ({}))
+            if (res.status !== 201) {
+                this.showToast(data.message || 'Save failed')
+                return
+            }
+            this.newPlanTemplate.name = ''
+            await this.loadAdminPlatformCatalog()
+            this.showToast('Template added')
+        },
+        async deletePlanTemplate(template) {
+            if (!confirm('Delete template ' + template.name + '?')) return
+            const res = await fetch('admin/platform/templates/' + template.id, { method: 'DELETE' })
+            if (res.status !== 200) {
+                this.showToast('Delete failed')
+                return
+            }
+            await this.loadAdminPlatformCatalog()
+            this.showToast('Template deleted')
+        },
+        async togglePlanTemplate(template) {
+            const res = await fetch('admin/platform/templates/' + template.id, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ is_active: !template.is_active }),
+            })
+            if (res.status !== 200) {
+                this.showToast('Update failed')
+                return
+            }
+            await this.loadAdminPlatformCatalog()
         },
         clampFormToLimits() {
             const eq = this.resourceLimits.equipment
@@ -760,7 +905,7 @@ const appVue = new Vue({
             if (!this.resourceLimits.limited || !this.resourceLimits.limits) return null
             const l = this.resourceLimits.limits
             if (!l.max_servers) return null
-            const count = l.server_count ?? this.myWorkspaces.length
+            const count = l.server_count ?? this.myServerPagination.total ?? this.myWorkspaces.length
             if (count >= l.max_servers) {
                 return `Server count exceeds group limit (${l.max_servers} max, you have ${count})`
             }
@@ -770,7 +915,7 @@ const appVue = new Vue({
             if (!this.resourceLimits.limited || !this.resourceLimits.limits) return null
             const l = this.resourceLimits.limits
             if (!l.max_drives) return null
-            const count = l.drive_count ?? this.myDrives.length
+            const count = l.drive_count ?? this.myDrivePagination.total ?? this.myDrives.length
             if (count >= l.max_drives) {
                 return `Drive count exceeds group limit (${l.max_drives} max, you have ${count})`
             }
@@ -778,8 +923,8 @@ const appVue = new Vue({
         },
         syncResourceUsageCounts() {
             if (!this.resourceLimits.limits) return
-            this.resourceLimits.limits.server_count = this.myWorkspaces.length
-            this.resourceLimits.limits.drive_count = this.myDrives.length
+            this.resourceLimits.limits.server_count = this.myServerPagination.total ?? this.myWorkspaces.length
+            this.resourceLimits.limits.drive_count = this.myDrivePagination.total ?? this.myDrives.length
         },
         async loadDockerImages() {
             const res = await fetch('docker_images')
@@ -810,7 +955,7 @@ const appVue = new Vue({
             this.form.ram = t.ram
             this.form.gpu = t.gpu
             this.form.name = t.name + ' workspace'
-            const env = resolveEnvDefaults(t.env_defaults)
+            const env = resolveTemplateEnv(t.env_defaults)
             this.form.env_vars = { ...this.form.env_vars, ...env }
             const firstKey = Object.keys(env)[0] || 'PASSWORD'
             this.envKey = firstKey
@@ -898,8 +1043,9 @@ const appVue = new Vue({
                     return
                 }
                 this.bulkSummary = formatBulkSummary(data, items.length)
-                await this.loadMyWorkspaces()
-                await this.loadMyDrives()
+                await this.loadMyWorkspaces(this.myServerPagination.page)
+                await this.loadMyDrives(this.myDrivePagination.page)
+                await this.loadMyDrivesAll()
                 this.showToast('Bulk server create finished')
             } catch (e) {
                 this.bulkSummary = e.message || String(e)
@@ -934,7 +1080,8 @@ const appVue = new Vue({
                     return
                 }
                 this.driveBulkSummary = formatBulkSummary(data, items.length)
-                await this.loadMyDrives()
+                await this.loadMyDrives(this.myDrivePagination.page)
+                await this.loadMyDrivesAll()
                 if (this.is_admin) await this.loadAdminDrives(this.adminDrivePagination.page)
                 this.showToast('Bulk drive create finished')
             } catch (e) {
@@ -943,12 +1090,25 @@ const appVue = new Vue({
                 this.driveBulkLoading = false
             }
         },
-        async loadMyDrives() {
-            const res = await fetch('drives')
+        async loadMyDrives(page) {
+            const q = new URLSearchParams({
+                page: page || this.myDrivePagination.page || 1,
+                per_page: 12,
+                name: this.myDriveFilter,
+            })
+            const res = await fetch('drives?' + q)
             if (res.status !== 200) return
             const data = await res.json()
             this.myDrives = data.result || []
+            this.myDrivePagination = data.pagination || this.myDrivePagination
             this.syncResourceUsageCounts()
+        },
+        async loadMyDrivesAll() {
+            const q = new URLSearchParams({ page: 1, per_page: 500 })
+            const res = await fetch('drives?' + q)
+            if (res.status !== 200) return
+            const data = await res.json()
+            this.myDrivesAll = data.result || []
         },
         async loadAdminDrives(page) {
             const q = new URLSearchParams({ page: page || 1, per_page: 12, user: this.adminDriveFilter })
@@ -999,7 +1159,8 @@ const appVue = new Vue({
                 return
             }
             this.newDrive = { name: 'My drive', size: '20Gi' }
-            await this.loadMyDrives()
+            await this.loadMyDrives(this.myDrivePagination.page)
+            await this.loadMyDrivesAll()
             this.closeCreateDriveModal()
             this.showToast('Drive created')
         },
@@ -1025,7 +1186,8 @@ const appVue = new Vue({
             }
             this.closeDeleteDriveModal()
             this.showToast('Drive deleted')
-            await this.loadMyDrives()
+            await this.loadMyDrives(this.myDrivePagination.page)
+            await this.loadMyDrivesAll()
             if (this.is_admin) await this.loadAdminDrives(this.adminDrivePagination.page)
         },
         driveSelectableForMount(drive, rowIndex) {
@@ -1036,7 +1198,7 @@ const appVue = new Vue({
             return !drive.in_use
         },
         drivesForMountRow(rowIndex) {
-            return this.myDrives.filter((d) => this.driveSelectableForMount(d, rowIndex))
+            return this.myDrivesAll.filter((d) => this.driveSelectableForMount(d, rowIndex))
         },
         addDriveMount() {
             if (!this.form.drive_mounts) this.$set(this.form, 'drive_mounts', [])
@@ -1048,12 +1210,13 @@ const appVue = new Vue({
             if (!this.form.drive_mounts || this.form.drive_mounts.length <= 1) return
             this.form.drive_mounts.splice(index, 1)
         },
-        openCreateServerModal() {
+        async openCreateServerModal() {
             const limitErr = this.checkServerCountLimit()
             if (limitErr) {
                 this.showToast(limitErr)
                 return
             }
+            await this.loadMyDrivesAll()
             if (!this.form.drive_mounts || !this.form.drive_mounts.length) {
                 this.form.drive_mounts = [defaultDriveMount()]
             }
@@ -1102,15 +1265,21 @@ const appVue = new Vue({
                 this.showToast(data.message || 'Start failed')
                 return
             }
-            await this.loadMyWorkspaces()
+            await this.loadMyWorkspaces(this.myServerPagination.page)
             this.closeCreateServerModal()
             this.showToast('Server created')
         },
-        async loadMyWorkspaces() {
-            const res = await fetch('workspaces')
+        async loadMyWorkspaces(page) {
+            const q = new URLSearchParams({
+                page: page || this.myServerPagination.page || 1,
+                per_page: 12,
+                name: this.myServerFilter,
+            })
+            const res = await fetch('workspaces?' + q)
             if (res.status !== 200) return
             const data = await res.json()
             this.myWorkspaces = data.result || []
+            this.myServerPagination = data.pagination || this.myServerPagination
             if (this.modalWorkspace) {
                 const updated = this.myWorkspaces.find((w) => w.id === this.modalWorkspace.id)
                 if (updated) this.modalWorkspace = { ...updated, env_vars: { ...(updated.env_vars || {}) } }
@@ -1144,7 +1313,7 @@ const appVue = new Vue({
             window.location = 'workspaces/' + ws.id + '/export'
         },
         async refreshLists() {
-            await this.loadMyWorkspaces()
+            await this.loadMyWorkspaces(this.myServerPagination.page)
             if (this.is_admin && this.menu === 'admin-servers') {
                 await this.loadAdminWorkspaces(this.adminPagination.page)
             }
@@ -1181,6 +1350,16 @@ const appVue = new Vue({
             this.adminUsersTab = tab
             if (tab === 'groups') this.loadResourceGroups()
             else this.loadAdminUsers(1)
+        },
+        switchAdminServersTab(tab) {
+            this.adminServersTab = tab
+            if (tab === 'catalog') this.loadAdminPlatformCatalog()
+            else this.loadAdminWorkspaces(1)
+        },
+        switchAdminDrivesTab(tab) {
+            this.adminDrivesTab = tab
+            if (tab === 'catalog') this.loadAdminPlatformCatalog()
+            else this.loadAdminDrives(1)
         },
         async loadResourceGroups() {
             const res = await fetch('admin/resource_groups')

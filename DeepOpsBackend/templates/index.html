@@ -71,7 +71,7 @@
                 <div>
                     <h2 class="text-lg font-bold text-slate-900">My drives</h2>
                     <p v-if="resourceLimits.limited && resourceLimits.limits.max_drives" class="text-xs text-slate-500 mt-0.5"
-                       v-text="'Drives: ' + (resourceLimits.limits.drive_count ?? myDrives.length) + ' / ' + resourceLimits.limits.max_drives"></p>
+                       v-text="'Drives: ' + (resourceLimits.limits.drive_count ?? myDrivePagination.total) + ' / ' + resourceLimits.limits.max_drives"></p>
                 </div>
                 <div class="flex flex-wrap items-center gap-2">
                     <button type="button" @click="openCreateDriveModal" :disabled="!canCreateMoreDrives"
@@ -85,7 +85,14 @@
                 </div>
             </div>
 
-            <p v-if="myDrives.length===0" class="text-sm text-slate-500">No drives yet. Use <strong>Create drive</strong> or <strong>Bulk create drive</strong> to provision a DirectPV volume.</p>
+            <div class="flex flex-wrap items-center gap-3">
+                <input v-model="myDriveFilter" @input="loadMyDrives(1)" placeholder="Filter by name…"
+                       class="rounded-lg border px-3 py-1.5 text-sm">
+                <span class="text-sm text-slate-500" v-text="'Page ' + myDrivePagination.page + ' / ' + myDrivePagination.pages"></span>
+            </div>
+
+            <p v-if="myDrivePagination.total===0 && !myDriveFilter" class="text-sm text-slate-500">No drives yet. Use <strong>Create drive</strong> or <strong>Bulk create drive</strong> to provision a DirectPV volume.</p>
+            <p v-else-if="myDrives.length===0" class="text-sm text-slate-500">No drives match your filter.</p>
 
             <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
                 <div v-for="d in myDrives" :key="d.id"
@@ -102,6 +109,12 @@
                             class="mt-3 text-xs font-semibold text-rose-600 hover:text-rose-800 disabled:opacity-40"
                             :title="d.in_use ? 'Stop servers using this drive first' : 'Delete'">Delete drive</button>
                 </div>
+            </div>
+            <div v-if="myDrivePagination.pages > 1" class="flex justify-center gap-2">
+                <button :disabled="myDrivePagination.page<=1" @click="loadMyDrives(myDrivePagination.page-1)"
+                        class="rounded-lg border px-4 py-2 text-sm disabled:opacity-40">Prev</button>
+                <button :disabled="myDrivePagination.page>=myDrivePagination.pages" @click="loadMyDrives(myDrivePagination.page+1)"
+                        class="rounded-lg border px-4 py-2 text-sm disabled:opacity-40">Next</button>
             </div>
         </section>
 
@@ -240,28 +253,61 @@
         <!-- Admin drives -->
         <section v-if="is_login && menu==='admin-drives' && is_admin" class="space-y-4">
             <div class="flex flex-wrap items-center gap-3">
-                <h2 class="text-lg font-bold text-slate-900">Drives</h2>
-                <input v-model="adminDriveFilter" @input="loadAdminDrives(1)" placeholder="Filter by username…"
-                       class="rounded-lg border px-3 py-1.5 text-sm">
-                <span class="text-sm text-slate-500" v-text="'Page ' + adminDrivePagination.page + ' / ' + adminDrivePagination.pages"></span>
-            </div>
-            <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-                <div v-for="d in adminDrives" :key="d.id"
-                     class="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-                    <h3 class="font-bold text-slate-900" v-text="d.name"></h3>
-                    <p class="text-xs text-slate-500" v-text="'@' + d.owner"></p>
-                    <p class="mt-1 text-xs font-mono text-slate-400 truncate" v-text="d.claim_name"></p>
-                    <p class="mt-2 text-sm" v-text="d.size + ' · ' + d.status"></p>
-                    <button type="button" @click="openDeleteDriveModal(d, true)" :disabled="d.in_use"
-                            class="mt-2 text-xs text-rose-600 disabled:opacity-40">Delete</button>
+                <h2 class="text-lg font-bold text-slate-900">Drive management</h2>
+                <div class="flex rounded-lg border border-slate-200 overflow-hidden text-sm">
+                    <button type="button" @click="switchAdminDrivesTab('drives')"
+                            :class="adminDrivesTab==='drives' ? 'bg-blue-600 text-white' : 'bg-white text-slate-600'"
+                            class="px-4 py-1.5 font-semibold">Drives</button>
+                    <button type="button" @click="switchAdminDrivesTab('catalog')"
+                            :class="adminDrivesTab==='catalog' ? 'bg-blue-600 text-white' : 'bg-white text-slate-600'"
+                            class="px-4 py-1.5 font-semibold border-l border-slate-200">Size options</button>
                 </div>
             </div>
-            <div class="flex justify-center gap-2">
-                <button :disabled="adminDrivePagination.page<=1" @click="loadAdminDrives(adminDrivePagination.page-1)"
-                        class="rounded-lg border px-4 py-2 text-sm disabled:opacity-40">Prev</button>
-                <button :disabled="adminDrivePagination.page>=adminDrivePagination.pages" @click="loadAdminDrives(adminDrivePagination.page+1)"
-                        class="rounded-lg border px-4 py-2 text-sm disabled:opacity-40">Next</button>
-            </div>
+
+            <template v-if="adminDrivesTab==='drives'">
+                <div class="flex flex-wrap items-center gap-3">
+                    <input v-model="adminDriveFilter" @input="loadAdminDrives(1)" placeholder="Filter by username…"
+                           class="rounded-lg border px-3 py-1.5 text-sm">
+                    <span class="text-sm text-slate-500" v-text="'Page ' + adminDrivePagination.page + ' / ' + adminDrivePagination.pages"></span>
+                </div>
+                <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+                    <div v-for="d in adminDrives" :key="d.id"
+                         class="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+                        <h3 class="font-bold text-slate-900" v-text="d.name"></h3>
+                        <p class="text-xs text-slate-500" v-text="'@' + d.owner"></p>
+                        <p class="mt-1 text-xs font-mono text-slate-400 truncate" v-text="d.claim_name"></p>
+                        <p class="mt-2 text-sm" v-text="d.size + ' · ' + d.status"></p>
+                        <button type="button" @click="openDeleteDriveModal(d, true)" :disabled="d.in_use"
+                                class="mt-2 text-xs text-rose-600 disabled:opacity-40">Delete</button>
+                    </div>
+                </div>
+                <div class="flex justify-center gap-2">
+                    <button :disabled="adminDrivePagination.page<=1" @click="loadAdminDrives(adminDrivePagination.page-1)"
+                            class="rounded-lg border px-4 py-2 text-sm disabled:opacity-40">Prev</button>
+                    <button :disabled="adminDrivePagination.page>=adminDrivePagination.pages" @click="loadAdminDrives(adminDrivePagination.page+1)"
+                            class="rounded-lg border px-4 py-2 text-sm disabled:opacity-40">Next</button>
+                </div>
+            </template>
+
+            <template v-else>
+                <div class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm space-y-3">
+                    <p class="text-xs text-slate-500">Values shown in the drive size selector on the Drives page.</p>
+                    <div class="flex flex-wrap gap-2">
+                        <span v-for="opt in catalogOptionsFor('drive_size')" :key="opt.id"
+                              class="inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-xs"
+                              :class="opt.is_active ? 'border-emerald-200 bg-emerald-50 text-emerald-800' : 'border-slate-200 bg-slate-50 text-slate-400 line-through'">
+                            <span v-text="opt.value"></span>
+                            <button type="button" @click="toggleCatalogOption(opt)" class="hover:underline" v-text="opt.is_active ? 'hide' : 'show'"></button>
+                            <button type="button" @click="deleteCatalogOption(opt)" class="text-rose-600 hover:underline">×</button>
+                        </span>
+                    </div>
+                    <div class="flex flex-wrap items-end gap-2">
+                        <input v-model="newCatalogOption.value" placeholder="e.g. 100Gi" class="rounded-lg border px-3 py-1.5 text-sm font-mono w-32">
+                        <button type="button" @click="newCatalogOption.category='drive_size'; addCatalogOption()"
+                                class="rounded-lg bg-blue-600 px-3 py-1.5 text-xs font-semibold text-white">Add size</button>
+                    </div>
+                </div>
+            </template>
         </section>
 
         <!-- My servers -->
@@ -270,7 +316,7 @@
                 <div>
                     <h2 class="text-lg font-bold text-slate-900">My servers</h2>
                     <p v-if="resourceLimits.limited && resourceLimits.limits.max_servers" class="text-xs text-slate-500 mt-0.5"
-                       v-text="'Servers: ' + (resourceLimits.limits.server_count ?? myWorkspaces.length) + ' / ' + resourceLimits.limits.max_servers"></p>
+                       v-text="'Servers: ' + (resourceLimits.limits.server_count ?? myServerPagination.total) + ' / ' + resourceLimits.limits.max_servers"></p>
                 </div>
                 <div class="flex flex-wrap items-center gap-2">
                     <button type="button" @click="openCreateServerModal" :disabled="!canCreateMoreServers"
@@ -283,12 +329,26 @@
                     </button>
                 </div>
             </div>
-            <p v-if="myWorkspaces.length===0" class="text-sm text-slate-500">No servers yet. Use <strong>Create server</strong> or <strong>Bulk create server</strong> to get started.</p>
+            <div class="flex flex-wrap items-center gap-3">
+                <input v-model="myServerFilter" @input="loadMyWorkspaces(1)" placeholder="Filter by name…"
+                       class="rounded-lg border px-3 py-1.5 text-sm">
+                <span class="text-sm text-slate-500" v-text="'Page ' + myServerPagination.page + ' / ' + myServerPagination.pages"></span>
+            </div>
+
+            <p v-if="myServerPagination.total===0 && !myServerFilter" class="text-sm text-slate-500">No servers yet. Use <strong>Create server</strong> or <strong>Bulk create server</strong> to get started.</p>
+            <p v-else-if="myWorkspaces.length===0" class="text-sm text-slate-500">No servers match your filter.</p>
+
             <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
                 <workspace-card v-for="ws in myWorkspaces" :key="ws.id" :ws="ws"
                                 @detail="openWorkspaceModal" @copy="copyWorkspaceUrl"
                                 @start="startWorkspace" @stop="stopWorkspace" @open="openWorkspace"
                                 @export="exportWorkspace" @delete="ws => openDeleteModal(ws, false)"></workspace-card>
+            </div>
+            <div v-if="myServerPagination.pages > 1" class="flex justify-center gap-2">
+                <button :disabled="myServerPagination.page<=1" @click="loadMyWorkspaces(myServerPagination.page-1)"
+                        class="rounded-lg border px-4 py-2 text-sm disabled:opacity-40">Prev</button>
+                <button :disabled="myServerPagination.page>=myServerPagination.pages" @click="loadMyWorkspaces(myServerPagination.page+1)"
+                        class="rounded-lg border px-4 py-2 text-sm disabled:opacity-40">Next</button>
             </div>
         </section>
 
@@ -369,23 +429,94 @@
         <!-- Admin servers -->
         <section v-if="is_login && menu==='admin-servers' && is_admin" class="space-y-4">
             <div class="flex flex-wrap items-center gap-3">
-                <h2 class="text-lg font-bold text-slate-900">All servers</h2>
-                <input v-model="adminServerFilter" @input="loadAdminWorkspaces(1)" placeholder="Filter by username…"
-                       class="rounded-lg border px-3 py-1.5 text-sm">
-                <span class="text-sm text-slate-500" v-text="'Page ' + adminPagination.page + ' / ' + adminPagination.pages"></span>
+                <h2 class="text-lg font-bold text-slate-900">Server management</h2>
+                <div class="flex rounded-lg border border-slate-200 overflow-hidden text-sm">
+                    <button type="button" @click="switchAdminServersTab('servers')"
+                            :class="adminServersTab==='servers' ? 'bg-blue-600 text-white' : 'bg-white text-slate-600'"
+                            class="px-4 py-1.5 font-semibold">Servers</button>
+                    <button type="button" @click="switchAdminServersTab('catalog')"
+                            :class="adminServersTab==='catalog' ? 'bg-blue-600 text-white' : 'bg-white text-slate-600'"
+                            class="px-4 py-1.5 font-semibold border-l border-slate-200">Catalog</button>
+                </div>
             </div>
-            <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-                <workspace-card v-for="ws in adminWorkspaces" :key="ws.id" :ws="ws" :show-owner="true"
-                                @detail="openWorkspaceModal" @copy="copyWorkspaceUrl"
-                                @start="startWorkspace" @stop="stopWorkspace" @open="openWorkspace"
-                                @export="exportWorkspace" @delete="ws => openDeleteModal(ws, true)"></workspace-card>
-            </div>
-            <div class="flex justify-center gap-2">
-                <button :disabled="adminPagination.page<=1" @click="loadAdminWorkspaces(adminPagination.page-1)"
-                        class="rounded-lg border px-4 py-2 text-sm disabled:opacity-40">Prev</button>
-                <button :disabled="adminPagination.page>=adminPagination.pages" @click="loadAdminWorkspaces(adminPagination.page+1)"
-                        class="rounded-lg border px-4 py-2 text-sm disabled:opacity-40">Next</button>
-            </div>
+
+            <template v-if="adminServersTab==='servers'">
+                <div class="flex flex-wrap items-center gap-3">
+                    <input v-model="adminServerFilter" @input="loadAdminWorkspaces(1)" placeholder="Filter by username…"
+                           class="rounded-lg border px-3 py-1.5 text-sm">
+                    <span class="text-sm text-slate-500" v-text="'Page ' + adminPagination.page + ' / ' + adminPagination.pages"></span>
+                </div>
+                <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+                    <workspace-card v-for="ws in adminWorkspaces" :key="ws.id" :ws="ws" :show-owner="true"
+                                    @detail="openWorkspaceModal" @copy="copyWorkspaceUrl"
+                                    @start="startWorkspace" @stop="stopWorkspace" @open="openWorkspace"
+                                    @export="exportWorkspace" @delete="ws => openDeleteModal(ws, true)"></workspace-card>
+                </div>
+                <div class="flex justify-center gap-2">
+                    <button :disabled="adminPagination.page<=1" @click="loadAdminWorkspaces(adminPagination.page-1)"
+                            class="rounded-lg border px-4 py-2 text-sm disabled:opacity-40">Prev</button>
+                    <button :disabled="adminPagination.page>=adminPagination.pages" @click="loadAdminWorkspaces(adminPagination.page+1)"
+                            class="rounded-lg border px-4 py-2 text-sm disabled:opacity-40">Next</button>
+                </div>
+            </template>
+
+            <template v-else>
+                <div class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm space-y-5">
+                    <p class="text-xs text-slate-500">Quick templates and selector options used on the Servers page (create server modal).</p>
+
+                    <div class="space-y-2">
+                        <h4 class="text-xs font-semibold uppercase tracking-wide text-slate-500">Quick templates</h4>
+                        <table class="w-full text-xs">
+                            <thead><tr class="border-b text-left text-slate-500">
+                                <th class="py-1 pr-2">Name</th><th>CPU</th><th>RAM</th><th>GPU</th><th>Image</th><th>Active</th><th></th>
+                            </tr></thead>
+                            <tbody>
+                                <tr v-for="t in adminPlanTemplates" :key="t.id" class="border-b border-slate-100">
+                                    <td class="py-1.5 pr-2 font-medium" v-text="t.name"></td>
+                                    <td v-text="t.cpu"></td><td v-text="t.ram"></td><td v-text="t.gpu"></td>
+                                    <td class="font-mono" v-text="t.image"></td>
+                                    <td><button type="button" @click="togglePlanTemplate(t)" class="hover:underline" v-text="t.is_active ? 'yes' : 'no'"></button></td>
+                                    <td><button type="button" @click="deletePlanTemplate(t)" class="text-rose-600 hover:underline">Delete</button></td>
+                                </tr>
+                            </tbody>
+                        </table>
+                        <div class="grid gap-2 sm:grid-cols-6 pt-2">
+                            <input v-model="newPlanTemplate.name" placeholder="Name" class="rounded-lg border px-2 py-1.5 text-sm">
+                            <input v-model.number="newPlanTemplate.cpu" type="number" placeholder="CPU" class="rounded-lg border px-2 py-1.5 text-sm">
+                            <input v-model="newPlanTemplate.ram" placeholder="RAM" class="rounded-lg border px-2 py-1.5 text-sm font-mono">
+                            <input v-model="newPlanTemplate.gpu" placeholder="GPU" class="rounded-lg border px-2 py-1.5 text-sm font-mono">
+                            <input v-model="newPlanTemplate.image" placeholder="image.png" class="rounded-lg border px-2 py-1.5 text-sm font-mono">
+                            <button type="button" @click="savePlanTemplate" class="rounded-lg bg-blue-600 px-2 py-1.5 text-xs font-semibold text-white">Add template</button>
+                        </div>
+                        <textarea v-model="newPlanTemplate.env_defaults_text" rows="2" placeholder='{"PASSWORD_PREFIX":"my-","PWA_APPNAME":"Workspace"}'
+                                  class="w-full rounded-lg border px-2 py-1.5 text-xs font-mono"></textarea>
+                    </div>
+
+                    <div class="grid gap-4 lg:grid-cols-3">
+                        <div v-for="cat in [{id:'cpu',label:'CPU options',placeholder:'4'},{id:'ram',label:'RAM options',placeholder:'8G'},{id:'gpu',label:'GPU options',placeholder:'none'}]"
+                             :key="cat.id" class="space-y-2">
+                            <h4 class="text-xs font-semibold uppercase tracking-wide text-slate-500" v-text="cat.label"></h4>
+                            <div class="flex flex-wrap gap-1.5">
+                                <span v-for="opt in catalogOptionsFor(cat.id)" :key="opt.id"
+                                      class="inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-xs"
+                                      :class="opt.is_active ? 'border-emerald-200 bg-emerald-50 text-emerald-800' : 'border-slate-200 bg-slate-50 text-slate-400 line-through'">
+                                    <span v-text="opt.value + (cat.id==='gpu' && opt.vram_g ? ' ('+opt.vram_g+'G)' : '')"></span>
+                                    <button type="button" @click="toggleCatalogOption(opt)" class="hover:underline" v-text="opt.is_active ? '·' : '+'"></button>
+                                    <button type="button" @click="deleteCatalogOption(opt)" class="text-rose-600">×</button>
+                                </span>
+                            </div>
+                            <div class="flex gap-1">
+                                <input v-model="newCatalogOption.value" :placeholder="cat.placeholder"
+                                       class="flex-1 rounded-lg border px-2 py-1 text-sm font-mono">
+                                <input v-if="cat.id==='gpu'" v-model.number="newCatalogOption.vram_g" type="number" min="0" placeholder="VRAM"
+                                       class="w-16 rounded-lg border px-2 py-1 text-sm">
+                                <button type="button" @click="newCatalogOption.category=cat.id; newCatalogOption.vram_g=cat.id==='gpu'?newCatalogOption.vram_g:0; addCatalogOption()"
+                                        class="rounded-lg border px-2 py-1 text-xs font-semibold hover:bg-slate-50">Add</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </template>
         </section>
 
         <!-- Admin docker images -->
@@ -535,7 +666,7 @@
                     CPU ≤ <span v-text="resourceLimits.limits.max_cpu"></span> vCPU,
                     RAM ≤ <span v-text="resourceLimits.limits.max_ram_g"></span>G,
                     GPU VRAM ≤ <span v-text="resourceLimits.limits.max_gpu_vram_g"></span>G<span v-if="resourceLimits.limits.max_servers">,
-                    servers <span v-text="(resourceLimits.limits.server_count ?? myWorkspaces.length) + '/' + resourceLimits.limits.max_servers"></span></span>
+                    servers <span v-text="(resourceLimits.limits.server_count ?? myServerPagination.total) + '/' + resourceLimits.limits.max_servers"></span></span>
                 </p>
                 <section>
                     <h4 class="mb-3 text-sm font-bold text-slate-900">Quick templates</h4>
@@ -574,7 +705,7 @@
                                         + Add
                                     </button>
                                 </div>
-                                <p v-if="!myDrives.length" class="text-xs text-amber-700">No drives yet. Create one in the <strong>Drives</strong> tab.</p>
+                                <p v-if="!myDrivesAll.length" class="text-xs text-amber-700">No drives yet. Create one in the <strong>Drives</strong> tab.</p>
                                 <div v-for="(mount, idx) in form.drive_mounts" :key="'mount-' + idx"
                                      class="rounded-lg border border-slate-200 bg-slate-50/60 p-3 space-y-2">
                                     <div class="flex items-center justify-between gap-2">
@@ -738,7 +869,7 @@
             <div class="space-y-4 px-5 py-4">
                 <p v-if="resourceLimits.limited" class="rounded-lg bg-amber-50 border border-amber-200 px-3 py-2 text-xs text-amber-800">
                     Max drive size: <strong v-text="resourceLimits.limits.max_drive_size_gi + 'Gi'"></strong><span v-if="resourceLimits.limits.max_drives"> ·
-                    drives <span v-text="(resourceLimits.limits.drive_count ?? myDrives.length) + '/' + resourceLimits.limits.max_drives"></span></span>
+                    drives <span v-text="(resourceLimits.limits.drive_count ?? myDrivePagination.total) + '/' + resourceLimits.limits.max_drives"></span></span>
                 </p>
                 <div>
                     <label class="block text-sm font-medium text-slate-700">Name</label>

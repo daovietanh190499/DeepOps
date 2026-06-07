@@ -1,5 +1,6 @@
 from .drives import UserDrive
 from .groups import ResourceGroup, ResourceGroupMember
+from .platform import PlatformEquipmentOption, ServerPlanTemplate
 from .servers import ServerOption
 from .users import User, UserServer
 from .ssh_keys import WorkspaceSSHKey
@@ -16,4 +17,6 @@ __all__ = [
     'WorkspaceSSHKey',
     'ResourceGroup',
     'ResourceGroupMember',
+    'PlatformEquipmentOption',
+    'ServerPlanTemplate',
 ]

@@ -5,21 +5,13 @@ from __future__ import annotations
 import re
 
 from backend.models import ResourceGroup, ResourceGroupMember, User, UserDrive, Workspace
-
-ALL_CPU = [2, 4, 8, 16, 32]
-ALL_RAM = ['2G', '4G', '8G', '16G', '32G', '64G']
-ALL_GPU = ['none', 'mig-2g.10gb', 'mig-3g.20gb', 'gpu', 'gpu:2']
-ALL_DRIVE_SIZES = ['20Gi', '50Gi', '100Gi', '200Gi', '500Gi', '1Ti']
-
-GPU_VRAM_GB = {
-    '': 0,
-    'none': 0,
-    None: 0,
-    'mig-2g.10gb': 10,
-    'mig-3g.20gb': 20,
-    'gpu': 40,
-    'gpu:2': 80,
-}
+from backend.services.platform_catalog import (
+    all_cpu,
+    all_drive_sizes,
+    all_gpu,
+    all_ram,
+    get_gpu_vram_map,
+)
 
 
 def parse_ram_g(ram: str) -> int:
@@ -45,7 +37,7 @@ def gpu_vram_g(gpu: str | None) -> int:
     key = (gpu or '').strip() or 'none'
     if key == 'none':
         return 0
-    return GPU_VRAM_GB.get(key, 0)
+    return get_gpu_vram_map().get(key, 0)
 
 
 def get_user_group(user: User) -> ResourceGroup | None:
@@ -85,18 +77,22 @@ def limits_payload(group: ResourceGroup | None, user: User | None = None) -> dic
 
 
 def allowed_equipment(group: ResourceGroup | None) -> dict:
+    cpus = all_cpu()
+    rams = all_ram()
+    gpus = all_gpu()
+    drive_sizes = all_drive_sizes()
     if group is None:
         return {
-            'cpu': ALL_CPU[:],
-            'ram': ALL_RAM[:],
-            'gpu': ALL_GPU[:],
-            'drive_sizes': ALL_DRIVE_SIZES[:],
+            'cpu': cpus[:],
+            'ram': rams[:],
+            'gpu': gpus[:],
+            'drive_sizes': drive_sizes[:],
         }
     return {
-        'cpu': [c for c in ALL_CPU if c <= group.max_cpu],
-        'ram': [r for r in ALL_RAM if parse_ram_g(r) <= group.max_ram_g],
-        'gpu': [g for g in ALL_GPU if gpu_vram_g(g) <= group.max_gpu_vram_g],
-        'drive_sizes': [s for s in ALL_DRIVE_SIZES if parse_size_gi(s) <= group.max_drive_size_gi],
+        'cpu': [c for c in cpus if c <= group.max_cpu],
+        'ram': [r for r in rams if parse_ram_g(r) <= group.max_ram_g],
+        'gpu': [g for g in gpus if gpu_vram_g(g) <= group.max_gpu_vram_g],
+        'drive_sizes': [s for s in drive_sizes if parse_size_gi(s) <= group.max_drive_size_gi],
     }
 
 
