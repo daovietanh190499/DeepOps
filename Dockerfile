@@ -6,6 +6,7 @@ WORKDIR /app
 RUN apt-get update --yes && \
     apt-get upgrade --yes && \
     apt-get install --yes --no-install-recommends \
+    bsdutils \
     ca-certificates \
     curl \
     wget \

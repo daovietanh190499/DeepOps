@@ -90,8 +90,17 @@ spec:
               containerPort: {{ .port }}
               protocol: TCP
             {{- end }}
+          {{- $resources := deepCopy .Values.resources }}
+          {{- if .Values.gpu.enabled }}
+          {{- $_ := set $resources.limits "nvidia.com/gpu" (.Values.gpu.count | int) }}
+          {{- $_ := set $resources.requests "nvidia.com/gpu" (.Values.gpu.count | int) }}
+          {{- if gt (int .Values.gpu.memoryMiB) 0 }}
+          {{- $_ := set $resources.limits "nvidia.com/gpumem" (.Values.gpu.memoryMiB | int) }}
+          {{- $_ := set $resources.requests "nvidia.com/gpumem" (.Values.gpu.memoryMiB | int) }}
+          {{- end }}
+          {{- end }}
           resources:
-            {{- toYaml .Values.resources | nindent 12 }}
+            {{- toYaml $resources | nindent 12 }}
           volumeMounts:
             {{- if .Values.persistence.enabled }}
             - name: workspace-volume

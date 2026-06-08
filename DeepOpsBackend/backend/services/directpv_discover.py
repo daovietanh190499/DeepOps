@@ -1,14 +1,43 @@
 """DirectPV discover / init workflow (admin only)."""
 
 import os
+import shlex
 import shutil
+import subprocess
 from pathlib import Path
 
 import yaml
 
-from backend.services.cluster import _run
-
 DRIVES_YAML_PATH = os.environ.get('DIRECTPV_DRIVES_YAML_PATH', '/tmp/directpv-drives.yaml')
+
+
+def _run_cli(cmd: list[str], timeout: int = 280) -> subprocess.CompletedProcess:
+    """
+    Run a CLI command in a non-interactive environment.
+
+    directpv discover uses a Bubble Tea TUI that requires /dev/tty; wrap with
+    `script` when available so discover/init work from the Django container.
+    """
+    env = {**os.environ, 'TERM': 'dumb'}
+    run_cmd = cmd
+    if shutil.which('script'):
+        shell_cmd = ' '.join(shlex.quote(part) for part in cmd)
+        run_cmd = ['script', '-qefc', shell_cmd, '/dev/null']
+    try:
+        return subprocess.run(
+            run_cmd,
+            capture_output=True,
+            text=True,
+            check=False,
+            timeout=timeout,
+            stdin=subprocess.DEVNULL,
+            env=env,
+        )
+    except subprocess.TimeoutExpired as exc:
+        stdout = (exc.stdout or '') if isinstance(exc.stdout, str) else ''
+        stderr = (exc.stderr or '') if isinstance(exc.stderr, str) else ''
+        tail = '\n'.join(part for part in (stdout, stderr, 'command timed out') if part)
+        return subprocess.CompletedProcess(cmd, 124, stdout, tail)
 
 
 def _drives_yaml_path() -> Path:
@@ -104,7 +133,7 @@ def discover_drives() -> dict:
     if path.exists():
         path.unlink()
 
-    result = _run(
+    result = _run_cli(
         ['kubectl', 'directpv', 'discover', '--output-file', str(path)],
         timeout=280,
     )
@@ -193,7 +222,7 @@ def init_drives() -> dict:
             'path': str(path),
         }
 
-    result = _run(
+    result = _run_cli(
         ['kubectl', 'directpv', 'init', str(path), '--dangerous'],
         timeout=280,
     )

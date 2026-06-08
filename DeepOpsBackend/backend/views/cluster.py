@@ -71,9 +71,11 @@ def admin_directpv_discover_run(request, user):
     denied = _require_admin(user)
     if denied:
         return denied
-    result = discover_drives()
-    status = 200 if result.get('ok') else 500
-    return JsonResponse({'result': result}, status=status)
+    try:
+        result = discover_drives()
+    except Exception as exc:
+        return JsonResponse({'result': {'ok': False, 'error': str(exc)}}, status=200)
+    return JsonResponse({'result': result}, status=200)
 
 
 @auth.verify
@@ -100,6 +102,8 @@ def admin_directpv_init(request, user):
     denied = _require_admin(user)
     if denied:
         return denied
-    result = init_drives()
-    status = 200 if result.get('ok') else 500
-    return JsonResponse({'result': result}, status=status)
+    try:
+        result = init_drives()
+    except Exception as exc:
+        return JsonResponse({'result': {'ok': False, 'error': str(exc)}}, status=200)
+    return JsonResponse({'result': result}, status=200)

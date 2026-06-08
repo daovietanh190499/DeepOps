@@ -16,6 +16,7 @@ from backend.services.k8s_status import (
     live_workspace_state,
     workspace_is_active,
 )
+from backend.services.gpu_resources import normalize_gpu_value
 from backend.services.resource_limits import validate_server_count, validate_workspace_resources
 from backend.services.ssh_keys import ssh_info_payload
 from backend.services.workspace_mounts import (
@@ -83,17 +84,17 @@ def _parse_body(request) -> dict:
 def _validate_workspace_limits(user: User, data: dict, ws: Workspace | None = None) -> str | None:
     cpu = data.get('cpu', ws.cpu if ws else 2)
     ram = data.get('ram', ws.ram if ws else '4G')
-    gpu = data.get('gpu', ws.gpu if ws else '')
-    if gpu == 'none':
-        gpu = ''
+    gpu = normalize_gpu_value(data.get('gpu', ws.gpu if ws else ''))
     return validate_workspace_resources(user, cpu=cpu, ram=ram, gpu=gpu)
 
 
 def _apply_workspace_fields(ws: Workspace, data: dict, owner: User | None = None) -> str | None:
     owner = owner or ws.user
-    for field in ('name', 'cpu', 'ram', 'gpu', 'docker_repository', 'docker_tag'):
+    for field in ('name', 'cpu', 'ram', 'docker_repository', 'docker_tag'):
         if field in data and data[field] is not None:
             setattr(ws, field, data[field])
+    if 'gpu' in data:
+        ws.gpu = normalize_gpu_value(data.get('gpu'))
     mount_fields = (
         'drive_mounts', 'drive_id', 'user_drive_id', 'drive_name', 'drive_slug', 'drive', 'mount_path',
     )
@@ -247,11 +248,13 @@ def workspace_export(request, user, workspace_id):
     return response
 
 
-def _start_workspace(ws: Workspace):
+def _start_workspace(ws: Workspace, *, cleanup_on_failure: bool = False):
     if not ws.user_drive_id:
         return JsonResponse({'message': 'select a drive to mount'}, status=400)
     spawn_err = spawn_workspace(ws)
     if spawn_err:
+        if cleanup_on_failure:
+            ws.delete()
         return JsonResponse({'message': spawn_err.get('error', 'spawn failed'), **spawn_err}, status=500)
     return JsonResponse({'message': 'success', 'result': _workspace_payload(ws)})
 
@@ -323,7 +326,7 @@ def workspace_run(request, user):
         return JsonResponse({'message': 'at least one drive mount required'}, status=400)
     ws.save()
     persist_pending_drive_mounts(ws)
-    return _start_workspace(ws)
+    return _start_workspace(ws, cleanup_on_failure=True)
 
 
 @auth.verify

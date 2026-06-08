@@ -198,6 +198,18 @@ function formPayload(form) {
     }
 }
 
+const LEGACY_GPU_ALIASES = {
+    'mig-2g.10gb': '1:10240',
+    'mig-3g.20gb': '1:20480',
+    'gpu': '1:40960',
+    'gpu:2': '2:20480',
+}
+
+function normalizeGpuValue(gpu) {
+    if (!gpu || gpu === 'none') return 'none'
+    return LEGACY_GPU_ALIASES[gpu] || gpu
+}
+
 function formatBulkSummary(data, total) {
     let summary = `Done: ${data.ok} ok, ${data.failed} failed (${total} total)`
     const failed = (data.results || []).filter((r) => !r.ok)
@@ -388,7 +400,7 @@ const appVue = new Vue({
             equipment: {
                 cpu: [2, 4, 8, 16, 32],
                 ram: ['2G', '4G', '8G', '16G', '32G', '64G'],
-                gpu: ['none', 'mig-2g.10gb', 'mig-3g.20gb', 'gpu', 'gpu:2'],
+                gpu: ['none', '1:1024', '1:10240', '1:40960', '2:20480'],
                 drive_sizes: ['20Gi', '50Gi', '100Gi', '200Gi', '500Gi', '1Ti'],
             },
         },
@@ -421,7 +433,7 @@ const appVue = new Vue({
             if (!mounts.length) return '—'
             return mounts.map((m) => {
                 const d = this.myDrivesAll.find((x) => x.id === m.drive_id)
-                return (d ? d.name + ' (' + d.size + ')' : '?') + ' → ' + (m.mount_path || '/home/coder')
+                return (d ? this.driveOptionLabel(d) : '?') + ' → ' + (m.mount_path || '/home/coder')
             }).join(', ')
         },
         userTabs() {
@@ -533,6 +545,18 @@ const appVue = new Vue({
         logout() { window.location = 'logout' },
         workspaceUrl(ws) {
             return window.location.protocol + '//' + (ws.hostname || '')
+        },
+        driveOptionLabel(d) {
+            if (!d) return '—'
+            const inner = d.size + (d.node ? ', ' + d.node : '')
+            return d.name + ' (' + inner + ')'
+        },
+        driveDetailLine(d) {
+            if (!d) return ''
+            let line = d.size
+            if (d.node) line += ' · ' + d.node
+            if (d.in_use) line += ' · in use'
+            return line
         },
         showToast(msg) {
             this.toastMessage = msg
@@ -1024,7 +1048,7 @@ const appVue = new Vue({
         checkWorkspaceLimits(cpu, ram, gpu) {
             if (!this.resourceLimits.limited) return null
             const eq = this.resourceLimits.equipment || {}
-            const gpuVal = gpu === 'none' || !gpu ? 'none' : gpu
+            const gpuVal = normalizeGpuValue(gpu)
             if (eq.cpu && !eq.cpu.includes(Number(cpu))) {
                 return `CPU exceeds group limit (${this.resourceLimits.limits.max_cpu} vCPU)`
             }
@@ -1089,14 +1113,15 @@ const appVue = new Vue({
             }
         },
         applyTemplate(t) {
-            const err = this.checkWorkspaceLimits(t.cpu, t.ram, t.gpu)
+            const gpu = normalizeGpuValue(t.gpu)
+            const err = this.checkWorkspaceLimits(t.cpu, t.ram, gpu)
             if (err) {
                 this.showToast(err)
                 return
             }
             this.form.cpu = t.cpu
             this.form.ram = t.ram
-            this.form.gpu = t.gpu
+            this.form.gpu = gpu
             this.form.name = t.name + ' workspace'
             const env = resolveTemplateEnv(t.env_defaults)
             this.form.env_vars = { ...this.form.env_vars, ...env }

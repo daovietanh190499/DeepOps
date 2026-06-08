@@ -6,7 +6,12 @@ from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_http_methods
 
 from backend.models import User, UserDrive, Workspace, WorkspaceDriveMount
-from backend.services.drives_k8s import delete_drive_pvc, get_pvc_phase, normalize_size
+from backend.services.drives_k8s import (
+    delete_drive_pvc,
+    get_pvc_phase,
+    get_pvc_placement_map,
+    normalize_size,
+)
 from backend.services.bulk import bulk_drive_result, provision_user_drive
 from backend.services.k8s_status import drive_is_in_use, live_drive_status
 from backend.services.github_auth import auth
@@ -36,17 +41,30 @@ def _parse_body(request) -> dict:
     return json.loads(request.body.decode('utf-8'))
 
 
-def _drive_payload(drive: UserDrive) -> dict:
+def _drive_payload(drive: UserDrive, placement: dict | None = None) -> dict:
     data = drive.to_dict()
     data['status'] = live_drive_status(drive.claim_name)
     data['pvc_phase'] = get_pvc_phase(drive.claim_name)
     data['in_use'] = drive_is_in_use(drive)
+    if placement is None:
+        placement = get_pvc_placement_map([drive.claim_name]).get(drive.claim_name, {})
+    data['node'] = placement.get('node', '') or ''
+    data['pv_name'] = placement.get('pv_name', '') or ''
     ws_ids = set(Workspace.objects.filter(user_drive=drive).values_list('id', flat=True))
     ws_ids.update(
         WorkspaceDriveMount.objects.filter(user_drive=drive).values_list('workspace_id', flat=True),
     )
     data['workspace_count'] = len(ws_ids)
     return data
+
+
+def _drive_payloads(drives) -> list[dict]:
+    drive_list = list(drives)
+    placement_map = get_pvc_placement_map([d.claim_name for d in drive_list])
+    return [
+        _drive_payload(d, placement_map.get(d.claim_name, {}))
+        for d in drive_list
+    ]
 
 
 @auth.verify
@@ -67,7 +85,7 @@ def my_drives(request, user):
     paginator = Paginator(qs, per_page)
     page_obj = paginator.get_page(page)
     return JsonResponse({
-        'result': [_drive_payload(d) for d in page_obj.object_list],
+        'result': _drive_payloads(page_obj.object_list),
         'pagination': {
             'page': page_obj.number,
             'per_page': per_page,
@@ -204,7 +222,7 @@ def admin_drives(request, user):
     paginator = Paginator(qs, per_page)
     page_obj = paginator.get_page(page)
     return JsonResponse({
-        'result': [_drive_payload(d) for d in page_obj.object_list],
+        'result': _drive_payloads(page_obj.object_list),
         'pagination': {
             'page': page_obj.number,
             'per_page': per_page,

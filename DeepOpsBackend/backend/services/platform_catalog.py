@@ -6,11 +6,17 @@ from backend.models import PlatformEquipmentOption, ServerPlanTemplate
 
 FALLBACK_CPU = [2, 4, 8, 16, 32]
 FALLBACK_RAM = ['2G', '4G', '8G', '16G', '32G', '64G']
-FALLBACK_GPU = ['none', 'mig-2g.10gb', 'mig-3g.20gb', 'gpu', 'gpu:2']
+# GPU values: "count" or "count:gpumem_mib" (nvidia.com/gpu + nvidia.com/gpumem)
+FALLBACK_GPU = ['none', '1:1024', '1:10240', '1:40960', '2:20480']
 FALLBACK_DRIVE_SIZES = ['20Gi', '50Gi', '100Gi', '200Gi', '500Gi', '1Ti']
 FALLBACK_GPU_VRAM = {
     'none': 0,
     '': 0,
+    '1:1024': 1,
+    '1:10240': 10,
+    '1:40960': 40,
+    '2:20480': 40,
+    # Legacy values (still spawn correctly via gpu_resources.py)
     'mig-2g.10gb': 10,
     'mig-3g.20gb': 20,
     'gpu': 40,

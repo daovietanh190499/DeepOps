@@ -5,6 +5,7 @@ from __future__ import annotations
 import re
 
 from backend.models import ResourceGroup, ResourceGroupMember, User, UserDrive, Workspace
+from backend.services.gpu_resources import normalize_gpu_value
 from backend.services.platform_catalog import (
     all_cpu,
     all_drive_sizes,
@@ -34,10 +35,19 @@ def parse_size_gi(size: str) -> int:
 
 
 def gpu_vram_g(gpu: str | None) -> int:
-    key = (gpu or '').strip() or 'none'
+    key = normalize_gpu_value(gpu) or 'none'
     if key == 'none':
         return 0
-    return get_gpu_vram_map().get(key, 0)
+    mapped = get_gpu_vram_map().get(key)
+    if mapped is not None:
+        return mapped
+    if ':' in key:
+        try:
+            mem_mib = int(key.split(':', 1)[1])
+            return max(1, mem_mib // 1024) if mem_mib > 0 else 0
+        except ValueError:
+            return 0
+    return 0
 
 
 def get_user_group(user: User) -> ResourceGroup | None:

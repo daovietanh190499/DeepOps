@@ -35,17 +35,19 @@ fi
 GPU_FLAGS=()
 if [[ -n "${GPU}" && "${GPU}" != "none" && "${GPU}" != "null" && "${GPU}" != "" ]]; then
   if [[ "${GPU}" == *:* ]]; then
-    GPU_RESOURCE="${GPU%%:*}"
-    GPU_QUANTITY="${GPU##*:}"
+    GPU_COUNT="${GPU%%:*}"
+    GPU_MEM_MIB="${GPU##*:}"
   else
-    GPU_RESOURCE="${GPU}"
-    GPU_QUANTITY="1"
+    GPU_COUNT="${GPU}"
+    GPU_MEM_MIB="0"
   fi
-  GPU_KEY="nvidia.com/${GPU_RESOURCE}"
   GPU_FLAGS=(
-    --set "resources.limits.${GPU_KEY}=${GPU_QUANTITY}"
-    --set "resources.requests.${GPU_KEY}=${GPU_QUANTITY}"
+    --set gpu.enabled=true
+    --set "gpu.count=${GPU_COUNT}"
   )
+  if [[ -n "${GPU_MEM_MIB}" && "${GPU_MEM_MIB}" != "0" ]]; then
+    GPU_FLAGS+=(--set "gpu.memoryMiB=${GPU_MEM_MIB}")
+  fi
 fi
 
 RELEASE_NAME="${NAMESPACE}-${USERNAME}"

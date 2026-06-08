@@ -3,6 +3,7 @@ import os
 import subprocess
 
 from .config import get_hub_config
+from .gpu_resources import parse_gpu_resources
 from .k8s_env import CODEHUB_CHART_PATH, DEFAULT_PORT, DOMAIN_NAME, NAMESPACE
 from .ssh_keys import get_or_none, ssh_secret_name
 
@@ -14,10 +15,7 @@ def _storage_class() -> str:
 def build_spawn_config(workspace) -> dict:
     from .workspace_mounts import spawn_drive_mounts
 
-    gpu = workspace.gpu or ''
-    not_use_gpu = not gpu or gpu in ('null', 'none', '')
-    gpu_type = 'nvidia.com/' + (gpu.split(':')[0] if ':' in gpu else gpu)
-    gpu_quantity = int(gpu.split(':')[1]) if ':' in gpu else 1
+    gpu_spec = parse_gpu_resources(workspace.gpu)
     ram_str = str(workspace.ram)
     ram_value = int(ram_str[:-1]) if ram_str.endswith('G') else int(ram_str)
 
@@ -45,9 +43,9 @@ def build_spawn_config(workspace) -> dict:
         'max_cpu': workspace.cpu * 1.5,
         'max_ram': f'{int(ram_value * 1.5)}G',
         'ram': workspace.ram,
-        'gpu_type': gpu_type,
-        'gpu_quantity': gpu_quantity,
-        'not_use_gpu': not_use_gpu,
+        'gpu_enabled': gpu_spec['enabled'],
+        'gpu_count': gpu_spec['count'],
+        'gpu_memory_mib': gpu_spec['memory_mib'],
         'image': workspace.docker_repository,
         'image_tag': workspace.docker_tag,
         'defaultPort': main_port,
@@ -67,12 +65,13 @@ def build_spawn_config(workspace) -> dict:
 
 def _helm_base_cmd(config: dict) -> list[str]:
     gpu_flags: list[str] = []
-    if not config['not_use_gpu']:
-        gpu_key = config['gpu_type']
+    if config.get('gpu_enabled'):
         gpu_flags = [
-            '--set', f'resources.limits.{gpu_key}={config["gpu_quantity"]}',
-            '--set', f'resources.requests.{gpu_key}={config["gpu_quantity"]}',
+            '--set', 'gpu.enabled=true',
+            '--set', f'gpu.count={config["gpu_count"]}',
         ]
+        if config.get('gpu_memory_mib', 0) > 0:
+            gpu_flags.extend(['--set', f'gpu.memoryMiB={config["gpu_memory_mib"]}'])
 
     cmd = [
         'helm', 'upgrade', '--install', '--create-namespace',

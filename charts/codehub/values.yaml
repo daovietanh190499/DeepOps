@@ -101,6 +101,12 @@ securityContext:
   allowPrivilegeEscalation: true
   runAsUser: 0
 
+# vGPU via NVIDIA device plugin (nvidia.com/gpu + optional nvidia.com/gpumem in MiB)
+gpu:
+  enabled: false
+  count: 1
+  memoryMiB: 0
+
 resources:
   limits:
     cpu: 3

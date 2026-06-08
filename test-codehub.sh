@@ -165,8 +165,17 @@ CLAIM="claim-${NAMESPACE}-${USERNAME}"
 REL="${NAMESPACE}-${USERNAME}"
 GPU_SET=""
 if [[ "$GPU" != "none" && -n "$GPU" ]]; then
-  G="${GPU%%:*}"; Q="${GPU##*:}"; [[ "$GPU" != *:* ]] && Q=1
-  GPU_SET="--set resources.limits.nvidia.com/${G}=${Q} --set resources.requests.nvidia.com/${G}=${Q}"
+  if [[ "$GPU" == *:* ]]; then
+    GC="${GPU%%:*}"
+    GM="${GPU##*:}"
+  else
+    GC="$GPU"
+    GM="0"
+  fi
+  GPU_SET="--set gpu.enabled=true --set gpu.count=${GC}"
+  if [[ -n "$GM" && "$GM" != "0" ]]; then
+    GPU_SET="$GPU_SET --set gpu.memoryMiB=${GM}"
+  fi
 fi
 MAX_CPU=$(awk -v c="$CPU" 'BEGIN{printf "%g", c*1.5}')
 RAMN=${RAM%G}; MAX_RAM=$(awk -v r="$RAMN" 'BEGIN{printf "%d", r*1.5}')G
