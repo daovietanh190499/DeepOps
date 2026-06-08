@@ -329,7 +329,7 @@
         </section>
 
         <!-- DirectPV init confirm -->
-        <div v-if="showDirectpvInitConfirm" class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" @click.self="closeDirectpvInitConfirm">
+        <div v-if="showDirectpvInitConfirm" class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
             <div class="w-full max-w-md rounded-2xl border border-rose-200 bg-white p-6 shadow-xl">
                 <h3 class="text-lg font-bold text-rose-700">Initialize DirectPV drives?</h3>
                 <p class="mt-2 text-sm text-slate-600">
@@ -571,15 +571,20 @@
                         <h4 class="text-xs font-semibold uppercase tracking-wide text-slate-500">Quick templates</h4>
                         <table class="w-full text-xs">
                             <thead><tr class="border-b text-left text-slate-500">
-                                <th class="py-1 pr-2">Name</th><th>CPU</th><th>RAM</th><th>GPU</th><th>Image</th><th>Active</th><th></th>
+                                <th class="py-1 pr-2">Name</th><th>CPU</th><th>RAM</th><th>GPU</th><th>Icon</th><th>Docker</th><th>Ports</th><th>Active</th><th></th>
                             </tr></thead>
                             <tbody>
                                 <tr v-for="t in adminPlanTemplates" :key="t.id" class="border-b border-slate-100">
                                     <td class="py-1.5 pr-2 font-medium" v-text="t.name"></td>
                                     <td v-text="t.cpu"></td><td v-text="t.ram"></td><td v-text="t.gpu"></td>
                                     <td class="font-mono" v-text="t.image"></td>
+                                    <td class="font-mono text-[10px]" v-text="(t.docker_repository || '—') + (t.docker_tag ? ':' + t.docker_tag : '')"></td>
+                                    <td class="font-mono" v-text="(t.exposed_ports || []).join(', ') || '8080'"></td>
                                     <td><button type="button" @click="togglePlanTemplate(t)" class="hover:underline" v-text="t.is_active ? 'yes' : 'no'"></button></td>
-                                    <td><button type="button" @click="deletePlanTemplate(t)" class="text-rose-600 hover:underline">Delete</button></td>
+                                    <td class="space-x-2 whitespace-nowrap">
+                                        <button type="button" @click="openEditPlanTemplateModal(t)" class="text-blue-600 hover:underline">Edit</button>
+                                        <button type="button" @click="deletePlanTemplate(t)" class="text-rose-600 hover:underline">Delete</button>
+                                    </td>
                                 </tr>
                             </tbody>
                         </table>
@@ -588,8 +593,14 @@
                             <input v-model.number="newPlanTemplate.cpu" type="number" placeholder="CPU" class="rounded-lg border px-2 py-1.5 text-sm">
                             <input v-model="newPlanTemplate.ram" placeholder="RAM" class="rounded-lg border px-2 py-1.5 text-sm font-mono">
                             <input v-model="newPlanTemplate.gpu" placeholder="GPU" class="rounded-lg border px-2 py-1.5 text-sm font-mono">
-                            <input v-model="newPlanTemplate.image" placeholder="image.png" class="rounded-lg border px-2 py-1.5 text-sm font-mono">
+                            <input v-model="newPlanTemplate.image" placeholder="icon.png" class="rounded-lg border px-2 py-1.5 text-sm font-mono">
                             <button type="button" @click="savePlanTemplate" class="rounded-lg bg-blue-600 px-2 py-1.5 text-xs font-semibold text-white">Add template</button>
+                        </div>
+                        <div class="grid gap-2 sm:grid-cols-3">
+                            <input v-model="newPlanTemplate.docker_repository" placeholder="Docker repository" class="rounded-lg border px-2 py-1.5 text-sm font-mono sm:col-span-2">
+                            <input v-model="newPlanTemplate.docker_tag" placeholder="Docker tag" class="rounded-lg border px-2 py-1.5 text-sm font-mono">
+                            <input v-model="newPlanTemplate.ports_text" placeholder="Ports (8080, 3000)" class="rounded-lg border px-2 py-1.5 text-sm font-mono sm:col-span-3">
+                            <input v-model="newPlanTemplate.command_text" placeholder="Container command (space-separated)" class="rounded-lg border px-2 py-1.5 text-sm font-mono sm:col-span-3">
                         </div>
                         <textarea v-model="newPlanTemplate.env_defaults_text" rows="2" placeholder='{"PASSWORD_PREFIX":"my-","PWA_APPNAME":"Workspace"}'
                                   class="w-full rounded-lg border px-2 py-1.5 text-xs font-mono"></textarea>
@@ -651,7 +662,7 @@
     </main>
 
     <!-- Workspace detail modal -->
-    <div v-if="modalWorkspace" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50" @click.self="closeWorkspaceModal">
+    <div v-if="modalWorkspace" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50">
         <div class="max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-2xl border border-slate-200 bg-white shadow-xl">
             <div class="sticky top-0 flex items-center justify-between border-b border-slate-100 bg-white px-5 py-4">
                 <h3 class="text-lg font-bold text-slate-900" v-text="modalWorkspace.name"></h3>
@@ -757,7 +768,7 @@
     </div>
 
     <!-- Create server modal -->
-    <div v-if="showCreateServerModal" class="fixed inset-0 z-[55] flex items-center justify-center p-4 bg-slate-900/50" @click.self="closeCreateServerModal">
+    <div v-if="showCreateServerModal" class="fixed inset-0 z-[55] flex items-center justify-center p-4 bg-slate-900/50">
         <div class="w-full max-w-5xl rounded-2xl border border-slate-200 bg-white shadow-xl max-h-[92vh] overflow-y-auto">
             <div class="flex items-center justify-between border-b border-slate-100 px-5 py-4 sticky top-0 bg-white z-10">
                 <div>
@@ -782,7 +793,7 @@
                                 class="flex flex-col rounded-xl border-2 border-slate-200 bg-white p-3 text-left transition hover:border-blue-400 hover:shadow-md">
                             <img :src="'/static/img/' + t.image" class="mb-2 h-8 w-8 object-contain" alt="">
                             <span class="text-sm font-semibold text-slate-800" v-text="t.name"></span>
-                            <span class="mt-1 text-xs text-slate-500" v-text="t.cpu + ' vCPU · ' + (t.gpu || 'no GPU')"></span>
+                            <span class="mt-1 text-xs text-slate-500" v-text="templateSummaryLine(t)"></span>
                         </button>
                     </div>
                 </section>
@@ -916,7 +927,7 @@
     </div>
 
     <!-- Bulk create server modal -->
-    <div v-if="showBulkCreateServerModal" class="fixed inset-0 z-[55] flex items-center justify-center p-4 bg-slate-900/50" @click.self="closeBulkCreateServerModal">
+    <div v-if="showBulkCreateServerModal" class="fixed inset-0 z-[55] flex items-center justify-center p-4 bg-slate-900/50">
         <div class="w-full max-w-lg rounded-2xl border border-slate-200 bg-white shadow-xl max-h-[90vh] overflow-y-auto">
             <div class="flex items-center justify-between border-b border-slate-100 px-5 py-4 sticky top-0 bg-white">
                 <div>
@@ -975,7 +986,7 @@
     </div>
 
     <!-- Create drive modal -->
-    <div v-if="showCreateDriveModal" class="fixed inset-0 z-[55] flex items-center justify-center p-4 bg-slate-900/50" @click.self="closeCreateDriveModal">
+    <div v-if="showCreateDriveModal" class="fixed inset-0 z-[55] flex items-center justify-center p-4 bg-slate-900/50">
         <div class="w-full max-w-md rounded-2xl border border-slate-200 bg-white shadow-xl">
             <div class="flex items-center justify-between border-b border-slate-100 px-5 py-4">
                 <div>
@@ -1012,7 +1023,7 @@
     </div>
 
     <!-- Bulk create drive modal -->
-    <div v-if="showBulkCreateDriveModal" class="fixed inset-0 z-[55] flex items-center justify-center p-4 bg-slate-900/50" @click.self="closeBulkCreateDriveModal">
+    <div v-if="showBulkCreateDriveModal" class="fixed inset-0 z-[55] flex items-center justify-center p-4 bg-slate-900/50">
         <div class="w-full max-w-lg rounded-2xl border border-slate-200 bg-white shadow-xl max-h-[90vh] overflow-y-auto">
             <div class="flex items-center justify-between border-b border-slate-100 px-5 py-4 sticky top-0 bg-white">
                 <div>
@@ -1064,7 +1075,7 @@
     </div>
 
     <!-- Delete drive confirmation -->
-    <div v-if="deleteModalDrive" class="fixed inset-0 z-[55] flex items-center justify-center p-4 bg-slate-900/50" @click.self="closeDeleteDriveModal">
+    <div v-if="deleteModalDrive" class="fixed inset-0 z-[55] flex items-center justify-center p-4 bg-slate-900/50">
         <div class="w-full max-w-md rounded-2xl border border-slate-200 bg-white shadow-xl">
             <div class="border-b border-slate-100 px-5 py-4">
                 <h3 class="text-lg font-bold text-slate-900">Delete drive</h3>
@@ -1082,7 +1093,7 @@
     </div>
 
     <!-- Delete server confirmation -->
-    <div v-if="deleteModalWorkspace" class="fixed inset-0 z-[55] flex items-center justify-center p-4 bg-slate-900/50" @click.self="closeDeleteModal">
+    <div v-if="deleteModalWorkspace" class="fixed inset-0 z-[55] flex items-center justify-center p-4 bg-slate-900/50">
         <div class="w-full max-w-md rounded-2xl border border-slate-200 bg-white shadow-xl">
             <div class="border-b border-slate-100 px-5 py-4">
                 <h3 class="text-lg font-bold text-slate-900">Delete server</h3>
@@ -1114,8 +1125,79 @@
         </div>
     </div>
 
+    <!-- Edit quick template -->
+    <div v-if="showPlanTemplateModal" class="fixed inset-0 z-[55] flex items-center justify-center p-4 bg-slate-900/50">
+        <div class="w-full max-w-lg rounded-2xl border border-slate-200 bg-white shadow-xl max-h-[90vh] overflow-y-auto">
+            <div class="flex items-center justify-between border-b border-slate-100 px-5 py-4 sticky top-0 bg-white z-10">
+                <h3 class="text-lg font-bold text-slate-900">Edit quick template</h3>
+                <button type="button" @click="closePlanTemplateModal" class="text-slate-400 hover:text-slate-700"><i class="fa fa-times text-xl"></i></button>
+            </div>
+            <div class="space-y-4 px-5 py-4">
+                <div>
+                    <label class="block text-xs font-medium text-slate-600">Name</label>
+                    <input v-model="planTemplateForm.name" type="text" class="mt-1 w-full rounded-lg border px-3 py-2 text-sm">
+                </div>
+                <div class="grid gap-3 sm:grid-cols-2">
+                    <div>
+                        <label class="block text-xs font-medium text-slate-600">CPU (vCPU)</label>
+                        <input v-model.number="planTemplateForm.cpu" type="number" min="1" class="mt-1 w-full rounded-lg border px-3 py-2 text-sm">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-medium text-slate-600">RAM</label>
+                        <input v-model="planTemplateForm.ram" type="text" placeholder="4G" class="mt-1 w-full rounded-lg border px-3 py-2 text-sm font-mono">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-medium text-slate-600">GPU</label>
+                        <input v-model="planTemplateForm.gpu" type="text" placeholder="none" class="mt-1 w-full rounded-lg border px-3 py-2 text-sm font-mono">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-medium text-slate-600">Icon image</label>
+                        <input v-model="planTemplateForm.image" type="text" placeholder="logo.png" class="mt-1 w-full rounded-lg border px-3 py-2 text-sm font-mono">
+                    </div>
+                    <div class="sm:col-span-2">
+                        <label class="block text-xs font-medium text-slate-600">Docker repository</label>
+                        <input v-model="planTemplateForm.docker_repository" type="text" placeholder="codercom/code-server" class="mt-1 w-full rounded-lg border px-3 py-2 text-sm font-mono">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-medium text-slate-600">Docker tag</label>
+                        <input v-model="planTemplateForm.docker_tag" type="text" placeholder="4.89.0-ubuntu" class="mt-1 w-full rounded-lg border px-3 py-2 text-sm font-mono">
+                    </div>
+                    <div class="sm:col-span-2">
+                        <label class="block text-xs font-medium text-slate-600">Exposed ports</label>
+                        <input v-model="planTemplateForm.ports_text" type="text" placeholder="8080, 3000" class="mt-1 w-full rounded-lg border px-3 py-2 text-sm font-mono">
+                    </div>
+                    <div class="sm:col-span-2">
+                        <label class="block text-xs font-medium text-slate-600">Container command</label>
+                        <input v-model="planTemplateForm.command_text" type="text" placeholder="leave empty for image default" class="mt-1 w-full rounded-lg border px-3 py-2 text-sm font-mono">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-medium text-slate-600">Sort order</label>
+                        <input v-model.number="planTemplateForm.sort_order" type="number" min="0" class="mt-1 w-full rounded-lg border px-3 py-2 text-sm">
+                    </div>
+                    <div class="flex items-end">
+                        <label class="flex items-center gap-2 text-sm text-slate-700">
+                            <input v-model="planTemplateForm.is_active" type="checkbox" class="rounded border-slate-300">
+                            Active
+                        </label>
+                    </div>
+                </div>
+                <div>
+                    <label class="block text-xs font-medium text-slate-600">Environment defaults (JSON)</label>
+                    <textarea v-model="planTemplateForm.env_defaults_text" rows="4"
+                              placeholder='{"PASSWORD_PREFIX":"my-","PWA_APPNAME":"Workspace"}'
+                              class="mt-1 w-full rounded-lg border px-3 py-2 text-xs font-mono"></textarea>
+                </div>
+                <div class="flex justify-end gap-2">
+                    <button type="button" @click="closePlanTemplateModal" class="rounded-lg border px-4 py-2 text-sm">Cancel</button>
+                    <button type="button" @click="savePlanTemplateModal" :disabled="planTemplateFormLoading"
+                            class="rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50">Save</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <!-- Create / edit resource group -->
-    <div v-if="showGroupFormModal" class="fixed inset-0 z-[55] flex items-center justify-center p-4 bg-slate-900/50" @click.self="closeGroupFormModal">
+    <div v-if="showGroupFormModal" class="fixed inset-0 z-[55] flex items-center justify-center p-4 bg-slate-900/50">
         <div class="w-full max-w-md rounded-2xl border border-slate-200 bg-white shadow-xl">
             <div class="flex items-center justify-between border-b border-slate-100 px-5 py-4">
                 <h3 class="text-lg font-bold text-slate-900" v-text="editingGroup ? 'Edit group' : 'Create group'"></h3>
@@ -1170,7 +1252,7 @@
     </div>
 
     <!-- Group members -->
-    <div v-if="groupMembersModal" class="fixed inset-0 z-[55] flex items-center justify-center p-4 bg-slate-900/50" @click.self="closeGroupMembersModal">
+    <div v-if="groupMembersModal" class="fixed inset-0 z-[55] flex items-center justify-center p-4 bg-slate-900/50">
         <div class="w-full max-w-lg rounded-2xl border border-slate-200 bg-white shadow-xl max-h-[90vh] overflow-y-auto">
             <div class="flex items-center justify-between border-b border-slate-100 px-5 py-4 sticky top-0 bg-white z-10">
                 <div>

@@ -6,7 +6,7 @@ from django.views.decorators.http import require_http_methods
 
 from backend.models import PlatformEquipmentOption, ServerPlanTemplate, User
 from backend.services.github_auth import auth
-from backend.services.platform_catalog import admin_catalog_payload, catalog_payload
+from backend.services.platform_catalog import _template_payload, admin_catalog_payload, catalog_payload
 
 
 def _require_admin(user):
@@ -29,6 +29,38 @@ def _parse_body(request) -> dict:
     if not request.body:
         return {}
     return json.loads(request.body.decode('utf-8'))
+
+
+def _parse_exposed_ports(raw) -> list[int]:
+    if isinstance(raw, list):
+        ports = []
+        for item in raw:
+            try:
+                port = int(item)
+            except (TypeError, ValueError):
+                continue
+            if port > 0:
+                ports.append(port)
+        return ports or [8080]
+    if isinstance(raw, str) and raw.strip():
+        ports = []
+        for part in raw.replace(';', ',').split(','):
+            try:
+                port = int(part.strip())
+            except ValueError:
+                continue
+            if port > 0:
+                ports.append(port)
+        return ports or [8080]
+    return [8080]
+
+
+def _parse_container_command(raw) -> list[str]:
+    if isinstance(raw, list):
+        return [str(c).strip() for c in raw if str(c).strip()]
+    if isinstance(raw, str):
+        return [c for c in raw.split() if c]
+    return []
 
 
 @auth.verify
@@ -141,6 +173,12 @@ def admin_platform_template_create(request, user):
         cpu=int(data.get('cpu', 2) or 2),
         ram=(data.get('ram') or '4G').strip(),
         gpu=(data.get('gpu') or 'none').strip() or 'none',
+        docker_repository=(data.get('docker_repository') or '').strip(),
+        docker_tag=(data.get('docker_tag') or '').strip(),
+        exposed_ports=_parse_exposed_ports(data.get('exposed_ports')),
+        container_command=_parse_container_command(
+            data.get('container_command', data.get('command_text', data.get('command'))),
+        ),
         env_defaults=data.get('env_defaults') if isinstance(data.get('env_defaults'), dict) else {},
         sort_order=int(data.get('sort_order', 0) or 0),
         is_active=data.get('is_active', True),
@@ -172,11 +210,17 @@ def admin_platform_template_detail(request, user, template_id):
         if ServerPlanTemplate.objects.filter(name=new_name).exclude(id=template.id).exists():
             return JsonResponse({'message': 'template already exists'}, status=400)
         template.name = new_name
-    for field in ('image', 'ram', 'gpu'):
+    for field in ('image', 'ram', 'gpu', 'docker_repository', 'docker_tag'):
         if field in data and data[field] is not None:
             setattr(template, field, str(data[field]).strip())
     if 'cpu' in data:
         template.cpu = int(data['cpu'] or 2)
+    if 'exposed_ports' in data:
+        template.exposed_ports = _parse_exposed_ports(data['exposed_ports'])
+    if any(key in data for key in ('container_command', 'command_text', 'command')):
+        template.container_command = _parse_container_command(
+            data.get('container_command', data.get('command_text', data.get('command'))),
+        )
     if 'env_defaults' in data and isinstance(data['env_defaults'], dict):
         template.env_defaults = data['env_defaults']
     if 'sort_order' in data:
@@ -184,4 +228,4 @@ def admin_platform_template_detail(request, user, template_id):
     if 'is_active' in data:
         template.is_active = bool(data['is_active'])
     template.save()
-    return JsonResponse({'message': 'success'})
+    return JsonResponse({'result': _template_payload(template)})

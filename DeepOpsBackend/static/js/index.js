@@ -140,6 +140,48 @@ function defaultDriveMount() {
     return { drive_id: '', mount_path: '/home/coder' }
 }
 
+function defaultPlanTemplateForm() {
+    return {
+        name: '',
+        image: 'logo.png',
+        cpu: 2,
+        ram: '4G',
+        gpu: 'none',
+        docker_repository: 'codercom/code-server',
+        docker_tag: '4.89.0-ubuntu',
+        ports_text: '8080',
+        command_text: '',
+        env_defaults_text: '{"PASSWORD_PREFIX":"my-","PWA_APPNAME":"Workspace"}',
+        sort_order: 0,
+        is_active: true,
+    }
+}
+
+function planTemplatePayloadFromForm(form) {
+    let env_defaults = {}
+    try {
+        env_defaults = JSON.parse(form.env_defaults_text || '{}')
+    } catch {
+        return { error: 'env_defaults must be valid JSON' }
+    }
+    return {
+        payload: {
+            name: form.name,
+            image: form.image,
+            cpu: form.cpu,
+            ram: form.ram,
+            gpu: form.gpu,
+            docker_repository: (form.docker_repository || '').trim(),
+            docker_tag: (form.docker_tag || '').trim(),
+            exposed_ports: parsePorts(form.ports_text),
+            container_command: parseCommand(form.command_text),
+            env_defaults,
+            sort_order: form.sort_order,
+            is_active: form.is_active,
+        },
+    }
+}
+
 function defaultForm() {
     return {
         name: 'My workspace',
@@ -313,12 +355,12 @@ const appVue = new Vue({
         driveSizeOptions: [],
         adminCatalogOptions: [],
         adminPlanTemplates: [],
+        showPlanTemplateModal: false,
+        editingPlanTemplate: null,
+        planTemplateForm: defaultPlanTemplateForm(),
+        planTemplateFormLoading: false,
         newCatalogOption: { category: 'cpu', value: '', vram_g: 0 },
-        newPlanTemplate: {
-            name: '', image: 'logo.png', cpu: 2, ram: '4G', gpu: 'none',
-            env_defaults_text: '{"PASSWORD_PREFIX":"my-","PWA_APPNAME":"Workspace"}',
-            sort_order: 0, is_active: true,
-        },
+        newPlanTemplate: defaultPlanTemplateForm(),
         myDrives: [],
         myDrivesAll: [],
         myDriveFilter: '',
@@ -998,36 +1040,79 @@ const appVue = new Vue({
             await this.loadAdminPlatformCatalog()
         },
         async savePlanTemplate() {
-            let env_defaults = {}
-            try {
-                env_defaults = JSON.parse(this.newPlanTemplate.env_defaults_text || '{}')
-            } catch {
-                this.showToast('env_defaults must be valid JSON')
+            const built = planTemplatePayloadFromForm(this.newPlanTemplate)
+            if (built.error) {
+                this.showToast(built.error)
                 return
-            }
-            const payload = {
-                name: this.newPlanTemplate.name,
-                image: this.newPlanTemplate.image,
-                cpu: this.newPlanTemplate.cpu,
-                ram: this.newPlanTemplate.ram,
-                gpu: this.newPlanTemplate.gpu,
-                env_defaults,
-                sort_order: this.newPlanTemplate.sort_order,
-                is_active: this.newPlanTemplate.is_active,
             }
             const res = await fetch('admin/platform/templates', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(payload),
+                body: JSON.stringify(built.payload),
             })
             const data = await res.json().catch(() => ({}))
             if (res.status !== 201) {
                 this.showToast(data.message || 'Save failed')
                 return
             }
-            this.newPlanTemplate.name = ''
+            this.newPlanTemplate = defaultPlanTemplateForm()
             await this.loadAdminPlatformCatalog()
+            await this.loadPlatformCatalog()
             this.showToast('Template added')
+        },
+        openEditPlanTemplateModal(template) {
+            this.editingPlanTemplate = template
+            this.planTemplateForm = {
+                name: template.name,
+                image: template.image,
+                cpu: template.cpu,
+                ram: template.ram,
+                gpu: template.gpu || 'none',
+                docker_repository: template.docker_repository || '',
+                docker_tag: template.docker_tag || '',
+                ports_text: (template.exposed_ports || [8080]).join(', '),
+                command_text: (template.container_command || []).join(' '),
+                env_defaults_text: JSON.stringify(template.env_defaults || {}, null, 2),
+                sort_order: template.sort_order || 0,
+                is_active: template.is_active !== false,
+            }
+            this.showPlanTemplateModal = true
+        },
+        closePlanTemplateModal() {
+            this.showPlanTemplateModal = false
+            this.editingPlanTemplate = null
+            this.planTemplateForm = defaultPlanTemplateForm()
+        },
+        async savePlanTemplateModal() {
+            if (!this.editingPlanTemplate) return
+            const built = planTemplatePayloadFromForm(this.planTemplateForm)
+            if (built.error) {
+                this.showToast(built.error)
+                return
+            }
+            if (!(built.payload.name || '').trim()) {
+                this.showToast('Name required')
+                return
+            }
+            this.planTemplateFormLoading = true
+            try {
+                const res = await fetch('admin/platform/templates/' + this.editingPlanTemplate.id, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(built.payload),
+                })
+                const data = await res.json().catch(() => ({}))
+                if (res.status !== 200) {
+                    this.showToast(data.message || 'Save failed')
+                    return
+                }
+                this.closePlanTemplateModal()
+                await this.loadAdminPlatformCatalog()
+                await this.loadPlatformCatalog()
+                this.showToast('Template updated')
+            } finally {
+                this.planTemplateFormLoading = false
+            }
         },
         async deletePlanTemplate(template) {
             if (!confirm('Delete template ' + template.name + '?')) return
@@ -1037,6 +1122,7 @@ const appVue = new Vue({
                 return
             }
             await this.loadAdminPlatformCatalog()
+            await this.loadPlatformCatalog()
             this.showToast('Template deleted')
         },
         async togglePlanTemplate(template) {
@@ -1050,6 +1136,7 @@ const appVue = new Vue({
                 return
             }
             await this.loadAdminPlatformCatalog()
+            await this.loadPlatformCatalog()
         },
         clampFormToLimits() {
             const eq = this.resourceLimits.equipment
@@ -1144,11 +1231,50 @@ const appVue = new Vue({
             this.form.ram = t.ram
             this.form.gpu = gpu
             this.form.name = t.name + ' workspace'
+            this.applyTemplateDockerSettings(t)
+            if (t.container_command && t.container_command.length) {
+                this.form.command_text = t.container_command.join(' ')
+            } else {
+                this.form.command_text = ''
+            }
             const env = resolveTemplateEnv(t.env_defaults)
             this.form.env_vars = { ...this.form.env_vars, ...env }
             const firstKey = Object.keys(env)[0] || 'PASSWORD'
             this.envKey = firstKey
             this.envValue = this.form.env_vars[firstKey] || ''
+        },
+        applyTemplateDockerSettings(t) {
+            if (t.exposed_ports && t.exposed_ports.length) {
+                this.form.ports_text = t.exposed_ports.join(', ')
+            }
+            const repository = (t.docker_repository || '').trim()
+            if (!repository) return
+            const img = this.dockerImages.find((i) => i.repository === repository)
+            if (img) {
+                this.form.docker_image_id = img.id
+                this.form.docker_repository = img.repository
+                const tags = (img.tags && img.tags.length) ? img.tags : [img.default_tag || 'latest']
+                const wanted = (t.docker_tag || img.default_tag || tags[0] || 'latest').trim()
+                this.form.docker_tag = tags.includes(wanted) ? wanted : tags[0]
+                return
+            }
+            this.form.docker_image_id = ''
+            this.form.docker_repository = repository
+            this.form.docker_tag = (t.docker_tag || 'latest').trim()
+        },
+        templateSummaryLine(t) {
+            const parts = [t.cpu + ' vCPU', t.gpu || 'no GPU']
+            if (t.docker_repository) {
+                parts.push(t.docker_repository + (t.docker_tag ? ':' + t.docker_tag : ''))
+            }
+            if (t.exposed_ports && t.exposed_ports.length) {
+                parts.push('ports ' + t.exposed_ports.join(','))
+            }
+            if (t.container_command && t.container_command.length) {
+                const cmd = t.container_command.join(' ')
+                parts.push('cmd ' + (cmd.length > 24 ? cmd.slice(0, 24) + '…' : cmd))
+            }
+            return parts.join(' · ')
         },
         addEnv() {
             const k = (this.envKey || '').trim()

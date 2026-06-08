@@ -1,6 +1,14 @@
 from django.db import models
 
 
+def _default_ports():
+    return [8080]
+
+
+def _default_command():
+    return []
+
+
 class PlatformEquipmentOption(models.Model):
     CATEGORY_CPU = 'cpu'
     CATEGORY_RAM = 'ram'
@@ -33,6 +41,10 @@ class ServerPlanTemplate(models.Model):
     cpu = models.PositiveIntegerField(default=2)
     ram = models.CharField(max_length=64, default='4G')
     gpu = models.CharField(max_length=64, default='none')
+    docker_repository = models.CharField(max_length=512, blank=True, default='')
+    docker_tag = models.CharField(max_length=128, blank=True, default='')
+    exposed_ports = models.JSONField(default=_default_ports, blank=True)
+    container_command = models.JSONField(default=_default_command, blank=True)
     env_defaults = models.JSONField(default=dict, blank=True)
     sort_order = models.PositiveIntegerField(default=0)
     is_active = models.BooleanField(default=True)
