@@ -30,7 +30,7 @@ Download a release binary from [wstunnel releases](https://github.com/erebe/wstu
 
 ```sshconfig
 Host dohub-myworkspace
-    HostName myworkspace.youruser.dohub.com
+    HostName myworkspace-youruser.dohub.com
     User coder
     IdentityFile ~/.ssh/dohub-myworkspace
     ProxyCommand wstunnel client --log-lvl=warn -P ssh-tunnel -L stdio://127.0.0.1:2222 wss://%h/ssh-tunnel
@@ -46,7 +46,7 @@ ssh dohub-myworkspace
 One-liner without config file:
 
 ```bash
-ssh -i ~/.ssh/dohub-myworkspace -o ProxyCommand="wstunnel client --log-lvl=warn -P ssh-tunnel -L stdio://127.0.0.1:2222 wss://%h/ssh-tunnel" coder@myworkspace.youruser.dohub.com
+ssh -i ~/.ssh/dohub-myworkspace -o ProxyCommand="wstunnel client --log-lvl=warn -P ssh-tunnel -L stdio://127.0.0.1:2222 wss://%h/ssh-tunnel" coder@myworkspace-youruser.dohub.com
 ```
 
 ## 4. Build & deploy

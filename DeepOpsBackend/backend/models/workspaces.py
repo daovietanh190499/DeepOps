@@ -123,7 +123,7 @@ class Workspace(models.Model):
     @property
     def hostname(self) -> str:
         domain = __import__('os').environ.get('DOMAIN_NAME', 'dohub.com')
-        return f'{self.slug}.{self.user.username}.{domain}'
+        return f'{self.slug}-{self.user.username}.{domain}'
 
     def to_config_dict(self) -> dict:
         return {

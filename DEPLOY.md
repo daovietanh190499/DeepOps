@@ -116,7 +116,7 @@ API: `GET/POST /drives/create`, `DELETE /drives/<id>`, `GET /admin/drives`.
 - **Admin → Servers**: lưới card, lọc user, phân trang
 - **Admin → Images**: danh sách docker image cho user chọn
 - Template Lollipop/Oreo/… chỉ fill form trên UI (không còn plan trong DB)
-- Hostname mỗi server: `{slug}.{username}.{DOMAIN_NAME}`
+- Hostname mỗi server: `{slug}-{username}.{DOMAIN_NAME}`
 
 API chính: `POST /workspaces/run`, `GET /workspaces`, `POST /workspaces/<id>/start|stop`, `GET /workspaces/<id>/export`
 
