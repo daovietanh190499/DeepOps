@@ -25,11 +25,15 @@ def seed_docker_images():
         ]
 
     for i, item in enumerate(images):
+        tags = item.get('tags')
+        if not isinstance(tags, list) or not tags:
+            tags = [item.get('default_tag', 'latest')]
         DockerImage.objects.get_or_create(
             repository=item['repository'],
             defaults={
                 'label': item.get('label', item['repository']),
-                'default_tag': item.get('default_tag', 'latest'),
+                'default_tag': item.get('default_tag', tags[0]),
+                'tags': tags,
                 'is_active': item.get('is_active', True),
                 'sort_order': item.get('sort_order', i),
             },

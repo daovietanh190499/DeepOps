@@ -60,7 +60,22 @@ def build_spawn_config(workspace) -> dict:
         'ssh_enabled': ssh_record is not None,
         'ssh_secret_name': ssh_secret_name(workspace),
         'ssh_public_key': ssh_record.public_key if ssh_record else '',
+        'privileged': workspace.privileged,
     }
+
+
+def _security_context_helm_flags(privileged: bool) -> list[str]:
+    if privileged:
+        return [
+            '--set', 'securityContext.privileged=true',
+            '--set', 'securityContext.runAsUser=0',
+            '--set', 'securityContext.allowPrivilegeEscalation=true',
+            '--set', 'securityContext.capabilities.add[0]=SYS_ADMIN',
+        ]
+    return [
+        '--set-json',
+        'securityContext={"runAsUser":1000,"allowPrivilegeEscalation":false,"privileged":false}',
+    ]
 
 
 def _helm_base_cmd(config: dict) -> list[str]:
@@ -87,9 +102,7 @@ def _helm_base_cmd(config: dict) -> list[str]:
         '--set', 'serviceAccount.automount=false',
         '--set', 'serviceAccount.name=default',
         '--set', 'podSecurityContext.fsGroup=100',
-        '--set', 'securityContext.capabilities.add[0]=SYS_ADMIN',
-        '--set', 'securityContext.allowPrivilegeEscalation=true',
-        '--set', 'securityContext.runAsUser=0',
+        *_security_context_helm_flags(config.get('privileged', False)),
         '--set', 'service.type=ClusterIP',
         '--set', f'service.port={config["defaultPort"]}',
         '--set', 'ingress.enabled=true',

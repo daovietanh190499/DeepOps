@@ -8,6 +8,10 @@ initDockerImages:
   - label: Code Server
     repository: codercom/code-server
     default_tag: 4.89.0-ubuntu
+    tags:
+      - 4.89.0-ubuntu
+      - 4.88.0-ubuntu
+      - latest
     sort_order: 0
 
 # UI-only templates (filled in browser); not seeded to DB

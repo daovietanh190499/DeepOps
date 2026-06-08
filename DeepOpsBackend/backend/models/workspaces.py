@@ -24,6 +24,11 @@ class DockerImage(models.Model):
     label = models.CharField(max_length=255)
     repository = models.CharField(max_length=512)
     default_tag = models.CharField(max_length=128, default='latest')
+    tags = models.JSONField(
+        default=list,
+        blank=True,
+        help_text='Selectable image tags; default_tag should be included',
+    )
     is_active = models.BooleanField(default=True)
     sort_order = models.PositiveIntegerField(default=0)
 
@@ -32,6 +37,26 @@ class DockerImage(models.Model):
 
     def __str__(self):
         return f'{self.label} ({self.repository}:{self.default_tag})'
+
+    def available_tags(self) -> list[str]:
+        raw = self.tags if isinstance(self.tags, list) else []
+        tags = [str(t).strip() for t in raw if str(t).strip()]
+        if not tags and self.default_tag:
+            tags = [self.default_tag]
+        elif self.default_tag and self.default_tag not in tags:
+            tags.insert(0, self.default_tag)
+        return tags or ['latest']
+
+    def to_dict(self) -> dict:
+        return {
+            'id': self.id,
+            'label': self.label,
+            'repository': self.repository,
+            'default_tag': self.default_tag,
+            'tags': self.available_tags(),
+            'is_active': self.is_active,
+            'sort_order': self.sort_order,
+        }
 
 
 class WorkspaceDriveMount(models.Model):
@@ -89,6 +114,10 @@ class Workspace(models.Model):
     env_vars = models.JSONField(default=_default_env, blank=True)
     exposed_ports = models.JSONField(default=_default_ports, blank=True)
     container_command = models.JSONField(default=_default_command, blank=True)
+    privileged = models.BooleanField(
+        default=False,
+        help_text='Run code-server container with securityContext.privileged=true',
+    )
     state = models.CharField(max_length=32, choices=STATE_CHOICES, default=STATE_OFFLINE)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
@@ -143,6 +172,7 @@ class Workspace(models.Model):
             'env_vars': self.env_vars or {},
             'exposed_ports': self.exposed_ports or [],
             'container_command': self.container_command or [],
+            'privileged': self.privileged,
             'state': self.state,
             'hostname': self.hostname,
             'release_name': self.release_name,

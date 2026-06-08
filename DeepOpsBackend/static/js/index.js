@@ -153,6 +153,7 @@ function defaultForm() {
         ports_text: '8080',
         command_text: '',
         env_vars: {},
+        privileged: false,
     }
 }
 
@@ -195,6 +196,7 @@ function formPayload(form) {
         env_vars: { ...form.env_vars },
         exposed_ports: parsePorts(form.ports_text),
         container_command: parseCommand(form.command_text),
+        privileged: !!form.privileged,
     }
 }
 
@@ -355,7 +357,7 @@ const appVue = new Vue({
         adminPagination: { page: 1, pages: 1, total: 0, per_page: 12 },
         adminServerFilter: '',
         adminDockerImages: [],
-        newImage: { label: '', repository: '', default_tag: 'latest' },
+        newImage: { label: '', repository: '', default_tag: 'latest', tags_text: '' },
         clusterOverview: null,
         clusterLoading: false,
         joinCommand: '',
@@ -385,7 +387,7 @@ const appVue = new Vue({
         resourceGroups: [],
         showGroupFormModal: false,
         editingGroup: null,
-        groupForm: { name: '', max_cpu: 4, max_ram_g: 8, max_drive_size_gi: 50, max_gpu_vram_g: 10, max_servers: 5, max_drives: 3 },
+        groupForm: { name: '', max_cpu: 4, max_ram_g: 8, max_drive_size_gi: 50, max_gpu_vram_g: 10, max_servers: 5, max_drives: 3, can_change_privileged: false },
         groupFormLoading: false,
         groupMembersModal: null,
         memberSearchQuery: '',
@@ -427,6 +429,15 @@ const appVue = new Vue({
         },
         canConfirmDeleteDrive() {
             return this.deleteDriveConfirmInput.trim().toLowerCase() === 'delete'
+        },
+        canChangePrivileged() {
+            return this.is_admin || !!(this.resourceLimits && this.resourceLimits.can_change_privileged)
+        },
+        selectedDockerTags() {
+            const img = this.dockerImages.find((i) => i.id === this.form.docker_image_id)
+            if (!img) return []
+            if (img.tags && img.tags.length) return img.tags
+            return [img.default_tag || 'latest']
         },
         selectedDrivesLabel() {
             const mounts = (this.form.drive_mounts || []).filter((m) => m.drive_id)
@@ -549,13 +560,21 @@ const appVue = new Vue({
         driveOptionLabel(d) {
             if (!d) return '—'
             const inner = d.size + (d.node ? ', ' + d.node : '')
-            return d.name + ' (' + inner + ')'
+            let label = d.name + ' (' + inner + ')'
+            if (d.workspace_count > 0) {
+                label += ' · ' + d.workspace_count + ' server' + (d.workspace_count === 1 ? '' : 's')
+            }
+            if (d.in_use) label += ' · running'
+            return label
         },
         driveDetailLine(d) {
             if (!d) return ''
             let line = d.size
             if (d.node) line += ' · ' + d.node
-            if (d.in_use) line += ' · in use'
+            if (d.workspace_count > 0) {
+                line += ' · ' + d.workspace_count + ' server' + (d.workspace_count === 1 ? '' : 's')
+            }
+            if (d.in_use) line += ' · running'
             return line
         },
         showToast(msg) {
@@ -880,7 +899,7 @@ const appVue = new Vue({
             const u = data.result
             this.current_user = u.username
             this.is_admin = u.role === 'admin'
-            this.resourceLimits = u.resource_limits || { limited: false, limits: null, equipment: null }
+            this.resourceLimits = u.resource_limits || { limited: false, limits: null, equipment: null, can_change_privileged: false }
             this.refreshEquipmentFromLimits()
         },
         applyPlatformCatalog(catalog) {
@@ -1102,14 +1121,16 @@ const appVue = new Vue({
                 const first = this.dockerImages[0]
                 this.form.docker_image_id = first.id
                 this.form.docker_repository = first.repository
-                this.form.docker_tag = first.default_tag
+                const tags = (first.tags && first.tags.length) ? first.tags : [first.default_tag || 'latest']
+                this.form.docker_tag = tags.includes(first.default_tag) ? first.default_tag : tags[0]
             }
         },
         onDockerImageChange() {
             const img = this.dockerImages.find((i) => i.id === this.form.docker_image_id)
             if (img) {
                 this.form.docker_repository = img.repository
-                this.form.docker_tag = img.default_tag
+                const tags = (img.tags && img.tags.length) ? img.tags : [img.default_tag || 'latest']
+                this.form.docker_tag = tags.includes(img.default_tag) ? img.default_tag : tags[0]
             }
         },
         applyTemplate(t) {
@@ -1363,7 +1384,7 @@ const appVue = new Vue({
             if ((this.form.drive_mounts || []).some((m, i) => i !== rowIndex && m.drive_id === drive.id)) {
                 return false
             }
-            return !drive.in_use
+            return true
         },
         drivesForMountRow(rowIndex) {
             return this.myDrivesAll.filter((d) => this.driveSelectableForMount(d, rowIndex))
@@ -1385,6 +1406,10 @@ const appVue = new Vue({
                 return
             }
             await this.loadMyDrivesAll()
+            await this.loadDockerImages()
+            if (this.selectedDockerTags.length && !this.selectedDockerTags.includes(this.form.docker_tag)) {
+                this.form.docker_tag = this.selectedDockerTags[0]
+            }
             if (!this.form.drive_mounts || !this.form.drive_mounts.length) {
                 this.form.drive_mounts = [defaultDriveMount()]
             }
@@ -1537,7 +1562,7 @@ const appVue = new Vue({
         },
         openCreateGroupModal() {
             this.editingGroup = null
-            this.groupForm = { name: '', max_cpu: 4, max_ram_g: 8, max_drive_size_gi: 50, max_gpu_vram_g: 10, max_servers: 5, max_drives: 3 }
+            this.groupForm = { name: '', max_cpu: 4, max_ram_g: 8, max_drive_size_gi: 50, max_gpu_vram_g: 10, max_servers: 5, max_drives: 3, can_change_privileged: false }
             this.showGroupFormModal = true
         },
         openEditGroupModal(g) {
@@ -1550,6 +1575,7 @@ const appVue = new Vue({
                 max_gpu_vram_g: g.max_gpu_vram_g,
                 max_servers: g.max_servers,
                 max_drives: g.max_drives,
+                can_change_privileged: !!g.can_change_privileged,
             }
             this.showGroupFormModal = true
         },
@@ -1699,7 +1725,7 @@ const appVue = new Vue({
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(this.newImage),
             })
-            this.newImage = { label: '', repository: '', default_tag: 'latest' }
+            this.newImage = { label: '', repository: '', default_tag: 'latest', tags_text: '' }
             await this.loadAdminDockerImages()
             await this.loadDockerImages()
         },

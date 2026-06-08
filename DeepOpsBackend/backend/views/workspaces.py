@@ -1,4 +1,5 @@
 import json
+import re
 
 from django.conf import settings
 from django.core.paginator import Paginator
@@ -17,7 +18,7 @@ from backend.services.k8s_status import (
     workspace_is_active,
 )
 from backend.services.gpu_resources import normalize_gpu_value
-from backend.services.resource_limits import validate_server_count, validate_workspace_resources
+from backend.services.resource_limits import can_change_privileged, validate_server_count, validate_workspace_resources
 from backend.services.ssh_keys import ssh_info_payload
 from backend.services.workspace_mounts import (
     apply_drive_mounts_from_data,
@@ -112,7 +113,46 @@ def _apply_workspace_fields(ws: Workspace, data: dict, owner: User | None = None
             ws.container_command = [c for c in cmd.split() if c]
         elif isinstance(cmd, list):
             ws.container_command = [str(c) for c in cmd]
+    if 'privileged' in data:
+        requested = bool(data['privileged'])
+        if requested and not can_change_privileged(owner):
+            return 'privileged mode not allowed for your group'
+        ws.privileged = requested if can_change_privileged(owner) else False
     return None
+
+
+def _parse_docker_image_tags(data: dict) -> list[str]:
+    tags = data.get('tags')
+    if isinstance(tags, list):
+        return [str(t).strip() for t in tags if str(t).strip()]
+    text = (data.get('tags_text') or '').strip()
+    if text:
+        return [t for t in re.split(r'[\s,;]+', text) if t]
+    default_tag = (data.get('default_tag') or 'latest').strip()
+    return [default_tag] if default_tag else ['latest']
+
+
+def _docker_image_fields(data: dict) -> tuple[dict | None, str | None]:
+    label = (data.get('label') or '').strip()
+    repository = (data.get('repository') or '').strip()
+    if not label:
+        return None, 'label required'
+    if not repository:
+        return None, 'repository required'
+
+    tags = _parse_docker_image_tags(data)
+    default_tag = (data.get('default_tag') or tags[0] or 'latest').strip()
+    if default_tag not in tags:
+        tags.insert(0, default_tag)
+
+    return {
+        'label': label[:255],
+        'repository': repository[:512],
+        'default_tag': default_tag[:128],
+        'tags': tags,
+        'is_active': bool(data.get('is_active', True)),
+        'sort_order': int(data.get('sort_order', 0)),
+    }, None
 
 
 @auth.verify
@@ -122,15 +162,7 @@ def docker_images_list(request, user):
     if denied:
         return denied
     images = DockerImage.objects.filter(is_active=True)
-    result = [
-        {
-            'id': img.id,
-            'label': img.label,
-            'repository': img.repository,
-            'default_tag': img.default_tag,
-        }
-        for img in images
-    ]
+    result = [img.to_dict() for img in images]
     return JsonResponse({'result': result})
 
 
@@ -431,17 +463,7 @@ def admin_docker_images(request, user):
         return denied
     images = DockerImage.objects.all()
     return JsonResponse({
-        'result': [
-            {
-                'id': img.id,
-                'label': img.label,
-                'repository': img.repository,
-                'default_tag': img.default_tag,
-                'is_active': img.is_active,
-                'sort_order': img.sort_order,
-            }
-            for img in images
-        ],
+        'result': [img.to_dict() for img in images],
     })
 
 
@@ -456,14 +478,11 @@ def admin_docker_image_create(request, user):
         data = _parse_body(request)
     except json.JSONDecodeError:
         return JsonResponse({'message': 'invalid json'}, status=400)
-    img = DockerImage.objects.create(
-        label=data.get('label', 'Image'),
-        repository=data.get('repository', ''),
-        default_tag=data.get('default_tag', 'latest'),
-        is_active=data.get('is_active', True),
-        sort_order=data.get('sort_order', 0),
-    )
-    return JsonResponse({'result': {'id': img.id}}, status=201)
+    fields, err = _docker_image_fields(data)
+    if err:
+        return JsonResponse({'message': err}, status=400)
+    img = DockerImage.objects.create(**fields)
+    return JsonResponse({'result': img.to_dict()}, status=201)
 
 
 @auth.verify
@@ -483,8 +502,20 @@ def admin_docker_image_detail(request, user, image_id):
         data = _parse_body(request)
     except json.JSONDecodeError:
         return JsonResponse({'message': 'invalid json'}, status=400)
-    for field in ('label', 'repository', 'default_tag', 'is_active', 'sort_order'):
-        if field in data:
-            setattr(img, field, data[field])
-    img.save()
-    return JsonResponse({'message': 'success'})
+    if any(key in data for key in ('label', 'repository', 'default_tag', 'tags', 'tags_text', 'is_active', 'sort_order')):
+        merged = {
+            'label': data.get('label', img.label),
+            'repository': data.get('repository', img.repository),
+            'default_tag': data.get('default_tag', img.default_tag),
+            'tags': data.get('tags', img.tags),
+            'tags_text': data.get('tags_text', ''),
+            'is_active': data.get('is_active', img.is_active),
+            'sort_order': data.get('sort_order', img.sort_order),
+        }
+        fields, err = _docker_image_fields(merged)
+        if err:
+            return JsonResponse({'message': err}, status=400)
+        for key, value in fields.items():
+            setattr(img, key, value)
+        img.save()
+    return JsonResponse({'result': img.to_dict()})

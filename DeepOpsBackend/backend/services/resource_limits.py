@@ -79,6 +79,7 @@ def limits_payload(group: ResourceGroup | None, user: User | None = None) -> dic
         'max_gpu_vram_g': group.max_gpu_vram_g,
         'max_servers': group.max_servers,
         'max_drives': group.max_drives,
+        'can_change_privileged': group.can_change_privileged,
     }
     if user is not None:
         payload['server_count'] = user_server_count(user)
@@ -106,6 +107,15 @@ def allowed_equipment(group: ResourceGroup | None) -> dict:
     }
 
 
+def can_change_privileged(user: User) -> bool:
+    if user.role == User.ROLE_ADMIN:
+        return True
+    group = get_user_group(user)
+    if group is None:
+        return False
+    return group.can_change_privileged
+
+
 def resource_limits_for_user(user: User) -> dict:
     group = get_user_group(user)
     limits = limits_payload(group, user=user)
@@ -114,6 +124,7 @@ def resource_limits_for_user(user: User) -> dict:
         'limited': limits is not None,
         'limits': limits,
         'equipment': equipment,
+        'can_change_privileged': can_change_privileged(user),
     }
 
 

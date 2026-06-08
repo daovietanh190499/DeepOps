@@ -107,7 +107,7 @@
                     <p class="mt-2 text-sm text-slate-600" v-text="driveDetailLine(d)"></p>
                     <button type="button" @click="openDeleteDriveModal(d)" :disabled="d.in_use"
                             class="mt-3 text-xs font-semibold text-rose-600 hover:text-rose-800 disabled:opacity-40"
-                            :title="d.in_use ? 'Stop servers using this drive first' : 'Delete'">Delete drive</button>
+                            :title="d.in_use ? 'Stop running server using this drive first' : 'Delete'">Delete drive</button>
                 </div>
             </div>
             <div v-if="myDrivePagination.pages > 1" class="flex justify-center gap-2">
@@ -522,6 +522,7 @@
                             <span v-text="'GPU VRAM ≤ ' + g.max_gpu_vram_g + 'G'"></span>
                             <span v-text="'Servers ≤ ' + (g.max_servers || '∞')"></span>
                             <span v-text="'Drives ≤ ' + (g.max_drives || '∞')"></span>
+                            <span class="sm:col-span-2" v-text="g.can_change_privileged ? 'Privileged pods: allowed' : 'Privileged pods: denied'"></span>
                         </div>
                     </div>
                 </div>
@@ -624,21 +625,23 @@
         <!-- Admin docker images -->
         <section v-if="is_login && menu==='admin-images' && is_admin" class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm space-y-4">
             <h2 class="text-lg font-bold text-slate-900">Docker images</h2>
-            <div class="grid gap-3 sm:grid-cols-4">
+            <div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
                 <input v-model="newImage.label" placeholder="Label" class="rounded-lg border px-3 py-2 text-sm">
-                <input v-model="newImage.repository" placeholder="repository/name" class="rounded-lg border px-3 py-2 text-sm sm:col-span-2">
-                <input v-model="newImage.default_tag" placeholder="tag" class="rounded-lg border px-3 py-2 text-sm font-mono">
+                <input v-model="newImage.repository" placeholder="repository/name" class="rounded-lg border px-3 py-2 text-sm lg:col-span-2">
+                <input v-model="newImage.default_tag" placeholder="Default tag" class="rounded-lg border px-3 py-2 text-sm font-mono">
+                <input v-model="newImage.tags_text" placeholder="Tags (comma-separated)" class="rounded-lg border px-3 py-2 text-sm font-mono sm:col-span-2 lg:col-span-3">
             </div>
             <button @click="createDockerImage" class="rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white">Add image</button>
             <table class="w-full text-sm">
                 <thead><tr class="border-b text-left text-slate-500">
-                    <th class="py-2">Label</th><th>Repository</th><th>Tag</th><th>Active</th><th></th>
+                    <th class="py-2">Label</th><th>Repository</th><th>Default tag</th><th>Tags</th><th>Active</th><th></th>
                 </tr></thead>
                 <tbody>
                     <tr v-for="img in adminDockerImages" :key="img.id" class="border-b border-slate-100">
                         <td class="py-2" v-text="img.label"></td>
                         <td class="font-mono text-xs" v-text="img.repository"></td>
-                        <td v-text="img.default_tag"></td>
+                        <td class="font-mono text-xs" v-text="img.default_tag"></td>
+                        <td class="font-mono text-xs" v-text="(img.tags || []).join(', ')"></td>
                         <td v-text="img.is_active ? 'yes' : 'no'"></td>
                         <td><button @click="deleteDockerImage(img)" class="text-rose-600 text-xs">Delete</button></td>
                     </tr>
@@ -681,6 +684,7 @@
                     <spec-row v-if="!(modalWorkspace.drive_mounts || []).length"
                               label="Drive" :value="(modalWorkspace.drive_name || '—') + ' → ' + (modalWorkspace.mount_path || '/home/coder')"></spec-row>
                     <spec-row label="GPU" :value="modalWorkspace.gpu || 'none'"></spec-row>
+                    <spec-row label="Privileged" :value="modalWorkspace.privileged ? 'yes' : 'no'"></spec-row>
                     <spec-row label="Image" :value="modalWorkspace.docker_repository + ':' + modalWorkspace.docker_tag"></spec-row>
                     <spec-row label="Ports" :value="(modalWorkspace.exposed_ports || []).join(', ') || '8080'"></spec-row>
                     <spec-row label="Command" :value="(modalWorkspace.container_command || []).join(' ') || '(default)'"></spec-row>
@@ -816,7 +820,7 @@
                                                 class="text-xs text-rose-600 hover:underline">Remove</button>
                                     </div>
                                     <select v-model="mount.drive_id" class="w-full rounded-lg border px-3 py-2 text-sm bg-white">
-                                        <option value="">— Select drive (not in use) —</option>
+                                        <option value="">— Select drive —</option>
                                         <option v-for="d in drivesForMountRow(idx)" :key="d.id" :value="d.id"
                                                 v-text="driveOptionLabel(d) + (d.status !== 'bound' ? ' · ' + d.status : '')"></option>
                                     </select>
@@ -828,6 +832,15 @@
                                 <select v-model="form.gpu" class="mt-1 w-full rounded-lg border px-3 py-2 text-sm">
                                     <option v-for="g in equipmentList.gpu" :key="g" :value="g" v-text="g"></option>
                                 </select></div>
+                            <div v-if="canChangePrivileged" class="sm:col-span-2">
+                                <label class="flex items-start gap-3 rounded-lg border border-slate-200 bg-slate-50/60 p-3 cursor-pointer">
+                                    <input v-model="form.privileged" type="checkbox" class="mt-0.5 rounded border-slate-300">
+                                    <span>
+                                        <span class="text-sm font-medium text-slate-700">Privileged container</span>
+                                        <span class="block text-xs text-slate-500 mt-0.5">Run as root with <code class="rounded bg-white px-1">securityContext.privileged: true</code>. Required for some Docker-in-Docker or FUSE workloads.</span>
+                                    </span>
+                                </label>
+                            </div>
                         </div>
                         <div class="grid gap-4 sm:grid-cols-2">
                             <div><label class="text-sm font-medium text-slate-600">Docker image</label>
@@ -836,7 +849,9 @@
                                     <option v-for="img in dockerImages" :key="img.id" :value="img.id" v-text="img.label"></option>
                                 </select></div>
                             <div><label class="text-sm font-medium text-slate-600">Version (tag)</label>
-                                <input v-model="form.docker_tag" type="text" class="mt-1 w-full rounded-lg border px-3 py-2 text-sm font-mono"></div>
+                                <select v-model="form.docker_tag" class="mt-1 w-full rounded-lg border px-3 py-2 text-sm font-mono">
+                                    <option v-for="tag in selectedDockerTags" :key="tag" :value="tag" v-text="tag"></option>
+                                </select></div>
                         </div>
                         <div>
                             <label class="text-sm font-medium text-slate-600">Exposed ports (comma-separated)</label>
@@ -879,6 +894,7 @@
                             <spec-row label="RAM" :value="form.ram"></spec-row>
                             <spec-row label="Drives" :value="selectedDrivesLabel"></spec-row>
                             <spec-row label="GPU" :value="form.gpu || 'none'"></spec-row>
+                            <spec-row v-if="canChangePrivileged" label="Privileged" :value="form.privileged ? 'yes' : 'no'"></spec-row>
                             <spec-row label="Image" :value="form.docker_repository + ':' + form.docker_tag"></spec-row>
                             <spec-row label="Ports" :value="form.ports_text || '8080'"></spec-row>
                             <spec-row label="Command" :value="form.command_text || '(default)'"></spec-row>
@@ -1137,6 +1153,13 @@
                     </div>
                 </div>
                 <p class="text-xs text-slate-500">Limits apply per member. Use 0 for unlimited servers/drives.</p>
+                <label class="flex items-start gap-3 rounded-lg border border-slate-200 bg-slate-50/60 p-3 cursor-pointer">
+                    <input v-model="groupForm.can_change_privileged" type="checkbox" class="mt-0.5 rounded border-slate-300">
+                    <span>
+                        <span class="text-sm font-medium text-slate-700">Allow privileged pods</span>
+                        <span class="block text-xs text-slate-500 mt-0.5">Members can enable privileged (root) containers when creating servers.</span>
+                    </span>
+                </label>
                 <div class="flex justify-end gap-2">
                     <button type="button" @click="closeGroupFormModal" class="rounded-lg border px-4 py-2 text-sm">Cancel</button>
                     <button type="button" @click="saveResourceGroup" :disabled="groupFormLoading"

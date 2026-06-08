@@ -81,6 +81,11 @@ def spawn_workspace(ws: Workspace) -> dict | None:
     """Helm spawn for a workspace. Returns error dict on failure, else None."""
     if settings.DEFAULT_SPAWNER != 'k8s':
         return None
+    from backend.services.workspace_mounts import validate_workspace_drives_for_start
+
+    drive_err = validate_workspace_drives_for_start(ws)
+    if drive_err:
+        return {'error': drive_err}
     try:
         config = build_spawn_config(ws)
     except ValueError as exc:
