@@ -85,6 +85,7 @@ Ingress path `/ssh-tunnel` must match wstunnel path prefix `ssh-tunnel` (`-P` cl
 
 - **`logout` then SSH hangs:** Rebuild and redeploy `ssh-bridge` (log build id: `ssh-bridge-2026-06-09-host-key-validate`). Restart the workspace pod. Sidecar logs should show `remote shell exit detected` then `SSH session closing` when you type `exit`.
 - **`KeyImportError: Unrecognized OpenSSH private key type` / `asyncssh server exited before binding port 2222`:** The Kubernetes secret `host_key` is invalid or placeholder data. In Dohub open the server → **Regenerate key pair** (rewrites the secret with a valid Ed25519 host key), then **Stop → Start** the server (or restart the pod).
+- **No line wrap / very long lines in SSH:** The ssh-bridge must forward your terminal width to `kubectl exec` (build id `ssh-bridge-2026-06-09-pty-resize`). Rebuild the sidecar image and restart the workspace pod. Resize the terminal window after connecting if wrap still looks wrong.
 - **`command terminated with exit code 130`:** Usually from **Ctrl+C** (`130` = SIGINT). `kubectl exec` prints this on stderr when the session is interrupted. Type `exit` without Ctrl+C for a clean disconnect.
 
 ## Security

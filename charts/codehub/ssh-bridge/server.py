@@ -10,14 +10,16 @@ import fcntl
 import logging
 import os
 import re
+import struct
 import subprocess
 import sys
+import termios
 from pathlib import Path
 
 import asyncssh
 
 LOG = logging.getLogger('ssh_bridge')
-BUILD_ID = 'ssh-bridge-2026-06-08-logout-detect'
+BUILD_ID = 'ssh-bridge-2026-06-09-pty-resize'
 
 SSH_BIND_HOST = os.environ.get('SSH_BIND_HOST', '127.0.0.1')
 SSH_PORT = int(os.environ.get('SSH_PORT', '2222'))
@@ -70,11 +72,40 @@ def _kubectl_exec_base() -> list[str]:
     ]
 
 
-def _shell_env(process: asyncssh.SSHServerProcess) -> dict[str, str]:
+def _set_pty_winsize(fd: int, rows: int, cols: int) -> None:
+    rows = max(rows, 1)
+    cols = max(cols, 1)
+    winsize = struct.pack('HHHH', rows, cols, 0, 0)
+    fcntl.ioctl(fd, termios.TIOCSWINSZ, winsize)
+
+
+def _term_cols_rows(process: asyncssh.SSHServerProcess) -> tuple[int, int]:
+    size = process.term_size
+    if size:
+        return max(size[0], 1), max(size[1], 1)
+    return 80, 24
+
+
+def _shell_env(process: asyncssh.SSHServerProcess, cols: int, rows: int) -> dict[str, str]:
     env = os.environ.copy()
     if process.term_type:
         env['TERM'] = process.term_type
+    env['COLUMNS'] = str(cols)
+    env['LINES'] = str(rows)
     return env
+
+
+def _attach_terminal_resize(process: asyncssh.SSHServerProcess, master_fd: int) -> None:
+    """Forward SSH client window resizes to the local kubectl exec PTY."""
+
+    def terminal_size_changed(width: int, height: int, pixwidth: int, pixheight: int) -> None:
+        del pixwidth, pixheight
+        try:
+            _set_pty_winsize(master_fd, height, width)
+        except OSError:
+            LOG.debug('pty resize failed', exc_info=True)
+
+    process.terminal_size_changed = terminal_size_changed
 
 
 def _set_nonblocking(fd: int) -> None:
@@ -178,9 +209,12 @@ async def _forward_pty_to_ssh(
 
 async def _run_interactive_shell(process: asyncssh.SSHServerProcess) -> int:
     """Attach an interactive session to kubectl exec via a local PTY."""
+    cols, rows = _term_cols_rows(process)
     master_fd, slave_fd = os.openpty()
+    _set_pty_winsize(master_fd, rows, cols)
+    _attach_terminal_resize(process, master_fd)
     _set_nonblocking(master_fd)
-    env = _shell_env(process)
+    env = _shell_env(process, cols, rows)
     stop_event = asyncio.Event()
 
     shell = subprocess.Popen(
