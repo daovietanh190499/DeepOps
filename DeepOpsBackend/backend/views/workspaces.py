@@ -13,7 +13,7 @@ from backend.services.k8s import get_codehub_workspace, remove_codehub, stop_cod
 from backend.services.bulk import bulk_workspace_result, spawn_workspace
 from backend.services.k8s_status import (
     derive_workspace_state,
-    live_workspace_k8s_status,
+    live_workspace_k8s_status_batch,
     live_workspace_state,
     workspace_is_active,
 )
@@ -52,16 +52,69 @@ def _require_accepted(user):
     return None
 
 
-def _workspace_payload(ws: Workspace, include_log: bool = False) -> dict:
+def _parse_status_ids(request) -> list[str]:
+    """Parse workspace/drive ids from POST JSON body: {ids: [...]} or {id: \"...\"}."""
+    if not request.body:
+        return []
+    try:
+        data = _parse_body(request)
+    except json.JSONDecodeError:
+        raise
+    if not isinstance(data, dict):
+        return []
+
+    if 'ids' in data:
+        raw_ids = data['ids']
+        if isinstance(raw_ids, list):
+            return [str(item).strip() for item in raw_ids if str(item).strip()]
+        if isinstance(raw_ids, str) and raw_ids.strip():
+            return [part.strip() for part in raw_ids.split(',') if part.strip()]
+        return []
+
+    if data.get('id'):
+        return [str(data['id']).strip()]
+    return []
+
+
+def _workspace_list_payload(ws: Workspace) -> dict:
+    """DB-only workspace row for list endpoints (no kubectl)."""
     data = ws.to_config_dict()
-    k8s_status = live_workspace_k8s_status(ws)
-    data['k8s_status'] = k8s_status
-    data['state'] = derive_workspace_state(k8s_status)
+    data['state'] = Workspace.STATE_OFFLINE
     data['user_id'] = ws.user_id
     data['owner'] = ws.user.username
     data['created_at'] = ws.created_at.isoformat()
     data['updated_at'] = ws.updated_at.isoformat()
     data['drive_mounts'] = drive_mounts_payload(ws)
+    return data
+
+
+def _workspace_status_payloads(workspaces) -> list[dict]:
+    ws_list = list(workspaces)
+    k8s_map = live_workspace_k8s_status_batch(ws_list)
+    empty = {
+        'display': 'Not deployed',
+        'deployment': None,
+        'pods': [],
+        'release_exists': False,
+    }
+    return [
+        {
+            'id': str(ws.id),
+            'state': derive_workspace_state(k8s_map.get(str(ws.id), empty)),
+            'k8s_status': k8s_map.get(str(ws.id), empty),
+        }
+        for ws in ws_list
+    ]
+
+
+def _workspace_status_payload(ws: Workspace) -> dict:
+    """Live K8s status for a single workspace."""
+    return _workspace_status_payloads([ws])[0]
+
+
+def _workspace_payload(ws: Workspace, include_log: bool = False) -> dict:
+    data = _workspace_list_payload(ws)
+    data.update(_workspace_status_payload(ws))
     if include_log:
         data['pod_status'] = get_codehub_workspace(ws)
     data.update(ssh_info_payload(ws))
@@ -185,7 +238,7 @@ def my_workspaces(request, user):
     paginator = Paginator(qs, per_page)
     page_obj = paginator.get_page(page)
     return JsonResponse({
-        'result': [_workspace_payload(ws) for ws in page_obj.object_list],
+        'result': [_workspace_list_payload(ws) for ws in page_obj.object_list],
         'pagination': {
             'page': page_obj.number,
             'per_page': per_page,
@@ -193,6 +246,23 @@ def my_workspaces(request, user):
             'pages': paginator.num_pages or 1,
         },
     })
+
+
+@auth.verify
+@csrf_exempt
+@require_http_methods(['POST'])
+def my_workspaces_status(request, user):
+    denied = _require_accepted(user)
+    if denied:
+        return denied
+    try:
+        ids = _parse_status_ids(request)
+    except json.JSONDecodeError:
+        return JsonResponse({'message': 'invalid json'}, status=400)
+    qs = Workspace.objects.filter(user=user)
+    if ids:
+        qs = qs.filter(id__in=ids)
+    return JsonResponse({'result': _workspace_status_payloads(qs)})
 
 
 @auth.verify
@@ -456,7 +526,7 @@ def admin_workspaces(request, user):
     paginator = Paginator(qs, per_page)
     page_obj = paginator.get_page(page)
     return JsonResponse({
-        'result': [_workspace_payload(ws) for ws in page_obj.object_list],
+        'result': [_workspace_list_payload(ws) for ws in page_obj.object_list],
         'pagination': {
             'page': page_obj.number,
             'per_page': per_page,
@@ -464,6 +534,23 @@ def admin_workspaces(request, user):
             'pages': paginator.num_pages or 1,
         },
     })
+
+
+@auth.verify
+@csrf_exempt
+@require_http_methods(['POST'])
+def admin_workspaces_status(request, user):
+    denied = _require_admin(user)
+    if denied:
+        return denied
+    try:
+        ids = _parse_status_ids(request)
+    except json.JSONDecodeError:
+        return JsonResponse({'message': 'invalid json'}, status=400)
+    qs = Workspace.objects.all()
+    if ids:
+        qs = qs.filter(id__in=ids)
+    return JsonResponse({'result': _workspace_status_payloads(qs)})
 
 
 @auth.verify

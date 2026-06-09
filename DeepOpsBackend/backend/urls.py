@@ -28,6 +28,7 @@ urlpatterns = [
     path('change_role/<str:username>/<str:role>', views.change_role, name='change-role'),
 
     path('drives', drive_views.my_drives, name='my-drives'),
+    path('drives/status', drive_views.my_drives_status, name='my-drives-status'),
     path('drives/create', drive_views.drive_create, name='drive-create'),
     path('drives/bulk_create', drive_views.drive_bulk_create, name='drive-bulk-create'),
     path('drives/<uuid:drive_id>', drive_views.drive_delete, name='drive-delete'),
@@ -38,6 +39,7 @@ urlpatterns = [
     path('admin/cluster/directpv/discover/save', cluster_views.admin_directpv_discover_save, name='admin-directpv-discover-save'),
     path('admin/cluster/directpv/init', cluster_views.admin_directpv_init, name='admin-directpv-init'),
     path('admin/drives', drive_views.admin_drives, name='admin-drives'),
+    path('admin/drives/status', drive_views.admin_drives_status, name='admin-drives-status'),
 
     path('platform/catalog', catalog_views.platform_catalog, name='platform-catalog'),
     path('admin/platform/catalog', catalog_views.admin_platform_catalog, name='admin-platform-catalog'),
@@ -57,8 +59,10 @@ urlpatterns = [
     path('workspaces/<uuid:workspace_id>/stop', ws_views.workspace_stop, name='workspace-stop'),
     path('workspaces/<uuid:workspace_id>', ws_views.workspace_detail, name='workspace-detail'),
     path('workspaces', ws_views.my_workspaces, name='my-workspaces'),
+    path('workspaces/status', ws_views.my_workspaces_status, name='my-workspaces-status'),
 
     path('admin/workspaces', ws_views.admin_workspaces, name='admin-workspaces'),
+    path('admin/workspaces/status', ws_views.admin_workspaces_status, name='admin-workspaces-status'),
     path('admin/docker_images', ws_views.admin_docker_images, name='admin-docker-images'),
     path('admin/docker_images/create', ws_views.admin_docker_image_create, name='admin-docker-image-create'),
     path('admin/docker_images/<int:image_id>', ws_views.admin_docker_image_detail, name='admin-docker-image-detail'),

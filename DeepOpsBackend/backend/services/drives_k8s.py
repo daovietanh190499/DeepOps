@@ -64,20 +64,69 @@ def delete_drive_pvc(claim_name: str) -> int:
     ])
 
 
-def get_pvc_phase(claim_name: str) -> str:
+def _kubectl_json(args: list[str]) -> dict | None:
     result = subprocess.run(
-        [
-            'kubectl', 'get', 'pvc', claim_name,
-            '-n', NAMESPACE,
-            '-o', 'jsonpath={.status.phase}',
-        ],
+        ['kubectl', *args, '-o', 'json'],
         capture_output=True,
         text=True,
         check=False,
     )
-    if result.returncode != 0:
-        return 'NotFound'
-    return (result.stdout or '').strip() or 'NotFound'
+    if result.returncode != 0 or not (result.stdout or '').strip():
+        return None
+    try:
+        return json.loads(result.stdout)
+    except json.JSONDecodeError:
+        return None
+
+
+def kubectl_json(args: list[str]) -> dict | None:
+    """Public wrapper for kubectl JSON fetches."""
+    return _kubectl_json(args)
+
+
+def get_pvc_info_map(claim_names: list[str]) -> dict[str, dict]:
+    """Resolve PVC phase and bound PV/node for many claims in one kubectl call."""
+    wanted = {name for name in claim_names if name}
+    empty = {'phase': 'NotFound', 'node': '', 'pv_name': ''}
+    if not wanted:
+        return {}
+
+    pvc_data = _kubectl_json(['get', 'pvc', '-n', NAMESPACE])
+    if not pvc_data:
+        return {name: dict(empty) for name in wanted}
+
+    claim_info: dict[str, dict] = {}
+    claim_to_pv: dict[str, str] = {}
+    for item in pvc_data.get('items') or []:
+        meta = item.get('metadata') or {}
+        claim = meta.get('name', '')
+        if claim not in wanted:
+            continue
+        status = item.get('status') or {}
+        phase = status.get('phase') or 'NotFound'
+        spec = item.get('spec') or {}
+        pv_name = spec.get('volumeName') or ''
+        claim_info[claim] = {'phase': phase, 'node': '', 'pv_name': ''}
+        if phase == 'Bound' and pv_name:
+            claim_to_pv[claim] = pv_name
+            claim_info[claim]['pv_name'] = pv_name
+
+    pv_nodes = _build_pv_node_map(set(claim_to_pv.values()))
+    for claim, pv_name in claim_to_pv.items():
+        claim_info[claim]['node'] = pv_nodes.get(pv_name, '')
+
+    return {name: claim_info.get(name, dict(empty)) for name in wanted}
+
+
+def get_pvc_phases_map(claim_names: list[str]) -> dict[str, str]:
+    return {
+        name: info.get('phase', 'NotFound')
+        for name, info in get_pvc_info_map(claim_names).items()
+    }
+
+
+def get_pvc_phase(claim_name: str) -> str:
+    return get_pvc_phases_map([claim_name]).get(claim_name, 'NotFound')
 
 
 def _kubectl_json(args: list[str]) -> dict | None:
@@ -168,36 +217,12 @@ def _build_pv_node_map(pv_names: set[str]) -> dict[str, str]:
 
 def get_pvc_placement_map(claim_names: list[str]) -> dict[str, dict]:
     """Resolve bound PVC claim names to PV and Kubernetes node."""
-    wanted = {name for name in claim_names if name}
-    empty = {'node': '', 'pv_name': ''}
-    if not wanted:
-        return {}
-
-    pvc_data = _kubectl_json(['get', 'pvc', '-n', NAMESPACE])
-    if not pvc_data:
-        return {name: dict(empty) for name in wanted}
-
-    claim_to_pv: dict[str, str] = {}
-    for item in pvc_data.get('items') or []:
-        meta = item.get('metadata') or {}
-        claim = meta.get('name', '')
-        if claim not in wanted:
-            continue
-        status = item.get('status') or {}
-        if status.get('phase') != 'Bound':
-            continue
-        spec = item.get('spec') or {}
-        pv_name = spec.get('volumeName') or ''
-        if pv_name:
-            claim_to_pv[claim] = pv_name
-
-    pv_nodes = _build_pv_node_map(set(claim_to_pv.values()))
     return {
-        claim: {
-            'node': pv_nodes.get(claim_to_pv.get(claim, ''), ''),
-            'pv_name': claim_to_pv.get(claim, ''),
+        name: {
+            'node': info.get('node', '') or '',
+            'pv_name': info.get('pv_name', '') or '',
         }
-        for claim in wanted
+        for name, info in get_pvc_info_map(claim_names).items()
     }
 
 

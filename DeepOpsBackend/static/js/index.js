@@ -42,12 +42,14 @@ Vue.component('user-row', {
 })
 
 Vue.component('workspace-card', {
-    props: ['ws', 'showOwner'],
+    props: ['ws', 'showOwner', 'disabled'],
     computed: {
         k8sDisplay() {
+            if (this.disabled) return 'Loading…'
             return (this.ws.k8s_status && this.ws.k8s_status.display) || this.ws.state
         },
         stateClass() {
+            if (this.disabled) return 'bg-slate-100 text-slate-500'
             const d = this.k8sDisplay.toLowerCase()
             if (d === 'running') return 'bg-emerald-100 text-emerald-700'
             if (d === 'terminating') return 'bg-rose-100 text-rose-700'
@@ -81,11 +83,13 @@ Vue.component('workspace-card', {
             return 'Drive: ' + (ws.drive_name || '—') + ' → ' + (ws.mount_path || '/home/coder')
         },
         onCardClick() {
+            if (this.disabled) return
             this.$emit('detail', this.ws)
         },
     },
     template: `
-    <div class="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm flex flex-col gap-3 cursor-pointer transition hover:border-blue-300 hover:shadow-md"
+    <div class="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm flex flex-col gap-3 transition"
+         :class="disabled ? 'opacity-60 pointer-events-none select-none' : 'cursor-pointer hover:border-blue-300 hover:shadow-md'"
          @click="onCardClick">
       <div class="flex justify-between items-start gap-2">
         <div class="min-w-0 flex-1">
@@ -493,6 +497,13 @@ const appVue = new Vue({
         toastMessage: '',
         toastTimer: null,
         statusPollTimer: null,
+        listLoading: 0,
+        statusPending: {
+            myWorkspaces: false,
+            myDrives: false,
+            adminWorkspaces: false,
+            adminDrives: false,
+        },
     },
     computed: {
         canConfirmDelete() {
@@ -615,13 +626,199 @@ const appVue = new Vue({
                 this.statusPollTimer = null
             }
         },
+        beginListLoad() {
+            this.listLoading += 1
+        },
+        endListLoad() {
+            this.listLoading = Math.max(0, this.listLoading - 1)
+        },
+        setStatusPending(keys, value) {
+            ;(keys || []).forEach((key) => {
+                if (key in this.statusPending) this.statusPending[key] = value
+            })
+        },
+        async loadListsThenPoll(loadFn, pollFn, pendingKeysFn) {
+            this.beginListLoad()
+            try {
+                await loadFn()
+            } finally {
+                this.endListLoad()
+            }
+            const keys = typeof pendingKeysFn === 'function' ? pendingKeysFn() : (pendingKeysFn || [])
+            if (keys.length) this.setStatusPending(keys, true)
+            try {
+                if (pollFn) await pollFn()
+            } finally {
+                if (keys.length) this.setStatusPending(keys, false)
+            }
+        },
         async pollStatuses() {
+            if (this.listLoading > 0) return
             const m = this.menu
-            if (m === 'drives' || m === 'servers') await this.loadMyDrives(this.myDrivePagination.page)
-            if (m === 'servers') await this.loadMyWorkspaces(this.myServerPagination.page)
-            if (m === 'admin-drives') await this.loadAdminDrives(this.adminDrivePagination.page)
-            if (m === 'admin-servers') await this.loadAdminWorkspaces(this.adminPagination.page)
+            const tasks = []
+            if (m === 'drives' || m === 'servers') tasks.push(this.pollMyDriveStatuses())
+            if (m === 'servers') tasks.push(this.pollMyWorkspaceStatuses())
+            if (m === 'admin-drives') tasks.push(this.pollAdminDriveStatuses())
+            if (m === 'admin-servers') tasks.push(this.pollAdminWorkspaceStatuses())
             if (m === 'admin-overall') await this.loadClusterOverview()
+            await Promise.all(tasks)
+        },
+        collectIds(items) {
+            const seen = {}
+            return (items || []).map((item) => item.id).filter((id) => {
+                if (!id || seen[id]) return false
+                seen[id] = true
+                return true
+            })
+        },
+        mergeWorkspaceStatuses(items, statusMap) {
+            ;(items || []).forEach((ws) => {
+                const st = statusMap[ws.id]
+                if (!st) return
+                this.$set(ws, 'state', st.state)
+                this.$set(ws, 'k8s_status', st.k8s_status)
+            })
+        },
+        mergeDriveStatuses(items, statusMap) {
+            ;(items || []).forEach((d) => {
+                const st = statusMap[d.id]
+                if (!st) return
+                ;['status', 'pvc_phase', 'in_use', 'node', 'pv_name'].forEach((k) => {
+                    if (st[k] !== undefined) this.$set(d, k, st[k])
+                })
+            })
+        },
+        statusMapFromResult(rows) {
+            const map = {}
+            ;(rows || []).forEach((row) => { if (row.id) map[row.id] = row })
+            return map
+        },
+        async fetchWorkspaceStatuses(path, ids) {
+            const res = await fetch(path, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(ids && ids.length ? { ids } : {}),
+            })
+            if (res.status !== 200) return {}
+            const data = await res.json()
+            return this.statusMapFromResult(data.result)
+        },
+        async fetchDriveStatuses(path, ids) {
+            const res = await fetch(path, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(ids && ids.length ? { ids } : {}),
+            })
+            if (res.status !== 200) return {}
+            const data = await res.json()
+            return this.statusMapFromResult(data.result)
+        },
+        async pollMyWorkspaceStatuses() {
+            const ids = this.collectIds(this.myWorkspaces)
+            if (!ids.length) return
+            const map = await this.fetchWorkspaceStatuses('workspaces/status', ids)
+            this.mergeWorkspaceStatuses(this.myWorkspaces, map)
+            if (this.modalWorkspace && map[this.modalWorkspace.id]) {
+                this.mergeWorkspaceStatuses([this.modalWorkspace], map)
+            }
+        },
+        async pollAdminWorkspaceStatuses() {
+            const ids = this.collectIds(this.adminWorkspaces)
+            if (!ids.length) return
+            const map = await this.fetchWorkspaceStatuses('admin/workspaces/status', ids)
+            this.mergeWorkspaceStatuses(this.adminWorkspaces, map)
+        },
+        async pollMyDriveStatuses() {
+            const ids = this.collectIds([].concat(this.myDrives || [], this.myDrivesAll || []))
+            if (!ids.length) return
+            const map = await this.fetchDriveStatuses('drives/status', ids)
+            this.mergeDriveStatuses(this.myDrives, map)
+            this.mergeDriveStatuses(this.myDrivesAll, map)
+        },
+        async pollAdminDriveStatuses() {
+            const ids = this.collectIds(this.adminDrives)
+            if (!ids.length) return
+            const map = await this.fetchDriveStatuses('admin/drives/status', ids)
+            this.mergeDriveStatuses(this.adminDrives, map)
+        },
+        async reloadMyWorkspaces(page) {
+            await this.loadListsThenPoll(
+                () => this.loadMyWorkspaces(page),
+                () => this.pollMyWorkspaceStatuses(),
+                () => (this.myWorkspaces.length ? ['myWorkspaces'] : []),
+            )
+        },
+        async reloadMyDrives(page) {
+            await this.loadListsThenPoll(
+                () => this.loadMyDrives(page),
+                () => this.pollMyDriveStatuses(),
+                () => (this.myDrives.length ? ['myDrives'] : []),
+            )
+        },
+        async reloadMyDrivesAll() {
+            await this.loadListsThenPoll(
+                () => this.loadMyDrivesAll(),
+                () => this.pollMyDriveStatuses(),
+                () => (this.myDrivesAll.length ? ['myDrives'] : []),
+            )
+        },
+        async reloadAdminWorkspaces(page) {
+            await this.loadListsThenPoll(
+                () => this.loadAdminWorkspaces(page),
+                () => this.pollAdminWorkspaceStatuses(),
+                () => (this.adminWorkspaces.length ? ['adminWorkspaces'] : []),
+            )
+        },
+        async reloadAdminDrives(page) {
+            await this.loadListsThenPoll(
+                () => this.loadAdminDrives(page),
+                () => this.pollAdminDriveStatuses(),
+                () => (this.adminDrives.length ? ['adminDrives'] : []),
+            )
+        },
+        async reloadDriveLists() {
+            await this.loadListsThenPoll(async () => {
+                await this.loadMyDrives(this.myDrivePagination.page)
+                await this.loadMyDrivesAll()
+                if (this.is_admin) await this.loadAdminDrives(this.adminDrivePagination.page)
+            }, async () => {
+                await this.pollMyDriveStatuses()
+                if (this.is_admin) await this.pollAdminDriveStatuses()
+            }, () => {
+                const keys = []
+                if (this.myDrives.length) keys.push('myDrives')
+                if (this.is_admin && this.adminDrives.length) keys.push('adminDrives')
+                return keys
+            })
+        },
+        async reloadServerLists() {
+            await this.loadListsThenPoll(async () => {
+                await this.loadMyWorkspaces(this.myServerPagination.page)
+                if (this.is_admin && this.menu === 'admin-servers') {
+                    await this.loadAdminWorkspaces(this.adminPagination.page)
+                }
+            }, async () => {
+                await this.pollMyWorkspaceStatuses()
+                if (this.is_admin && this.menu === 'admin-servers') {
+                    await this.pollAdminWorkspaceStatuses()
+                }
+            }, () => {
+                const keys = []
+                if (this.myWorkspaces.length) keys.push('myWorkspaces')
+                if (this.is_admin && this.menu === 'admin-servers' && this.adminWorkspaces.length) {
+                    keys.push('adminWorkspaces')
+                }
+                return keys
+            })
+        },
+        statusPendingKeysForMenu() {
+            const keys = []
+            const m = this.menu
+            if (m === 'servers' && this.myWorkspaces.length) keys.push('myWorkspaces')
+            if (m === 'drives' && this.myDrives.length) keys.push('myDrives')
+            if (m === 'admin-drives' && this.adminDrives.length) keys.push('adminDrives')
+            if (m === 'admin-servers' && this.adminWorkspaces.length) keys.push('adminWorkspaces')
+            return keys
         },
         loginWithGithub() { window.location = 'login' },
         logout() { window.location = 'logout' },
@@ -765,7 +962,7 @@ const appVue = new Vue({
                 }
                 this.closeDeleteModal()
                 this.showToast('Server deleted')
-                await this.refreshLists()
+                await this.reloadServerLists()
             } finally {
                 this.deleteInProgress = false
             }
@@ -774,29 +971,29 @@ const appVue = new Vue({
             if (!this.modalWorkspace) return
             downloadJson(this.modalWorkspace, 'dohub-' + this.modalWorkspace.slug + '-config.json')
         },
-        changeMenu(menu) {
+        async changeMenu(menu) {
             this.stopStatusPolling()
             this.menu = menu
             window.history.replaceState({}, '', '/?tab=' + menu)
-            if (menu === 'drives') this.loadMyDrives(1)
-            if (menu === 'servers') this.loadMyWorkspaces(1)
+            if (menu === 'drives') await this.reloadMyDrives(1)
+            if (menu === 'servers') await this.reloadMyWorkspaces(1)
             if (menu === 'admin-overall') {
-                this.loadClusterOverview()
-                this.loadDirectpvDiscover()
+                await this.loadClusterOverview()
+                await this.loadDirectpvDiscover()
             }
             if (menu === 'admin-drives') {
-                if (this.adminDrivesTab === 'catalog') this.loadAdminPlatformCatalog()
-                else this.loadAdminDrives(1)
+                if (this.adminDrivesTab === 'catalog') await this.loadAdminPlatformCatalog()
+                else await this.reloadAdminDrives(1)
             }
             if (menu === 'admin-servers') {
-                if (this.adminServersTab === 'catalog') this.loadAdminPlatformCatalog()
-                else this.loadAdminWorkspaces(1)
+                if (this.adminServersTab === 'catalog') await this.loadAdminPlatformCatalog()
+                else await this.reloadAdminWorkspaces(1)
             }
             if (menu === 'admin-users') {
-                if (this.adminUsersTab === 'groups') this.loadResourceGroups()
-                else this.loadAdminUsers(1)
+                if (this.adminUsersTab === 'groups') await this.loadResourceGroups()
+                else await this.loadAdminUsers(1)
             }
-            if (menu === 'admin-images') this.loadAdminDockerImages()
+            if (menu === 'admin-images') await this.loadAdminDockerImages()
             if (['drives', 'servers', 'admin-drives', 'admin-servers', 'admin-overall'].includes(menu)) {
                 this.startStatusPolling()
             }
@@ -806,9 +1003,19 @@ const appVue = new Vue({
             await this.getCurrentUserState()
             await this.loadPlatformCatalog()
             await this.loadDockerImages()
-            await this.loadMyDrives(1)
-            await this.loadMyDrivesAll()
-            await this.loadMyWorkspaces(1)
+            await this.loadListsThenPoll(async () => {
+                await this.loadMyDrives(1)
+                await this.loadMyDrivesAll()
+                await this.loadMyWorkspaces(1)
+                if (this.is_admin) {
+                    if (this.menu === 'admin-drives' && this.adminDrivesTab !== 'catalog') {
+                        await this.loadAdminDrives(1)
+                    }
+                    if (this.menu === 'admin-servers' && this.adminServersTab !== 'catalog') {
+                        await this.loadAdminWorkspaces(1)
+                    }
+                }
+            }, () => this.pollStatuses(), () => this.statusPendingKeysForMenu())
             if (this.is_admin) {
                 if (this.menu === 'admin-users') {
                     if (this.adminUsersTab === 'groups') await this.loadResourceGroups()
@@ -1409,9 +1616,7 @@ const appVue = new Vue({
                     return
                 }
                 this.bulkSummary = formatBulkSummary(data, items.length)
-                await this.loadMyWorkspaces(this.myServerPagination.page)
-                await this.loadMyDrives(this.myDrivePagination.page)
-                await this.loadMyDrivesAll()
+                await this.reloadServerLists()
                 this.showToast('Bulk server create finished')
             } catch (e) {
                 this.bulkSummary = e.message || String(e)
@@ -1446,9 +1651,7 @@ const appVue = new Vue({
                     return
                 }
                 this.driveBulkSummary = formatBulkSummary(data, items.length)
-                await this.loadMyDrives(this.myDrivePagination.page)
-                await this.loadMyDrivesAll()
-                if (this.is_admin) await this.loadAdminDrives(this.adminDrivePagination.page)
+                await this.reloadDriveLists()
                 this.showToast('Bulk drive create finished')
             } catch (e) {
                 this.driveBulkSummary = e.message || String(e)
@@ -1525,8 +1728,7 @@ const appVue = new Vue({
                 return
             }
             this.newDrive = { name: 'My drive', size: '20Gi' }
-            await this.loadMyDrives(this.myDrivePagination.page)
-            await this.loadMyDrivesAll()
+            await this.reloadDriveLists()
             this.closeCreateDriveModal()
             this.showToast('Drive created')
         },
@@ -1552,9 +1754,7 @@ const appVue = new Vue({
             }
             this.closeDeleteDriveModal()
             this.showToast('Drive deleted')
-            await this.loadMyDrives(this.myDrivePagination.page)
-            await this.loadMyDrivesAll()
-            if (this.is_admin) await this.loadAdminDrives(this.adminDrivePagination.page)
+            await this.reloadDriveLists()
         },
         driveSelectableForMount(drive, rowIndex) {
             if ((this.form.drive_mounts[rowIndex] || {}).drive_id === drive.id) return true
@@ -1635,7 +1835,7 @@ const appVue = new Vue({
                 this.showToast(data.message || 'Start failed')
                 return
             }
-            await this.loadMyWorkspaces(this.myServerPagination.page)
+            await this.reloadServerLists()
             this.closeCreateServerModal()
             this.showToast('Server created')
         },
@@ -1650,10 +1850,6 @@ const appVue = new Vue({
             const data = await res.json()
             this.myWorkspaces = data.result || []
             this.myServerPagination = data.pagination || this.myServerPagination
-            if (this.modalWorkspace) {
-                const updated = this.myWorkspaces.find((w) => w.id === this.modalWorkspace.id)
-                if (updated) this.modalWorkspace = { ...updated, env_vars: { ...(updated.env_vars || {}) } }
-            }
             this.syncResourceUsageCounts()
         },
         async loadAdminWorkspaces(page) {
@@ -1689,10 +1885,7 @@ const appVue = new Vue({
             window.location = 'workspaces/' + ws.id + '/export'
         },
         async refreshLists() {
-            await this.loadMyWorkspaces(this.myServerPagination.page)
-            if (this.is_admin && this.menu === 'admin-servers') {
-                await this.loadAdminWorkspaces(this.adminPagination.page)
-            }
+            await this.pollStatuses()
         },
         async loadAdminUsers(page) {
             const q = new URLSearchParams({
@@ -1727,15 +1920,15 @@ const appVue = new Vue({
             if (tab === 'groups') this.loadResourceGroups()
             else this.loadAdminUsers(1)
         },
-        switchAdminServersTab(tab) {
+        async switchAdminServersTab(tab) {
             this.adminServersTab = tab
-            if (tab === 'catalog') this.loadAdminPlatformCatalog()
-            else this.loadAdminWorkspaces(1)
+            if (tab === 'catalog') await this.loadAdminPlatformCatalog()
+            else await this.reloadAdminWorkspaces(1)
         },
-        switchAdminDrivesTab(tab) {
+        async switchAdminDrivesTab(tab) {
             this.adminDrivesTab = tab
-            if (tab === 'catalog') this.loadAdminPlatformCatalog()
-            else this.loadAdminDrives(1)
+            if (tab === 'catalog') await this.loadAdminPlatformCatalog()
+            else await this.reloadAdminDrives(1)
         },
         async loadResourceGroups() {
             const res = await fetch('admin/resource_groups')

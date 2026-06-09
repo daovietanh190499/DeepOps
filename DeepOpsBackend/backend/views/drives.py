@@ -8,12 +8,11 @@ from django.views.decorators.http import require_http_methods
 from backend.models import User, UserDrive, Workspace, WorkspaceDriveMount
 from backend.services.drives_k8s import (
     delete_drive_pvc,
-    get_pvc_phase,
-    get_pvc_placement_map,
+    get_pvc_info_map,
     normalize_size,
 )
 from backend.services.bulk import bulk_drive_result, provision_user_drive
-from backend.services.k8s_status import drive_is_in_use, live_drive_status
+from backend.services.k8s_status import drive_is_in_use, drive_status_from_pvc_phase, drives_in_use_map
 from backend.services.github_auth import auth
 from backend.services.resource_limits import validate_drive_count, validate_drive_size
 
@@ -41,28 +40,112 @@ def _parse_body(request) -> dict:
     return json.loads(request.body.decode('utf-8'))
 
 
-def _drive_payload(drive: UserDrive, placement: dict | None = None) -> dict:
-    data = drive.to_dict()
-    data['status'] = live_drive_status(drive.claim_name)
-    data['pvc_phase'] = get_pvc_phase(drive.claim_name)
-    data['in_use'] = drive_is_in_use(drive)
-    if placement is None:
-        placement = get_pvc_placement_map([drive.claim_name]).get(drive.claim_name, {})
-    data['node'] = placement.get('node', '') or ''
-    data['pv_name'] = placement.get('pv_name', '') or ''
+def _parse_status_ids(request) -> list[str]:
+    """Parse drive ids from POST JSON body: {ids: [...]} or {id: \"...\"}."""
+    if not request.body:
+        return []
+    try:
+        data = _parse_body(request)
+    except json.JSONDecodeError:
+        raise
+    if not isinstance(data, dict):
+        return []
+
+    if 'ids' in data:
+        raw_ids = data['ids']
+        if isinstance(raw_ids, list):
+            return [str(item).strip() for item in raw_ids if str(item).strip()]
+        if isinstance(raw_ids, str) and raw_ids.strip():
+            return [part.strip() for part in raw_ids.split(',') if part.strip()]
+        return []
+
+    if data.get('id'):
+        return [str(data['id']).strip()]
+    return []
+
+
+def _drive_workspace_count(drive: UserDrive) -> int:
     ws_ids = set(Workspace.objects.filter(user_drive=drive).values_list('id', flat=True))
     ws_ids.update(
         WorkspaceDriveMount.objects.filter(user_drive=drive).values_list('workspace_id', flat=True),
     )
-    data['workspace_count'] = len(ws_ids)
+    return len(ws_ids)
+
+
+def _drive_list_payload(drive: UserDrive) -> dict:
+    """DB-only drive row for list endpoints (no kubectl)."""
+    data = drive.to_dict()
+    data['workspace_count'] = _drive_workspace_count(drive)
+    data['pvc_phase'] = ''
+    data['in_use'] = False
+    data['node'] = ''
+    data['pv_name'] = ''
+    return data
+
+
+def _drive_status_payload(
+    drive: UserDrive,
+    pvc_info: dict | None = None,
+    in_use: bool | None = None,
+) -> dict:
+    if pvc_info is None:
+        pvc_info = get_pvc_info_map([drive.claim_name]).get(
+            drive.claim_name,
+            {'phase': 'NotFound', 'node': '', 'pv_name': ''},
+        )
+    phase = pvc_info.get('phase', 'NotFound')
+    if in_use is None:
+        in_use = drive_is_in_use(drive)
+    return {
+        'id': str(drive.id),
+        'status': drive_status_from_pvc_phase(phase),
+        'pvc_phase': '' if phase == 'NotFound' else phase,
+        'in_use': in_use,
+        'node': pvc_info.get('node', '') or '',
+        'pv_name': pvc_info.get('pv_name', '') or '',
+    }
+
+
+def _drive_payload(drive: UserDrive, pvc_info: dict | None = None, in_use: bool | None = None) -> dict:
+    data = _drive_list_payload(drive)
+    data.update(_drive_status_payload(drive, pvc_info=pvc_info, in_use=in_use))
     return data
 
 
 def _drive_payloads(drives) -> list[dict]:
     drive_list = list(drives)
-    placement_map = get_pvc_placement_map([d.claim_name for d in drive_list])
+    pvc_map = get_pvc_info_map([d.claim_name for d in drive_list])
+    in_use_map = drives_in_use_map(drive_list)
     return [
-        _drive_payload(d, placement_map.get(d.claim_name, {}))
+        _drive_payload(
+            d,
+            pvc_info=pvc_map.get(
+                d.claim_name,
+                {'phase': 'NotFound', 'node': '', 'pv_name': ''},
+            ),
+            in_use=in_use_map.get(str(d.id), False),
+        )
+        for d in drive_list
+    ]
+
+
+def _drive_list_payloads(drives) -> list[dict]:
+    return [_drive_list_payload(d) for d in drives]
+
+
+def _drive_status_payloads(drives) -> list[dict]:
+    drive_list = list(drives)
+    pvc_map = get_pvc_info_map([d.claim_name for d in drive_list])
+    in_use_map = drives_in_use_map(drive_list)
+    return [
+        _drive_status_payload(
+            d,
+            pvc_info=pvc_map.get(
+                d.claim_name,
+                {'phase': 'NotFound', 'node': '', 'pv_name': ''},
+            ),
+            in_use=in_use_map.get(str(d.id), False),
+        )
         for d in drive_list
     ]
 
@@ -85,7 +168,7 @@ def my_drives(request, user):
     paginator = Paginator(qs, per_page)
     page_obj = paginator.get_page(page)
     return JsonResponse({
-        'result': _drive_payloads(page_obj.object_list),
+        'result': _drive_list_payloads(page_obj.object_list),
         'pagination': {
             'page': page_obj.number,
             'per_page': per_page,
@@ -93,6 +176,23 @@ def my_drives(request, user):
             'pages': paginator.num_pages or 1,
         },
     })
+
+
+@auth.verify
+@csrf_exempt
+@require_http_methods(['POST'])
+def my_drives_status(request, user):
+    denied = _require_accepted(user)
+    if denied:
+        return denied
+    try:
+        ids = _parse_status_ids(request)
+    except json.JSONDecodeError:
+        return JsonResponse({'message': 'invalid json'}, status=400)
+    qs = UserDrive.objects.filter(user=user)
+    if ids:
+        qs = qs.filter(id__in=ids)
+    return JsonResponse({'result': _drive_status_payloads(qs)})
 
 
 @auth.verify
@@ -222,7 +322,7 @@ def admin_drives(request, user):
     paginator = Paginator(qs, per_page)
     page_obj = paginator.get_page(page)
     return JsonResponse({
-        'result': _drive_payloads(page_obj.object_list),
+        'result': _drive_list_payloads(page_obj.object_list),
         'pagination': {
             'page': page_obj.number,
             'per_page': per_page,
@@ -230,3 +330,20 @@ def admin_drives(request, user):
             'pages': paginator.num_pages or 1,
         },
     })
+
+
+@auth.verify
+@csrf_exempt
+@require_http_methods(['POST'])
+def admin_drives_status(request, user):
+    denied = _require_admin(user)
+    if denied:
+        return denied
+    try:
+        ids = _parse_status_ids(request)
+    except json.JSONDecodeError:
+        return JsonResponse({'message': 'invalid json'}, status=400)
+    qs = UserDrive.objects.all()
+    if ids:
+        qs = qs.filter(id__in=ids)
+    return JsonResponse({'result': _drive_status_payloads(qs)})
