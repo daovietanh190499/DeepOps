@@ -1776,21 +1776,21 @@ const appVue = new Vue({
             if (!this.form.drive_mounts || this.form.drive_mounts.length <= 1) return
             this.form.drive_mounts.splice(index, 1)
         },
+        resetCreateServerForm() {
+            this.form = defaultForm()
+            this.envKey = ''
+            this.envValue = ''
+            this.runError = ''
+        },
         async openCreateServerModal() {
             const limitErr = this.checkServerCountLimit()
             if (limitErr) {
                 this.showToast(limitErr)
                 return
             }
+            this.resetCreateServerForm()
             await this.loadMyDrivesAll()
             await this.loadDockerImages()
-            if (this.selectedDockerTags.length && !this.selectedDockerTags.includes(this.form.docker_tag)) {
-                this.form.docker_tag = this.selectedDockerTags[0]
-            }
-            if (!this.form.drive_mounts || !this.form.drive_mounts.length) {
-                this.form.drive_mounts = [defaultDriveMount()]
-            }
-            this.runError = ''
             this.showCreateServerModal = true
         },
         closeCreateServerModal() {
