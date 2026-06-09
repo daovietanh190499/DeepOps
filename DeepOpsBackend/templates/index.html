@@ -602,8 +602,11 @@
                             <input v-model="newPlanTemplate.ports_text" placeholder="Ports (8080, 3000)" class="rounded-lg border px-2 py-1.5 text-sm font-mono sm:col-span-3">
                             <input v-model="newPlanTemplate.command_text" placeholder="Container command (space-separated)" class="rounded-lg border px-2 py-1.5 text-sm font-mono sm:col-span-3">
                         </div>
-                        <textarea v-model="newPlanTemplate.env_defaults_text" rows="2" placeholder='{"PASSWORD_PREFIX":"my-","PWA_APPNAME":"Workspace"}'
+                        <textarea v-model="newPlanTemplate.env_defaults_text" rows="2" placeholder='{"SECRET_KEY":"secret-<<rdstring:64>>","PWA_APPNAME":"Workspace"}'
                                   class="w-full rounded-lg border px-2 py-1.5 text-xs font-mono"></textarea>
+                        <p class="text-[10px] text-slate-500">Env templates: <code class="rounded bg-slate-100 px-1">&lt;&lt;rdstring:N&gt;&gt;</code> random string,
+                            <code class="rounded bg-slate-100 px-1">&lt;&lt;rdnum:N&gt;&gt;</code> random digits,
+                            <code class="rounded bg-slate-100 px-1">&lt;&lt;tmsp&gt;&gt;</code> UTC timestamp (expanded when user picks template).</p>
                     </div>
 
                     <div class="grid gap-4 lg:grid-cols-3">
@@ -1184,8 +1187,9 @@
                 <div>
                     <label class="block text-xs font-medium text-slate-600">Environment defaults (JSON)</label>
                     <textarea v-model="planTemplateForm.env_defaults_text" rows="4"
-                              placeholder='{"PASSWORD_PREFIX":"my-","PWA_APPNAME":"Workspace"}'
+                              placeholder='{"SECRET_KEY":"secret-<<rdstring:64>>","PWA_APPNAME":"Workspace"}'
                               class="mt-1 w-full rounded-lg border px-3 py-2 text-xs font-mono"></textarea>
+                    <p class="mt-1 text-[10px] text-slate-500">Use <code class="rounded bg-slate-100 px-1">&lt;&lt;rdstring:N&gt;&gt;</code>, <code class="rounded bg-slate-100 px-1">&lt;&lt;rdnum:N&gt;&gt;</code>, <code class="rounded bg-slate-100 px-1">&lt;&lt;tmsp&gt;&gt;</code> in values for random expansion on template click.</p>
                 </div>
                 <div class="flex justify-end gap-2">
                     <button type="button" @click="closePlanTemplateModal" class="rounded-lg border px-4 py-2 text-sm">Cancel</button>

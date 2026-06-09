@@ -1,0 +1,26 @@
+version: v1
+nodes:
+    - name: iai-mini-1
+      drives:
+        - id: 8:1$aOgbM3aw5y9OKsjPcsZBhYC2fQIVUU8osMGB7OLn3LI=
+          name: sda1
+          size: 1000203091968
+          make: ATA WDC_WD10EZEX-75W (Part 1)
+          fs: xfs
+          select: "yes"
+    - name: iai-mini-gpu-00
+      drives:
+        - id: 8:17$PPM/qOfkOQjbKtrnsX147cym9+2m/jL5fzOJLSfoRiw=
+          name: sdb1
+          size: 1000203091968
+          make: ATA ST1000DM010-2EP1 (Part 1)
+          fs: xfs
+          select: "yes"
+    - name: iai-mini-0
+      drives:
+        - id: 8:2$jl4RRc/zJSvlxh7MnTQ4UFMyikPRq9PiPTqIoWCcZZE=
+          name: sda2
+          size: 999614897152
+          make: ATA WDC_WD10EZEX-75W (Part 2)
+          fs: xfs
+          select: "yes"

@@ -81,6 +81,11 @@ Ingress path `/ssh-tunnel` must match wstunnel path prefix `ssh-tunnel` (`-P` cl
 | POST | `/workspaces/<id>/ssh/generate` | Create/rotate keys, sync to cluster |
 | GET | `/workspaces/<id>/ssh/download` | Download stored private key |
 
+## Troubleshooting
+
+- **`logout` then SSH hangs:** Rebuild and redeploy `ssh-bridge` (log build id: `ssh-bridge-2026-06-08-logout-detect`). Restart the workspace pod. Sidecar logs should show `remote shell exit detected` then `SSH session closing` when you type `exit`.
+- **`command terminated with exit code 130`:** Usually from **Ctrl+C** (`130` = SIGINT). `kubectl exec` prints this on stderr when the session is interrupted. Type `exit` without Ctrl+C for a clean disconnect.
+
 ## Security
 
 - Public-key auth only (no passwords).

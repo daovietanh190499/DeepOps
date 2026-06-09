@@ -116,6 +116,8 @@ Vue.component('workspace-card', {
     </div>`,
 })
 
+const ENV_TEMPLATE_RE = /<<([a-z]+)(?::(\d+))?>>/gi
+
 function randomToken(len) {
     const chars = 'abcdefghijklmnopqrstuvwxyz0123456789'
     let s = ''
@@ -123,15 +125,40 @@ function randomToken(len) {
     return s
 }
 
+function randomDigits(len) {
+    let s = ''
+    for (let i = 0; i < len; i++) s += String(Math.floor(Math.random() * 10))
+    return s
+}
+
+function expandEnvTemplateString(value) {
+    if (value == null) return ''
+    return String(value).replace(ENV_TEMPLATE_RE, (_, kind, arg) => {
+        const n = arg ? parseInt(arg, 10) : 0
+        switch ((kind || '').toLowerCase()) {
+            case 'rdstring':
+                return randomToken(n > 0 ? n : 16)
+            case 'rdnum':
+                return randomDigits(n > 0 ? n : 6)
+            case 'tmsp':
+                return new Date().toISOString().replace(/\.\d{3}Z$/, 'Z')
+            default:
+                return `<<${kind}>>`
+        }
+    })
+}
+
 function resolveTemplateEnv(envDefaults) {
     const out = {}
     if (!envDefaults) return out
-    if (envDefaults.PASSWORD_PREFIX) {
-        out.PASSWORD = envDefaults.PASSWORD_PREFIX + randomToken(6)
+    const defaults = { ...envDefaults }
+    if (defaults.PASSWORD_PREFIX && !defaults.PASSWORD) {
+        defaults.PASSWORD = `${defaults.PASSWORD_PREFIX}<<rdstring:6>>`
+        delete defaults.PASSWORD_PREFIX
     }
-    Object.keys(envDefaults).forEach((k) => {
+    Object.keys(defaults).forEach((k) => {
         if (k === 'PASSWORD_PREFIX') return
-        out[k] = String(envDefaults[k])
+        out[k] = expandEnvTemplateString(defaults[k])
     })
     return out
 }
@@ -151,7 +178,7 @@ function defaultPlanTemplateForm() {
         docker_tag: '4.89.0-ubuntu',
         ports_text: '8080',
         command_text: '',
-        env_defaults_text: '{"PASSWORD_PREFIX":"my-","PWA_APPNAME":"Workspace"}',
+        env_defaults_text: '{"SECRET_KEY":"secret-<<rdstring:64>>","PWA_APPNAME":"Workspace"}',
         sort_order: 0,
         is_active: true,
     }
@@ -1239,7 +1266,7 @@ const appVue = new Vue({
             }
             const env = resolveTemplateEnv(t.env_defaults)
             this.form.env_vars = { ...this.form.env_vars, ...env }
-            const firstKey = Object.keys(env)[0] || 'PASSWORD'
+            const firstKey = Object.keys(env)[0] || ''
             this.envKey = firstKey
             this.envValue = this.form.env_vars[firstKey] || ''
         },

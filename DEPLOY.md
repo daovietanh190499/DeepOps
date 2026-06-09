@@ -100,6 +100,12 @@ Mở http://localhost:5000
 
 ## Drives (DirectPV) vs servers
 
+The hub pod runs `kubectl directpv …` as `system:serviceaccount:dohub:dohub-service-account`. That service account needs cluster RBAC for DirectPV CRDs (`directpvdrives`, `directpvvolumes`, …) and `daemonsets` in the `directpv` namespace (plugin version check). These rules live in `dohub/templates/clusterroles.yaml`. After upgrading the chart, re-apply if you still see `forbidden` on `directpvdrives` or `node-server`:
+
+```bash
+helm upgrade --install dohub ./dohub -n dohub
+```
+
 - **Drives** tab: user creates a DirectPV PVC (`kubectl apply`) with name + size (`20Gi`, …).
 - **SSH over HTTPS**: per-server key pair in the workspace detail modal; sidecar `localhost:32000/ssh-bridge` + ingress path `/ssh-tunnel`. See [docs/SSH-OVER-HTTPS.md](docs/SSH-OVER-HTTPS.md).
 - **Servers** no longer create storage; pick an existing drive + **mount path** (e.g. `/home/coder`).

@@ -4,8 +4,12 @@
 from __future__ import annotations
 
 import asyncio
+import contextlib
+import errno
+import fcntl
 import logging
 import os
+import re
 import subprocess
 import sys
 from pathlib import Path
@@ -13,7 +17,7 @@ from pathlib import Path
 import asyncssh
 
 LOG = logging.getLogger('ssh_bridge')
-BUILD_ID = 'ssh-bridge-2026-06-06-kubectl-exec'
+BUILD_ID = 'ssh-bridge-2026-06-08-logout-detect'
 
 SSH_BIND_HOST = os.environ.get('SSH_BIND_HOST', '127.0.0.1')
 SSH_PORT = int(os.environ.get('SSH_PORT', '2222'))
@@ -23,6 +27,15 @@ SSH_USER = os.environ.get('SSH_USER', 'coder')
 POD_NAME = os.environ.get('POD_NAME', '')
 POD_NAMESPACE = os.environ.get('POD_NAMESPACE', '')
 TARGET_CONTAINER = os.environ.get('TARGET_CONTAINER', 'codehub')
+READ_CHUNK = 65536
+SESSION_MARKER = b'___DOHUB_SSH_EOF___'
+LOGOUT_RE = re.compile(br'logout\r?\n')
+# Remote bash prints "logout" on exit; trap marker is a fallback if stream stalls.
+REMOTE_SHELL = (
+    'stty -echoctl 2>/dev/null; '
+    'trap \'printf "\\n___DOHUB_SSH_EOF___\\n"\' EXIT; '
+    'exec bash -l'
+)
 
 
 class DohubSSHServer(asyncssh.SSHServer):
@@ -64,7 +77,35 @@ def _shell_env(process: asyncssh.SSHServerProcess) -> dict[str, str]:
     return env
 
 
-async def _run_command(process: asyncssh.SSHServerProcess) -> int | None:
+def _set_nonblocking(fd: int) -> None:
+    flags = fcntl.fcntl(fd, fcntl.F_GETFL)
+    fcntl.fcntl(fd, fcntl.F_SETFL, flags | os.O_NONBLOCK)
+
+
+def _stop_shell(shell: subprocess.Popen[bytes]) -> int:
+    if shell.poll() is not None:
+        return shell.returncode or 0
+    shell.terminate()
+    try:
+        return shell.wait(timeout=3) or 0
+    except subprocess.TimeoutExpired:
+        shell.kill()
+        return shell.wait(timeout=1) or 0
+
+
+def _session_should_end(tail: bytes) -> bool:
+    if SESSION_MARKER in tail:
+        return True
+    return LOGOUT_RE.search(tail) is not None
+
+
+def _strip_session_marker(data: bytes) -> bytes:
+    if SESSION_MARKER not in data:
+        return data
+    return data.replace(SESSION_MARKER + b'\n', b'').replace(SESSION_MARKER, b'')
+
+
+async def _run_command(process: asyncssh.SSHServerProcess) -> int:
     proc = await asyncio.create_subprocess_exec(
         *_kubectl_exec_base(),
         POD_NAME,
@@ -79,55 +120,150 @@ async def _run_command(process: asyncssh.SSHServerProcess) -> int | None:
         stderr=asyncio.subprocess.PIPE,
     )
     await process.redirect(proc.stdin, proc.stdout, proc.stderr)
-    await proc.wait()
-    return proc.returncode
+    code = await proc.wait()
+    return code if code is not None else 0
 
 
-async def _run_interactive_shell(process: asyncssh.SSHServerProcess) -> int | None:
-    master_fd, slave_fd = os.openpty()
-    env = _shell_env(process)
-
+async def _forward_ssh_to_pty(
+    process: asyncssh.SSHServerProcess,
+    master_fd: int,
+    stop_event: asyncio.Event,
+) -> None:
     try:
-        shell = subprocess.Popen(
-            [
-                *_kubectl_exec_base(),
-                '-i',
-                '-t',
-                POD_NAME,
-                '-c',
-                TARGET_CONTAINER,
-                '--',
-                '/bin/bash',
-                '-l',
-            ],
-            stdin=slave_fd,
-            stdout=slave_fd,
-            stderr=slave_fd,
-            env=env,
-            preexec_fn=os.setsid,
-        )
+        while not stop_event.is_set():
+            data = await process.stdin.read(READ_CHUNK)
+            if not data:
+                stop_event.set()
+                break
+            await asyncio.get_running_loop().run_in_executor(None, os.write, master_fd, data)
+    except (asyncssh.DisconnectError, BrokenPipeError, OSError):
+        stop_event.set()
     finally:
-        os.close(slave_fd)
+        with contextlib.suppress(OSError):
+            os.shutdown(master_fd, os.SHUT_WR)
 
-    await process.redirect(stdin=master_fd, stdout=os.dup(master_fd))
-    await process.wait_closed()
-    return shell.wait()
+
+async def _forward_pty_to_ssh(
+    process: asyncssh.SSHServerProcess,
+    master_fd: int,
+    stop_event: asyncio.Event,
+) -> None:
+    tail = b''
+    loop = asyncio.get_running_loop()
+    try:
+        while not stop_event.is_set():
+            try:
+                data = await loop.run_in_executor(None, os.read, master_fd, READ_CHUNK)
+            except OSError as exc:
+                if exc.errno in (errno.EAGAIN, errno.EWOULDBLOCK):
+                    await asyncio.sleep(0.05)
+                    continue
+                stop_event.set()
+                break
+            if not data:
+                LOG.info('pty read EOF')
+                stop_event.set()
+                break
+            tail = (tail + data)[-512:]
+            out = _strip_session_marker(data)
+            if out:
+                process.stdout.write(out)
+            if _session_should_end(tail):
+                LOG.info('remote shell exit detected (logout/marker)')
+                stop_event.set()
+                break
+    except (asyncssh.DisconnectError, BrokenPipeError, OSError):
+        stop_event.set()
+
+
+async def _run_interactive_shell(process: asyncssh.SSHServerProcess) -> int:
+    """Attach an interactive session to kubectl exec via a local PTY."""
+    master_fd, slave_fd = os.openpty()
+    _set_nonblocking(master_fd)
+    env = _shell_env(process)
+    stop_event = asyncio.Event()
+
+    shell = subprocess.Popen(
+        [
+            *_kubectl_exec_base(),
+            '-i',
+            '-t',
+            POD_NAME,
+            '-c',
+            TARGET_CONTAINER,
+            '--',
+            '/bin/bash',
+            '-lc',
+            REMOTE_SHELL,
+        ],
+        stdin=slave_fd,
+        stdout=slave_fd,
+        stderr=slave_fd,
+        env=env,
+        preexec_fn=os.setsid,
+    )
+    os.close(slave_fd)
+
+    to_pty = asyncio.create_task(_forward_ssh_to_pty(process, master_fd, stop_event))
+    from_pty = asyncio.create_task(_forward_pty_to_ssh(process, master_fd, stop_event))
+    shell_task = asyncio.create_task(asyncio.to_thread(shell.wait))
+
+    code = 0
+    try:
+        wait_stop = asyncio.create_task(stop_event.wait())
+        done, _pending = await asyncio.wait(
+            {from_pty, to_pty, shell_task, wait_stop},
+            return_when=asyncio.FIRST_COMPLETED,
+        )
+
+        if shell_task in done:
+            code = shell_task.result() or 0
+            LOG.info('kubectl exec exited code=%s', code)
+        elif wait_stop in done or from_pty in done:
+            LOG.info('closing SSH session after shell exit')
+            code = _stop_shell(shell)
+        else:
+            LOG.info('SSH client disconnected')
+            code = _stop_shell(shell)
+
+        stop_event.set()
+    finally:
+        for task in (to_pty, from_pty):
+            if not task.done():
+                task.cancel()
+                with contextlib.suppress(asyncio.CancelledError):
+                    await task
+        if not shell_task.done():
+            shell_task.cancel()
+            with contextlib.suppress(asyncio.CancelledError):
+                await shell_task
+        with contextlib.suppress(OSError):
+            os.shutdown(master_fd, os.SHUT_RDWR)
+            os.close(master_fd)
+        if shell.poll() is None:
+            with contextlib.suppress(subprocess.TimeoutExpired):
+                shell.kill()
+                shell.wait(timeout=1)
+
+    return code
 
 
 async def handle_client(process: asyncssh.SSHServerProcess) -> None:
     """Attach each SSH session to the workspace container via kubectl exec."""
+    code = 1
     try:
         if process.command:
             code = await _run_command(process)
         else:
             code = await _run_interactive_shell(process)
-        if code is not None:
-            process.exit(code)
-        else:
-            process.close()
     except Exception:
         LOG.exception('shell session failed')
-        process.exit(1)
+        code = 1
+    finally:
+        with contextlib.suppress(Exception):
+            await process.stdout.drain()
+        LOG.info('SSH session closing exit=%s build=%s', code, BUILD_ID)
+        process.exit(code & 0xFF)
 
 
 async def ensure_host_key() -> None:

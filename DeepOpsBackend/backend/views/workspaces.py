@@ -18,6 +18,7 @@ from backend.services.k8s_status import (
     workspace_is_active,
 )
 from backend.services.gpu_resources import normalize_gpu_value
+from backend.services.env_templates import expand_env_vars
 from backend.services.resource_limits import can_change_privileged, validate_server_count, validate_workspace_resources
 from backend.services.ssh_keys import ssh_info_payload
 from backend.services.workspace_mounts import (
@@ -104,7 +105,7 @@ def _apply_workspace_fields(ws: Workspace, data: dict, owner: User | None = None
         if err:
             return err
     if 'env_vars' in data and isinstance(data['env_vars'], dict):
-        ws.env_vars = data['env_vars']
+        ws.env_vars = expand_env_vars(data['env_vars'])
     if 'exposed_ports' in data and isinstance(data['exposed_ports'], list):
         ws.exposed_ports = [int(p) for p in data['exposed_ports']]
     if 'container_command' in data:

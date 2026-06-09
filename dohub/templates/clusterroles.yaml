@@ -4,7 +4,10 @@ metadata:
   name: {{ .Release.Name }}-dohub-clusterroles
 rules:
 - apiGroups: ["apps"]
-  resources: ["deployments"]
+  resources: ["deployments", "daemonsets"]
+  verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+- apiGroups: ["directpv.min.io"]
+  resources: ["directpvdrives", "directpvvolumes", "directpvnodes", "directpvinitrequests"]
   verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
 - apiGroups: ["networking.k8s.io"]
   resources: ["ingresses"]
