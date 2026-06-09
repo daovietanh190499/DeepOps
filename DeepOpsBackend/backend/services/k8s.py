@@ -2,8 +2,6 @@ import json
 import os
 import subprocess
 
-from backend.services.kubectl_cache import clear_kubectl_cache, kubectl_json
-
 from .config import get_hub_config
 from .gpu_resources import parse_gpu_resources
 from .k8s_env import CODEHUB_CHART_PATH, DEFAULT_PORT, DOMAIN_NAME, NAMESPACE
@@ -93,9 +91,9 @@ def _helm_base_cmd(config: dict) -> list[str]:
     cmd = [
         'helm', 'upgrade', '--install', '--create-namespace',
         '-n', NAMESPACE,
-        '--set', f'image.repository={config["image"]}',
+        '--set-string', f'image.repository={config["image"]}',
         '--set', 'image.pullPolicy=IfNotPresent',
-        '--set', f'image.tag={config["image_tag"]}',
+        '--set-string', f'image.tag={config["image_tag"]}',
         '--set', f'podLabels.{NAMESPACE}-username={config["username"]}',
         '--set', f'podLabels.{NAMESPACE}-workspace={config["slug"]}',
         '--set', f'podLabels.{NAMESPACE}-workspace-id={config["workspace_id"]}',
@@ -129,6 +127,9 @@ def _helm_base_cmd(config: dict) -> list[str]:
         '--set', f'resources.requests.cpu={config["cpu"]}',
         '--set', f'resources.requests.memory={config["ram"]}',
     ]
+
+    if config.get('replica_count') is not None:
+        cmd.extend(['--set', f'replicaCount={int(config["replica_count"])}'])
 
     env_vars = dict(config.get('env_vars', {}))
     if env_vars.get('password'):
@@ -177,9 +178,9 @@ def _helm_base_cmd(config: dict) -> list[str]:
             '--set', 'sshBridge.enabled=true',
             '--set', 'sshBridge.serviceAccount.create=true',
             '--set', 'sshBridge.rbac.create=true',
-            '--set', f'sshBridge.secretName={config["ssh_secret_name"]}',
-            '--set', f'sshBridge.image.repository={bridge_image}',
-            '--set', f'sshBridge.image.tag={bridge_tag}',
+            '--set-string', f'sshBridge.secretName={config["ssh_secret_name"]}',
+            '--set-string', f'sshBridge.image.repository={bridge_image}',
+            '--set-string', f'sshBridge.image.tag={bridge_tag}',
         ])
 
     cmd.extend([
@@ -202,24 +203,58 @@ def create_codehub(config: dict) -> tuple[str, str, int]:
     cmd = _helm_base_cmd(config)
     result = subprocess.run(cmd, capture_output=True, text=True, check=False)
     logs = result.stdout + result.stderr
-    if result.returncode == 0:
-        clear_kubectl_cache()
     return ' '.join(cmd), logs, result.returncode
 
 
 def scale_codehub(release_name: str, replicas: int) -> tuple[str, int]:
     """Scale the workspace deployment without removing the Helm release."""
-    cmd = [
-        'kubectl', 'scale', 'deployment',
-        '-n', NAMESPACE,
-        f'-l=app.kubernetes.io/instance={release_name}',
-        f'--replicas={replicas}',
-    ]
-    result = subprocess.run(cmd, capture_output=True, text=True, check=False)
-    logs = (result.stdout or '') + (result.stderr or '')
-    if result.returncode == 0:
-        clear_kubectl_cache()
-    return ' '.join(cmd), result.returncode
+    lookup = subprocess.run(
+        [
+            'kubectl', 'get', 'deployment',
+            '-n', NAMESPACE,
+            f'-l=app.kubernetes.io/instance={release_name}',
+            '-o', 'json',
+        ],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    if lookup.returncode != 0 or not (lookup.stdout or '').strip():
+        return 'deployment lookup failed', 1
+    try:
+        data = json.loads(lookup.stdout)
+    except json.JSONDecodeError:
+        return 'deployment lookup failed', 1
+
+    items = data.get('items') or []
+    if not items:
+        return ('', 0) if replicas == 0 else ('deployment not found', 1)
+
+    logs_parts: list[str] = []
+    exit_code = 0
+    patch_body = json.dumps({'spec': {'replicas': replicas}})
+    for item in items:
+        name = (item.get('metadata') or {}).get('name', '')
+        if not name:
+            continue
+        result = subprocess.run(
+            [
+                'kubectl', 'patch', 'deployment', name,
+                '-n', NAMESPACE,
+                '--type=merge',
+                '-p', patch_body,
+            ],
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        chunk = ((result.stdout or '') + (result.stderr or '')).strip()
+        if chunk:
+            logs_parts.append(chunk)
+        if result.returncode != 0:
+            exit_code = result.returncode
+
+    return '\n'.join(logs_parts) or 'ok', exit_code
 
 
 def stop_codehub(release_name: str) -> tuple[str, int]:
@@ -232,20 +267,23 @@ def remove_codehub(release_name: str) -> int:
 
     if not helm_release_exists(release_name):
         return 0
-    code = subprocess.call([
+    return subprocess.call([
         'helm', 'uninstall', '-n', NAMESPACE, release_name,
     ])
-    if code == 0:
-        clear_kubectl_cache()
-    return code
 
 
 def get_codehub_workspace(workspace) -> dict:
-    data = kubectl_json([
-        'get', 'pod',
-        f'-l={NAMESPACE}-workspace-id={workspace.id}',
-        '-n', NAMESPACE,
-    ])
-    if not isinstance(data, dict):
+    result = subprocess.run(
+        [
+            'kubectl', 'get', 'pod',
+            f'-l={NAMESPACE}-workspace-id={workspace.id}',
+            '-n', NAMESPACE,
+            '-o', 'json',
+        ],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    if not result.stdout.strip():
         return {'items': [], 'apiVersion': 'v1', 'kind': 'List'}
-    return data
+    return json.loads(result.stdout)

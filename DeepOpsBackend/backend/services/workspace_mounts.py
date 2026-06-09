@@ -53,7 +53,7 @@ def normalize_drive_mounts_data(data: dict) -> list[dict]:
 
 def drive_mounts_payload(workspace: Workspace) -> list[dict]:
     rows = []
-    if workspace.user_drive_id:
+    if workspace.user_drive_id and workspace.user_drive:
         drive = workspace.user_drive
         rows.append({
             'drive_id': str(workspace.user_drive_id),

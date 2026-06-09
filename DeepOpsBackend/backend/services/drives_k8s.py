@@ -3,8 +3,6 @@ import os
 import subprocess
 import tempfile
 
-from backend.services.kubectl_cache import clear_kubectl_cache, kubectl_json, kubectl_run
-
 from .config import get_hub_config
 from .storage import drive_label_to_size
 
@@ -55,35 +53,46 @@ def create_drive_pvc(claim_name: str, size: str, username: str, drive_id: str) -
             text=True,
             check=False,
         )
-        clear_kubectl_cache()
         return result.stdout + result.stderr, result.returncode
     finally:
         os.unlink(path)
 
 
 def delete_drive_pvc(claim_name: str) -> int:
-    code = subprocess.call([
+    return subprocess.call([
         'kubectl', 'delete', 'pvc', claim_name, '-n', NAMESPACE, '--ignore-not-found=true',
     ])
-    if code == 0:
-        clear_kubectl_cache()
-    return code
 
 
 def get_pvc_phase(claim_name: str) -> str:
-    result = kubectl_run([
-        'kubectl', 'get', 'pvc', claim_name,
-        '-n', NAMESPACE,
-        '-o', 'jsonpath={.status.phase}',
-    ])
+    result = subprocess.run(
+        [
+            'kubectl', 'get', 'pvc', claim_name,
+            '-n', NAMESPACE,
+            '-o', 'jsonpath={.status.phase}',
+        ],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
     if result.returncode != 0:
         return 'NotFound'
     return (result.stdout or '').strip() or 'NotFound'
 
 
 def _kubectl_json(args: list[str]) -> dict | None:
-    data = kubectl_json(args)
-    return data if isinstance(data, dict) else None
+    result = subprocess.run(
+        ['kubectl', *args, '-o', 'json'],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    if result.returncode != 0 or not (result.stdout or '').strip():
+        return None
+    try:
+        return json.loads(result.stdout)
+    except json.JSONDecodeError:
+        return None
 
 
 def _node_from_pv(pv: dict) -> str:

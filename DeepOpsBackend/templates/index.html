@@ -731,6 +731,8 @@
                             <code class="rounded bg-slate-100 px-1">linux_amd64</code>), extract it, and add the folder to your <code class="rounded bg-slate-100 px-1">PATH</code>.
                         </p>
                     </div>
+                    <p v-if="sshSyncMessage && !sshSyncError" class="text-xs text-emerald-700" v-text="sshSyncMessage"></p>
+                    <p v-if="sshSyncError" class="text-xs text-rose-600 whitespace-pre-wrap" v-text="sshSyncError"></p>
                     <div v-if="modalWorkspace.has_key" class="space-y-2 text-xs">
                         <div class="flex items-center gap-2">
                             <span class="font-medium text-slate-500 shrink-0">WSS URL</span>

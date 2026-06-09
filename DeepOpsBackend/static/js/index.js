@@ -446,6 +446,8 @@ const appVue = new Vue({
         showDirectpvInitConfirm: false,
         sshGenerateLoading: false,
         sshPrivateKeyOnce: '',
+        sshSyncMessage: '',
+        sshSyncError: '',
         userList: [],
         adminUserFilter: '',
         adminUserStatus: '',
@@ -669,36 +671,58 @@ const appVue = new Vue({
         openWorkspaceModal(ws) {
             this.modalWorkspace = { ...ws, env_vars: { ...(ws.env_vars || {}) } }
             this.sshPrivateKeyOnce = ''
+            this.sshSyncMessage = ''
+            this.sshSyncError = ''
             this.loadWorkspaceSsh(ws)
         },
         closeWorkspaceModal() {
             this.modalWorkspace = null
             this.sshPrivateKeyOnce = ''
+            this.sshSyncMessage = ''
+            this.sshSyncError = ''
+        },
+        applySshModalFields(result) {
+            if (!this.modalWorkspace || !result) return
+            Object.keys(result).forEach((k) => {
+                if (k === 'private_key' || k === 'sync') return
+                this.$set(this.modalWorkspace, k, result[k])
+            })
         },
         async loadWorkspaceSsh(ws) {
             const res = await fetch('workspaces/' + ws.id + '/ssh')
             if (res.status !== 200 || !this.modalWorkspace || this.modalWorkspace.id !== ws.id) return
             const data = await res.json()
-            const info = data.result || {}
-            Object.assign(this.modalWorkspace, info)
+            this.applySshModalFields(data.result || {})
         },
         async generateSshKeys(ws) {
             this.sshGenerateLoading = true
             this.sshPrivateKeyOnce = ''
+            this.sshSyncMessage = ''
+            this.sshSyncError = ''
             try {
                 const res = await fetch('workspaces/' + ws.id + '/ssh/generate', { method: 'POST' })
                 const data = await res.json().catch(() => ({}))
                 const result = data.result || {}
-                if (res.status !== 200) {
-                    this.showToast(data.message || 'SSH key generation failed')
-                    if (result.private_key) this.sshPrivateKeyOnce = result.private_key
-                    if (result.has_key !== undefined) Object.assign(this.modalWorkspace, result)
+                this.applySshModalFields(result)
+                if (result.private_key) this.sshPrivateKeyOnce = result.private_key
+
+                const sync = result.sync || {}
+                if (sync.message) this.sshSyncMessage = sync.message
+                const syncErr = (sync.error || '').trim()
+                    || (sync.ok === false ? (sync.helm_logs || sync.apply_logs || '').trim() : '')
+                if (syncErr) this.sshSyncError = syncErr
+
+                if (res.status !== 200 || !result.has_key) {
+                    this.showToast(data.message || syncErr || 'SSH key generation failed')
                     return
                 }
-                Object.assign(this.modalWorkspace, result)
-                if (result.private_key) this.sshPrivateKeyOnce = result.private_key
-                this.showToast('SSH keys ready — save the private key')
+                this.showToast(
+                    sync.message
+                    || (sync.ok === false ? (data.message || 'Keys saved — check sync status below') : 'SSH keys ready — save the private key')
+                )
                 await this.refreshLists()
+            } catch (e) {
+                this.showToast(e.message || 'SSH key generation failed')
             } finally {
                 this.sshGenerateLoading = false
             }
@@ -1649,7 +1673,13 @@ const appVue = new Vue({
             await this.refreshLists()
         },
         async stopWorkspace(ws) {
-            await fetch('workspaces/' + ws.id + '/stop', { method: 'POST' })
+            const res = await fetch('workspaces/' + ws.id + '/stop', { method: 'POST' })
+            const data = await res.json().catch(() => ({}))
+            if (res.status !== 200) {
+                this.showToast(data.message || data.error || data.logs || 'Stop failed')
+                return
+            }
+            this.showToast('Server stopped')
             await this.refreshLists()
         },
         openWorkspace(ws) {

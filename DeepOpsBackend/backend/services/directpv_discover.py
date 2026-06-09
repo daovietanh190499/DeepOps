@@ -8,8 +8,6 @@ from pathlib import Path
 
 import yaml
 
-from backend.services.kubectl_cache import clear_kubectl_cache
-
 DRIVES_YAML_PATH = os.environ.get('DIRECTPV_DRIVES_YAML_PATH', '/tmp/directpv-drives.yaml')
 
 
@@ -240,7 +238,6 @@ def init_drives() -> dict:
             'path': str(path),
         }
 
-    clear_kubectl_cache()
     return {
         'ok': True,
         'message': f'Initialized {selected} drive(s)',

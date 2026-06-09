@@ -295,12 +295,18 @@ def _start_workspace(ws: Workspace, *, cleanup_on_failure: bool = False):
 def _stop_workspace(ws: Workspace):
     try:
         if settings.DEFAULT_SPAWNER == 'k8s':
-            _, exit_code = stop_codehub(ws.release_name)
+            logs, exit_code = stop_codehub(ws.release_name)
             if exit_code != 0:
-                return JsonResponse({'message': 'action failed'}, status=500)
-    except Exception:
-        return JsonResponse({'message': 'action failed'}, status=500)
-    return JsonResponse({'message': 'success', 'result': _workspace_payload(ws)})
+                return JsonResponse({
+                    'message': 'stop failed',
+                    'logs': logs,
+                }, status=500)
+        return JsonResponse({'message': 'success', 'result': _workspace_payload(ws)})
+    except Exception as exc:
+        return JsonResponse({
+            'message': 'stop failed',
+            'error': str(exc),
+        }, status=500)
 
 
 @auth.verify
@@ -329,7 +335,11 @@ def workspace_stop(request, user, workspace_id):
     ws, err = _get_workspace_for_user(user, workspace_id)
     if err:
         return err
-    if not workspace_is_active(live_workspace_state(ws)):
+    try:
+        state = live_workspace_state(ws)
+    except Exception:
+        state = Workspace.STATE_RUNNING
+    if not workspace_is_active(state):
         return JsonResponse({'message': 'not running'}, status=400)
     return _stop_workspace(ws)
 

@@ -39,9 +39,9 @@ def workspace_ssh_generate(request, user, workspace_id):
     payload['sync'] = sync
     if not sync.get('ok'):
         return JsonResponse({
-            'message': 'keys created but cluster sync failed',
+            'message': sync.get('error') or 'keys saved but SSH bridge sync failed',
             'result': payload,
-        }, status=500)
+        }, status=200)
     return JsonResponse({'result': payload})
 
 

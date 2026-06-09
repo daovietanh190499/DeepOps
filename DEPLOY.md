@@ -107,7 +107,7 @@ helm upgrade --install dohub ./dohub -n dohub
 ```
 
 - **Drives** tab: user creates a DirectPV PVC (`kubectl apply`) with name + size (`20Gi`, …).
-- **SSH over HTTPS**: per-server key pair in the workspace detail modal; sidecar `localhost:32000/ssh-bridge` + ingress path `/ssh-tunnel`. See [docs/SSH-OVER-HTTPS.md](docs/SSH-OVER-HTTPS.md).
+- **SSH over HTTPS**: per-server key pair in the workspace detail modal; sidecar `localhost:32000/ssh-bridge` + ingress path `/ssh-tunnel`. See [docs/SSH-OVER-HTTPS.md](docs/SSH-OVER-HTTPS.md). Enabling SSH runs `helm upgrade` on the workspace release and creates a per-release `ServiceAccount`, `Role`, and `RoleBinding` for the sidecar — the hub ClusterRole must allow `serviceaccounts`, `roles`, and `rolebindings` (see `dohub/templates/clusterroles.yaml`).
 - **Servers** no longer create storage; pick an existing drive + **mount path** (e.g. `/home/coder`).
 - PVC name: `drive-{namespace}-{username}-{slug}`.
 - Delete drive: type `delete` in modal; blocked if a server still uses it or server is running.
