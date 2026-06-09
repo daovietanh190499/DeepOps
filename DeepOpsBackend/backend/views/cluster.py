@@ -4,6 +4,7 @@ from django.http import JsonResponse
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_http_methods
 
+from backend.services.kubectl_cache import DEFAULT_TTL_SECONDS
 from backend.services.cluster import (
     get_cluster_overview,
     get_directpv_drives,
@@ -37,6 +38,7 @@ def admin_cluster_overview(request, user):
             'cluster': get_cluster_overview(),
             'nodes': get_k8s_nodes(),
             'directpv': get_directpv_drives(),
+            'cache_ttl_seconds': DEFAULT_TTL_SECONDS,
         },
     })
 

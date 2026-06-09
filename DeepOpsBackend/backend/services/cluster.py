@@ -6,8 +6,13 @@ import shutil
 import subprocess
 from datetime import datetime, timezone
 
+from backend.services.kubectl_cache import DEFAULT_TTL_SECONDS, kubectl_json, kubectl_run
+
 
 def _run(cmd: list[str], timeout: int = 60) -> subprocess.CompletedProcess:
+    if cmd and cmd[0] == 'kubectl':
+        result = kubectl_run(cmd, timeout=timeout)
+        return subprocess.CompletedProcess(cmd, result.returncode, result.stdout, result.stderr)
     return subprocess.run(
         cmd,
         capture_output=True,
@@ -18,6 +23,8 @@ def _run(cmd: list[str], timeout: int = 60) -> subprocess.CompletedProcess:
 
 
 def _run_json(cmd: list[str]) -> dict | list | None:
+    if len(cmd) >= 2 and cmd[0] == 'kubectl':
+        return kubectl_json(cmd[1:], timeout=60)
     result = _run(cmd)
     if result.returncode != 0 or not (result.stdout or '').strip():
         return None
@@ -225,6 +232,7 @@ def get_cluster_overview() -> dict:
 
     return {
         'fetched_at': datetime.now(timezone.utc).isoformat(),
+        'cache_ttl_seconds': DEFAULT_TTL_SECONDS,
         'cluster_info': (cluster_info.stdout or cluster_info.stderr or '').strip(),
         'client_version': client.get('gitVersion', ''),
         'server_version': server.get('gitVersion', ''),

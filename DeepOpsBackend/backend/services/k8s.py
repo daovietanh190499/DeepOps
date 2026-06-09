@@ -2,6 +2,8 @@ import json
 import os
 import subprocess
 
+from backend.services.kubectl_cache import clear_kubectl_cache, kubectl_json
+
 from .config import get_hub_config
 from .gpu_resources import parse_gpu_resources
 from .k8s_env import CODEHUB_CHART_PATH, DEFAULT_PORT, DOMAIN_NAME, NAMESPACE
@@ -200,6 +202,8 @@ def create_codehub(config: dict) -> tuple[str, str, int]:
     cmd = _helm_base_cmd(config)
     result = subprocess.run(cmd, capture_output=True, text=True, check=False)
     logs = result.stdout + result.stderr
+    if result.returncode == 0:
+        clear_kubectl_cache()
     return ' '.join(cmd), logs, result.returncode
 
 
@@ -213,6 +217,8 @@ def scale_codehub(release_name: str, replicas: int) -> tuple[str, int]:
     ]
     result = subprocess.run(cmd, capture_output=True, text=True, check=False)
     logs = (result.stdout or '') + (result.stderr or '')
+    if result.returncode == 0:
+        clear_kubectl_cache()
     return ' '.join(cmd), result.returncode
 
 
@@ -226,23 +232,20 @@ def remove_codehub(release_name: str) -> int:
 
     if not helm_release_exists(release_name):
         return 0
-    return subprocess.call([
+    code = subprocess.call([
         'helm', 'uninstall', '-n', NAMESPACE, release_name,
     ])
+    if code == 0:
+        clear_kubectl_cache()
+    return code
 
 
 def get_codehub_workspace(workspace) -> dict:
-    result = subprocess.run(
-        [
-            'kubectl', 'get', 'pod',
-            f'-l={NAMESPACE}-workspace-id={workspace.id}',
-            '-n', NAMESPACE,
-            '-o', 'json',
-        ],
-        capture_output=True,
-        text=True,
-        check=False,
-    )
-    if not result.stdout.strip():
+    data = kubectl_json([
+        'get', 'pod',
+        f'-l={NAMESPACE}-workspace-id={workspace.id}',
+        '-n', NAMESPACE,
+    ])
+    if not isinstance(data, dict):
         return {'items': [], 'apiVersion': 'v1', 'kind': 'List'}
-    return json.loads(result.stdout)
+    return data

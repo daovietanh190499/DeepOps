@@ -1,9 +1,7 @@
 """Live resource status from the Kubernetes API (not persisted in DB)."""
 
-import json
-import subprocess
-
 from backend.models import Workspace
+from backend.services.kubectl_cache import DEFAULT_TTL_SECONDS, get_cached, helm_run, kubectl_json
 
 from .drives_k8s import get_pvc_phase
 from .k8s_env import NAMESPACE
@@ -32,32 +30,17 @@ def live_drive_status(claim_name: str) -> str:
 
 
 def helm_release_exists(release_name: str) -> bool:
-    result = subprocess.run(
-        ['helm', 'list', '-n', NAMESPACE, '-f', f'^{release_name}$', '-q'],
-        capture_output=True,
-        text=True,
-        check=False,
-    )
+    result = helm_run(['helm', 'list', '-n', NAMESPACE, '-f', f'^{release_name}$', '-q'])
     return bool((result.stdout or '').strip())
 
 
 def get_deployment_status(release_name: str) -> dict | None:
-    result = subprocess.run(
-        [
-            'kubectl', 'get', 'deployment',
-            '-n', NAMESPACE,
-            f'-l=app.kubernetes.io/instance={release_name}',
-            '-o', 'json',
-        ],
-        capture_output=True,
-        text=True,
-        check=False,
-    )
-    if result.returncode != 0 or not (result.stdout or '').strip():
-        return None
-    try:
-        data = json.loads(result.stdout)
-    except json.JSONDecodeError:
+    data = kubectl_json([
+        'get', 'deployment',
+        '-n', NAMESPACE,
+        f'-l=app.kubernetes.io/instance={release_name}',
+    ])
+    if not isinstance(data, dict):
         return None
     items = data.get('items') or []
     if not items:
@@ -152,12 +135,19 @@ def _workspace_k8s_display(deployment: dict | None, pod_rows: list[dict], releas
 
 def live_workspace_k8s_status(workspace: Workspace) -> dict:
     """Live Kubernetes status for a workspace (pods + deployment)."""
+    return get_cached(
+        f'workspace_k8s_status:{workspace.id}',
+        lambda: _live_workspace_k8s_status(workspace),
+    )
+
+
+def _live_workspace_k8s_status(workspace: Workspace) -> dict:
     from .k8s import get_codehub_workspace
 
     try:
         pods_data = get_codehub_workspace(workspace)
         items = pods_data.get('items') or []
-    except (json.JSONDecodeError, KeyError):
+    except (KeyError, TypeError):
         items = []
 
     deployment = get_deployment_status(workspace.release_name)
@@ -180,6 +170,7 @@ def live_workspace_k8s_status(workspace: Workspace) -> dict:
         'deployment': deployment,
         'pods': pod_rows,
         'release_exists': release_exists,
+        'cache_ttl_seconds': DEFAULT_TTL_SECONDS,
     }
 
 
