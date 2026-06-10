@@ -8,6 +8,9 @@ cd "$ROOT"
 # Defaults
 IMAGE_REPO="${IMAGE_REPO:-daovietanh99/dohub}"
 IMAGE_TAG="${IMAGE_TAG:-latest}"
+SSH_BRIDGE_REPO="${SSH_BRIDGE_REPO:-localhost:32000/ssh-bridge}"
+SSH_BRIDGE_TAG="${SSH_BRIDGE_TAG:-${IMAGE_TAG}}"
+SSH_BRIDGE_CONTEXT="${SSH_BRIDGE_CONTEXT:-./charts/codehub/ssh-bridge}"
 KUBE_VERSION="${KUBE_VERSION:-1.30.0}"
 HELM_VERSION="${HELM_VERSION:-3.14.4}"
 TARGETOS="${TARGETOS:-linux}"
@@ -25,13 +28,15 @@ usage() {
 Usage: ./build-and-deploy.sh [OPTIONS] [COMMAND]
 
 Commands:
-  build     Build Docker image only
+  build     Build Docker images (dohub + ssh-bridge)
   deploy    Helm upgrade/install chart
   all       Build then deploy (default)
 
 Options:
-  -r, --repo REPO          Docker image repository     (default: daovietanh99/dohub)
-  -t, --tag TAG            Docker image tag            (default: latest)
+  -r, --repo REPO          DoHub image repository       (default: daovietanh99/dohub)
+  -t, --tag TAG            DoHub image tag              (default: latest)
+      --ssh-bridge-repo REPO ssh-bridge image repository (default: localhost:32000/ssh-bridge)
+      --ssh-bridge-tag TAG   ssh-bridge image tag         (default: same as --tag)
   -n, --namespace NS       Kubernetes namespace        (default: dohub)
       --release NAME       Helm release name           (default: dohub)
       --chart PATH         Helm chart directory        (default: ./dohub)
@@ -45,8 +50,9 @@ Options:
   -h, --help               Show this help
 
 Environment (override flags):
-  IMAGE_REPO, IMAGE_TAG, RELEASE_NAME, NAMESPACE, CHART_PATH,
-  VALUES_FILE, PUSH_IMAGE, KUBE_VERSION, HELM_VERSION
+  IMAGE_REPO, IMAGE_TAG, SSH_BRIDGE_REPO, SSH_BRIDGE_TAG, SSH_BRIDGE_CONTEXT,
+  RELEASE_NAME, NAMESPACE, CHART_PATH, VALUES_FILE, PUSH_IMAGE,
+  KUBE_VERSION, HELM_VERSION
 
 Examples:
   ./build-and-deploy.sh build
@@ -73,6 +79,15 @@ parse_args() {
         ;;
       -t|--tag)
         IMAGE_TAG="$2"
+        SSH_BRIDGE_TAG="${SSH_BRIDGE_TAG:-$2}"
+        shift 2
+        ;;
+      --ssh-bridge-repo)
+        SSH_BRIDGE_REPO="$2"
+        shift 2
+        ;;
+      --ssh-bridge-tag)
+        SSH_BRIDGE_TAG="$2"
         shift 2
         ;;
       -n|--namespace)
@@ -138,8 +153,8 @@ parse_args() {
   done
 }
 
-build_image() {
-  echo "==> Building ${IMAGE_REPO}:${IMAGE_TAG} (${TARGETOS}/${TARGETARCH})"
+build_dohub_image() {
+  echo "==> Building dohub ${IMAGE_REPO}:${IMAGE_TAG} (${TARGETOS}/${TARGETARCH})"
   docker build \
     --build-arg KUBE_VERSION="${KUBE_VERSION}" \
     --build-arg HELM_VERSION="${HELM_VERSION}" \
@@ -152,6 +167,28 @@ build_image() {
     echo "==> Pushing ${IMAGE_REPO}:${IMAGE_TAG}"
     docker push "${IMAGE_REPO}:${IMAGE_TAG}"
   fi
+}
+
+build_ssh_bridge_image() {
+  if [[ ! -f "${SSH_BRIDGE_CONTEXT}/Dockerfile" ]]; then
+    echo "ssh-bridge Dockerfile not found: ${SSH_BRIDGE_CONTEXT}/Dockerfile" >&2
+    exit 1
+  fi
+  echo "==> Building ssh-bridge ${SSH_BRIDGE_REPO}:${SSH_BRIDGE_TAG} (${TARGETOS}/${TARGETARCH})"
+  docker build \
+    --build-arg TARGETARCH="${TARGETARCH}" \
+    -t "${SSH_BRIDGE_REPO}:${SSH_BRIDGE_TAG}" \
+    -f "${SSH_BRIDGE_CONTEXT}/Dockerfile" \
+    "${SSH_BRIDGE_CONTEXT}"
+  if [[ "${PUSH_IMAGE}" == "true" ]]; then
+    echo "==> Pushing ${SSH_BRIDGE_REPO}:${SSH_BRIDGE_TAG}"
+    docker push "${SSH_BRIDGE_REPO}:${SSH_BRIDGE_TAG}"
+  fi
+}
+
+build_images() {
+  build_dohub_image
+  build_ssh_bridge_image
 }
 
 deploy_chart() {
@@ -182,6 +219,7 @@ deploy_chart() {
 
   echo "==> Deploying ${RELEASE_NAME} → namespace ${NAMESPACE}"
   echo "    Image: ${IMAGE_REPO}:${IMAGE_TAG}"
+  echo "    ssh-bridge (workspace sidecar): ${SSH_BRIDGE_REPO}:${SSH_BRIDGE_TAG}"
   echo "    Chart: ${CHART_PATH}"
   microk8s helm "${helm_args[@]}"
 
@@ -196,9 +234,9 @@ main() {
   parse_args "$@"
 
   case "${ACTION}" in
-    build) build_image ;;
+    build) build_images ;;
     deploy) deploy_chart ;;
-    all) build_image; deploy_chart ;;
+    all) build_images; deploy_chart ;;
     *)
       usage >&2
       exit 1
