@@ -20,6 +20,10 @@ def _default_command():
     return []
 
 
+def _default_ws_tunnel_ports():
+    return []
+
+
 class DockerImage(models.Model):
     label = models.CharField(max_length=255)
     repository = models.CharField(max_length=512)
@@ -112,6 +116,11 @@ class Workspace(models.Model):
     docker_tag = models.CharField(max_length=128, default='4.89.0-ubuntu')
     env_vars = models.JSONField(default=_default_env, blank=True)
     exposed_ports = models.JSONField(default=_default_ports, blank=True)
+    ws_tunnel_ports = models.JSONField(
+        default=_default_ws_tunnel_ports,
+        blank=True,
+        help_text='Main-container TCP ports exposed via wstunnel sidecar',
+    )
     container_command = models.JSONField(default=_default_command, blank=True)
     privileged = models.BooleanField(
         default=False,
@@ -170,6 +179,7 @@ class Workspace(models.Model):
             'docker_tag': self.docker_tag,
             'env_vars': self.env_vars or {},
             'exposed_ports': self.exposed_ports or [],
+            'ws_tunnel_ports': self.ws_tunnel_ports if isinstance(self.ws_tunnel_ports, list) else [],
             'container_command': self.container_command or [],
             'privileged': self.privileged,
             'state': self.state,

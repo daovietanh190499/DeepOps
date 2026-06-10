@@ -511,6 +511,20 @@ const appVue = new Vue({
         sshPrivateKeyOnce: '',
         sshSyncMessage: '',
         sshSyncError: '',
+        tunnelPortsText: '',
+        tunnelExposeLoading: false,
+        tunnelSyncMessage: '',
+        tunnelSyncError: '',
+        tunnelInfo: {
+            enabled: false,
+            ports: [],
+            ports_text: '',
+            wss_url: '',
+            path_prefix: 'port-tunnel',
+            client_command: '',
+            port_commands: [],
+            curl_example: '',
+        },
         modalTab: 'general',
         workspaceLogs: {
             text: '',
@@ -957,7 +971,22 @@ const appVue = new Vue({
             this.sshPrivateKeyOnce = ''
             this.sshSyncMessage = ''
             this.sshSyncError = ''
+            this.tunnelPortsText = ''
+            this.tunnelExposeLoading = false
+            this.tunnelSyncMessage = ''
+            this.tunnelSyncError = ''
+            this.tunnelInfo = {
+                enabled: false,
+                ports: [],
+                ports_text: '',
+                wss_url: '',
+                path_prefix: 'port-tunnel',
+                client_command: '',
+                port_commands: [],
+                curl_example: '',
+            }
             this.loadWorkspaceSsh(ws)
+            this.loadWorkspaceTunnel(ws)
         },
         closeWorkspaceModal() {
             this.stopWorkspaceLogsPoll()
@@ -966,6 +995,8 @@ const appVue = new Vue({
             this.sshPrivateKeyOnce = ''
             this.sshSyncMessage = ''
             this.sshSyncError = ''
+            this.tunnelSyncMessage = ''
+            this.tunnelSyncError = ''
         },
         switchModalTab(tab) {
             this.modalTab = tab
@@ -1079,6 +1110,58 @@ const appVue = new Vue({
             if (res.status !== 200 || !this.modalWorkspace || this.modalWorkspace.id !== ws.id) return
             const data = await res.json()
             this.applySshModalFields(data.result || {})
+        },
+        applyTunnelInfo(result) {
+            if (!result) return
+            this.tunnelInfo = {
+                enabled: !!result.enabled,
+                ports: result.ports || [],
+                ports_text: result.ports_text || '',
+                wss_url: result.wss_url || '',
+                path_prefix: result.path_prefix || 'port-tunnel',
+                client_command: result.client_command || '',
+                port_commands: result.port_commands || [],
+                curl_example: result.curl_example || '',
+            }
+            if (result.ports_text !== undefined) {
+                this.tunnelPortsText = result.ports_text
+            }
+        },
+        async loadWorkspaceTunnel(ws) {
+            const res = await fetch('workspaces/' + ws.id + '/tunnel')
+            if (res.status !== 200 || !this.modalWorkspace || this.modalWorkspace.id !== ws.id) return
+            const data = await res.json()
+            this.applyTunnelInfo(data.result || {})
+        },
+        async exposeTunnelPorts(ws) {
+            this.tunnelExposeLoading = true
+            this.tunnelSyncMessage = ''
+            this.tunnelSyncError = ''
+            try {
+                const res = await fetch('workspaces/' + ws.id + '/tunnel/expose', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ ports_text: this.tunnelPortsText }),
+                })
+                const data = await res.json().catch(() => ({}))
+                const result = data.result || {}
+                this.applyTunnelInfo(result)
+                const sync = result.sync || {}
+                if (sync.message) this.tunnelSyncMessage = sync.message
+                const syncErr = (sync.error || '').trim()
+                    || (sync.ok === false ? (sync.helm_logs || '').trim() : '')
+                if (syncErr) this.tunnelSyncError = syncErr
+                if (res.status !== 200) {
+                    this.showToast(data.message || syncErr || 'Expose failed')
+                    return
+                }
+                this.showToast(data.message || (this.tunnelInfo.enabled ? 'Ports exposed' : 'Tunnel cleared'))
+                await this.refreshLists()
+            } catch (e) {
+                this.showToast(e.message || 'Expose failed')
+            } finally {
+                this.tunnelExposeLoading = false
+            }
         },
         async generateSshKeys(ws) {
             this.sshGenerateLoading = true

@@ -17,6 +17,12 @@ spec:
       protocol: TCP
       name: ssh-ws
     {{- end }}
+    {{- if .Values.portTunnel.enabled }}
+    - port: {{ .Values.portTunnel.wsPort }}
+      targetPort: port-ws
+      protocol: TCP
+      name: port-ws
+    {{- end }}
     {{- range .Values.service.extraPorts }}
     - port: {{ .port }}
       targetPort: {{ .name }}

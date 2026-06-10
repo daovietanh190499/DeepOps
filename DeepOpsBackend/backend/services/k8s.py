@@ -56,6 +56,7 @@ def build_spawn_config(workspace) -> dict:
         'ssh_enabled': ssh_record is not None,
         'ssh_secret_name': ssh_secret_name(workspace),
         'ssh_public_key': ssh_record.public_key if ssh_record else '',
+        'ws_tunnel_ports': list(workspace.ws_tunnel_ports or []) if isinstance(workspace.ws_tunnel_ports, list) else [],
         'privileged': workspace.privileged,
     }
 
@@ -178,6 +179,17 @@ def _helm_base_cmd(config: dict) -> list[str]:
             '--set-string', f'sshBridge.secretName={config["ssh_secret_name"]}',
             '--set-string', f'sshBridge.image.repository={bridge_image}',
             '--set-string', f'sshBridge.image.tag={bridge_tag}',
+        ])
+
+    tunnel_ports = config.get('ws_tunnel_ports') or []
+    if tunnel_ports:
+        port_tunnel_image = os.environ.get('PORT_TUNNEL_IMAGE', 'localhost:32000/port-tunnel')
+        port_tunnel_tag = os.environ.get('PORT_TUNNEL_TAG', 'latest')
+        cmd.extend([
+            '--set', 'portTunnel.enabled=true',
+            '--set-json', f'portTunnel.ports={json.dumps([int(p) for p in tunnel_ports])}',
+            '--set-string', f'portTunnel.image.repository={port_tunnel_image}',
+            '--set-string', f'portTunnel.image.tag={port_tunnel_tag}',
         ])
 
     cmd.extend([

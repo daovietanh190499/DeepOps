@@ -58,6 +58,22 @@ spec:
               servicePort: {{ $.Values.sshBridge.wsPort }}
               {{- end }}
           {{- end }}
+          {{- if $.Values.portTunnel.enabled }}
+          - path: {{ $.Values.portTunnel.ingressPath | default "/port-tunnel" }}
+            {{- if semverCompare ">=1.18-0" $.Capabilities.KubeVersion.GitVersion }}
+            pathType: Prefix
+            {{- end }}
+            backend:
+              {{- if semverCompare ">=1.19-0" $.Capabilities.KubeVersion.GitVersion }}
+              service:
+                name: {{ $fullName }}
+                port:
+                  number: {{ $.Values.portTunnel.wsPort }}
+              {{- else }}
+              serviceName: {{ $fullName }}
+              servicePort: {{ $.Values.portTunnel.wsPort }}
+              {{- end }}
+          {{- end }}
           {{- range .paths }}
           - path: {{ .path }}
             {{- if and .pathType (semverCompare ">=1.18-0" $.Capabilities.KubeVersion.GitVersion) }}

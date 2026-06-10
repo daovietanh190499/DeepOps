@@ -48,6 +48,19 @@ sshBridge:
   rbac:
     create: true
 
+# Expose main-container TCP ports through wstunnel over HTTPS (separate from SSH tunnel)
+portTunnel:
+  enabled: false
+  image:
+    repository: localhost:32000/port-tunnel
+    tag: latest
+    pullPolicy: Always
+  wsPort: 8033
+  ingressPath: /port-tunnel
+  pathPrefix: port-tunnel
+  targetHost: 127.0.0.1
+  ports: []
+
 ingress:
   enabled: true
   className: nginx

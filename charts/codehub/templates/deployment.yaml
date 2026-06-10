@@ -166,6 +166,31 @@ spec:
               mountPath: /var/run/secrets/kubernetes.io/serviceaccount
               readOnly: true
         {{- end }}
+        {{- if .Values.portTunnel.enabled }}
+        - name: port-tunnel
+          image: "{{ .Values.portTunnel.image.repository }}:{{ .Values.portTunnel.image.tag }}"
+          imagePullPolicy: {{ .Values.portTunnel.image.pullPolicy }}
+          ports:
+            - name: port-ws
+              containerPort: {{ .Values.portTunnel.wsPort }}
+              protocol: TCP
+          env:
+            - name: WS_PORT
+              value: {{ .Values.portTunnel.wsPort | quote }}
+            - name: WS_PATH_PREFIX
+              value: {{ trimPrefix "/" (.Values.portTunnel.ingressPath | default "/port-tunnel") | quote }}
+            - name: TARGET_HOST
+              value: {{ .Values.portTunnel.targetHost | default "127.0.0.1" | quote }}
+            - name: TUNNEL_PORTS
+              value: {{ join "," (.Values.portTunnel.ports | default list) | quote }}
+          resources:
+            requests:
+              cpu: 25m
+              memory: 32Mi
+            limits:
+              cpu: 100m
+              memory: 128Mi
+        {{- end }}
       volumes:
         {{- if .Values.persistence.enabled }}
         {{- $claimName := .Values.persistence.claimName | default .Values.mainVolume.claimName }}
