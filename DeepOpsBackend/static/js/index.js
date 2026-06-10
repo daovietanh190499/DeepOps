@@ -189,6 +189,40 @@ function cpuListIncludes(list, cpu) {
     return (list || []).some((c) => parseCpuValue(c) === n)
 }
 
+function formatPlanTemplateDriveMountsText(mounts) {
+    if (!mounts || !mounts.length) return ''
+    return mounts
+        .map((m) => (typeof m === 'string' ? m : (m.mount_path || m.path || '')))
+        .filter(Boolean)
+        .join(', ')
+}
+
+function parsePlanTemplateDriveMountsText(text) {
+    const raw = (text || '').trim()
+    if (!raw) return { drive_mounts: [] }
+    if (raw.startsWith('[')) {
+        try {
+            const arr = JSON.parse(raw)
+            if (!Array.isArray(arr)) return { error: 'drive_mounts must be a JSON array' }
+            const drive_mounts = arr
+                .map((item) => {
+                    if (typeof item === 'string') return { mount_path: item.trim() }
+                    return { mount_path: (item.mount_path || item.path || '').trim() }
+                })
+                .filter((m) => m.mount_path)
+            return { drive_mounts }
+        } catch {
+            return { error: 'drive_mounts must be valid JSON' }
+        }
+    }
+    const drive_mounts = raw
+        .split(/[,;]/)
+        .map((p) => p.trim())
+        .filter(Boolean)
+        .map((mount_path) => ({ mount_path }))
+    return { drive_mounts }
+}
+
 function defaultPlanTemplateForm() {
     return {
         name: '',
@@ -200,6 +234,7 @@ function defaultPlanTemplateForm() {
         docker_tag: '4.89.0-ubuntu',
         ports_text: '8080',
         command_text: '',
+        drive_mounts_text: '',
         env_defaults_text: '{"SECRET_KEY":"secret-<<rdstring:64>>","PWA_APPNAME":"Workspace"}',
         sort_order: 0,
         is_active: true,
@@ -213,6 +248,8 @@ function planTemplatePayloadFromForm(form) {
     } catch {
         return { error: 'env_defaults must be valid JSON' }
     }
+    const mountsParsed = parsePlanTemplateDriveMountsText(form.drive_mounts_text)
+    if (mountsParsed.error) return { error: mountsParsed.error }
     return {
         payload: {
             name: form.name,
@@ -225,6 +262,7 @@ function planTemplatePayloadFromForm(form) {
             exposed_ports: parsePorts(form.ports_text),
             container_command: parseCommand(form.command_text),
             env_defaults,
+            drive_mounts: mountsParsed.drive_mounts,
             sort_order: form.sort_order,
             is_active: form.is_active,
         },
@@ -1348,6 +1386,7 @@ const appVue = new Vue({
                 docker_tag: template.docker_tag || '',
                 ports_text: (template.exposed_ports || [8080]).join(', '),
                 command_text: (template.container_command || []).join(' '),
+                drive_mounts_text: formatPlanTemplateDriveMountsText(template.drive_mounts),
                 env_defaults_text: JSON.stringify(template.env_defaults || {}, null, 2),
                 sort_order: template.sort_order || 0,
                 is_active: template.is_active !== false,
@@ -1518,6 +1557,14 @@ const appVue = new Vue({
             const firstKey = Object.keys(env)[0] || ''
             this.envKey = firstKey
             this.envValue = this.form.env_vars[firstKey] || ''
+            if (t.drive_mounts && t.drive_mounts.length) {
+                this.form.drive_mounts = t.drive_mounts.map((m) => ({
+                    drive_id: '',
+                    mount_path: m.mount_path || m.path || '/home/coder',
+                }))
+            } else {
+                this.form.drive_mounts = []
+            }
         },
         applyTemplateDockerSettings(t) {
             if (t.exposed_ports && t.exposed_ports.length) {
@@ -1549,6 +1596,13 @@ const appVue = new Vue({
             if (t.container_command && t.container_command.length) {
                 const cmd = t.container_command.join(' ')
                 parts.push('cmd ' + (cmd.length > 24 ? cmd.slice(0, 24) + '…' : cmd))
+            }
+            if (t.drive_mounts && t.drive_mounts.length) {
+                const paths = t.drive_mounts
+                    .map((m) => m.mount_path || m.path)
+                    .filter(Boolean)
+                    .join(', ')
+                if (paths) parts.push('mounts ' + paths)
             }
             return parts.join(' · ')
         },

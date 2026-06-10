@@ -12,6 +12,7 @@ from backend.services.platform_catalog import (
     catalog_payload,
     parse_cpu_value,
 )
+from backend.services.workspace_mounts import normalize_mount_path
 
 
 def _require_admin(user):
@@ -66,6 +67,47 @@ def _parse_container_command(raw) -> list[str]:
     if isinstance(raw, str):
         return [c for c in raw.split() if c]
     return []
+
+
+def _parse_template_drive_mounts(raw) -> list[dict]:
+    """Parse template drive mount folders from JSON list or comma-separated paths."""
+    if raw is None:
+        return []
+    if isinstance(raw, str):
+        text = raw.strip()
+        if not text:
+            return []
+        if text.startswith('['):
+            try:
+                raw = json.loads(text)
+            except json.JSONDecodeError:
+                raise ValueError('drive_mounts must be valid JSON')
+        else:
+            return [
+                {'mount_path': normalize_mount_path(part)}
+                for part in text.replace(';', ',').split(',')
+                if part.strip()
+            ]
+    if not isinstance(raw, list):
+        return []
+
+    mounts: list[dict] = []
+    for item in raw:
+        if isinstance(item, str) and item.strip():
+            mounts.append({'mount_path': normalize_mount_path(item)})
+            continue
+        if not isinstance(item, dict):
+            continue
+        path = item.get('mount_path') or item.get('path') or ''
+        if not str(path).strip():
+            continue
+        entry: dict = {'mount_path': normalize_mount_path(str(path))}
+        for key in ('drive_id', 'drive_name', 'drive_slug', 'claim_name'):
+            value = item.get(key)
+            if value:
+                entry[key] = str(value).strip()
+        mounts.append(entry)
+    return mounts
 
 
 @auth.verify
@@ -172,6 +214,13 @@ def admin_platform_template_create(request, user):
     if ServerPlanTemplate.objects.filter(name=name).exists():
         return JsonResponse({'message': 'template already exists'}, status=400)
 
+    try:
+        drive_mounts = _parse_template_drive_mounts(
+            data.get('drive_mounts', data.get('drive_mounts_text')),
+        )
+    except ValueError as exc:
+        return JsonResponse({'message': str(exc)}, status=400)
+
     template = ServerPlanTemplate.objects.create(
         name=name,
         image=(data.get('image') or 'logo.png').strip(),
@@ -185,6 +234,7 @@ def admin_platform_template_create(request, user):
             data.get('container_command', data.get('command_text', data.get('command'))),
         ),
         env_defaults=data.get('env_defaults') if isinstance(data.get('env_defaults'), dict) else {},
+        drive_mounts=drive_mounts,
         sort_order=int(data.get('sort_order', 0) or 0),
         is_active=data.get('is_active', True),
     )
@@ -231,6 +281,13 @@ def admin_platform_template_detail(request, user, template_id):
         )
     if 'env_defaults' in data and isinstance(data['env_defaults'], dict):
         template.env_defaults = data['env_defaults']
+    if 'drive_mounts' in data or 'drive_mounts_text' in data:
+        try:
+            template.drive_mounts = _parse_template_drive_mounts(
+                data.get('drive_mounts', data.get('drive_mounts_text')),
+            )
+        except ValueError as exc:
+            return JsonResponse({'message': str(exc)}, status=400)
     if 'sort_order' in data:
         template.sort_order = int(data['sort_order'] or 0)
     if 'is_active' in data:

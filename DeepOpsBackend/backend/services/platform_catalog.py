@@ -103,6 +103,7 @@ def _template_payload(template: ServerPlanTemplate) -> dict:
         'exposed_ports': template.exposed_ports or [8080],
         'container_command': template.container_command or [],
         'env_defaults': template.env_defaults or {},
+        'drive_mounts': template.drive_mounts if isinstance(template.drive_mounts, list) else [],
         'sort_order': template.sort_order,
         'is_active': template.is_active,
     }

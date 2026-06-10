@@ -575,7 +575,7 @@
                         <h4 class="text-xs font-semibold uppercase tracking-wide text-slate-500">Quick templates</h4>
                         <table class="w-full text-xs">
                             <thead><tr class="border-b text-left text-slate-500">
-                                <th class="py-1 pr-2">Name</th><th>CPU</th><th>RAM</th><th>GPU</th><th>Icon</th><th>Docker</th><th>Ports</th><th>Active</th><th></th>
+                                <th class="py-1 pr-2">Name</th><th>CPU</th><th>RAM</th><th>GPU</th><th>Icon</th><th>Docker</th><th>Ports</th><th>Mounts</th><th>Active</th><th></th>
                             </tr></thead>
                             <tbody>
                                 <tr v-for="t in adminPlanTemplates" :key="t.id" class="border-b border-slate-100">
@@ -584,6 +584,8 @@
                                     <td class="font-mono" v-text="t.image"></td>
                                     <td class="font-mono text-[10px]" v-text="(t.docker_repository || '—') + (t.docker_tag ? ':' + t.docker_tag : '')"></td>
                                     <td class="font-mono" v-text="(t.exposed_ports || []).join(', ') || '8080'"></td>
+                                    <td class="font-mono text-[10px] max-w-[8rem] truncate" :title="(t.drive_mounts || []).map(m => m.mount_path).join(', ')"
+                                        v-text="(t.drive_mounts || []).map(m => m.mount_path).join(', ') || '—'"></td>
                                     <td><button type="button" @click="togglePlanTemplate(t)" class="hover:underline" v-text="t.is_active ? 'yes' : 'no'"></button></td>
                                     <td class="space-x-2 whitespace-nowrap">
                                         <button type="button" @click="openEditPlanTemplateModal(t)" class="text-blue-600 hover:underline">Edit</button>
@@ -606,9 +608,11 @@
                             <input v-model="newPlanTemplate.ports_text" placeholder="Ports (8080, 3000)" class="rounded-lg border px-2 py-1.5 text-sm font-mono sm:col-span-3">
                             <input v-model="newPlanTemplate.command_text" placeholder="Container command (space-separated)" class="rounded-lg border px-2 py-1.5 text-sm font-mono sm:col-span-3">
                         </div>
+                        <input v-model="newPlanTemplate.drive_mounts_text" placeholder="Mount paths (/home/coder, /app/data)"
+                               class="w-full rounded-lg border px-2 py-1.5 text-xs font-mono">
                         <textarea v-model="newPlanTemplate.env_defaults_text" rows="2" placeholder='{"SECRET_KEY":"secret-<<rdstring:64>>","PWA_APPNAME":"Workspace"}'
                                   class="w-full rounded-lg border px-2 py-1.5 text-xs font-mono"></textarea>
-                        <p class="text-[10px] text-slate-500">Env templates: <code class="rounded bg-slate-100 px-1">&lt;&lt;rdstring:N&gt;&gt;</code> random string,
+                        <p class="text-[10px] text-slate-500">Mount paths are pre-filled when users pick this template (they still choose drives). Env templates: <code class="rounded bg-slate-100 px-1">&lt;&lt;rdstring:N&gt;&gt;</code> random string,
                             <code class="rounded bg-slate-100 px-1">&lt;&lt;rdnum:N&gt;&gt;</code> random digits,
                             <code class="rounded bg-slate-100 px-1">&lt;&lt;tmsp&gt;&gt;</code> UTC timestamp (expanded when user picks template).</p>
                     </div>
@@ -1194,6 +1198,13 @@
                             Active
                         </label>
                     </div>
+                </div>
+                <div>
+                    <label class="block text-xs font-medium text-slate-600">Mount paths</label>
+                    <input v-model="planTemplateForm.drive_mounts_text" type="text"
+                           placeholder="/home/coder, /app/data, /app/logs"
+                           class="mt-1 w-full rounded-lg border px-3 py-2 text-sm font-mono">
+                    <p class="mt-1 text-[10px] text-slate-500">Comma-separated container paths (or JSON array). Applied when users pick this quick template; they assign drives per row.</p>
                 </div>
                 <div>
                     <label class="block text-xs font-medium text-slate-600">Environment defaults (JSON)</label>

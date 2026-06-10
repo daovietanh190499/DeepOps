@@ -9,6 +9,10 @@ def _default_command():
     return []
 
 
+def _default_drive_mounts():
+    return []
+
+
 class PlatformEquipmentOption(models.Model):
     CATEGORY_CPU = 'cpu'
     CATEGORY_RAM = 'ram'
@@ -46,6 +50,11 @@ class ServerPlanTemplate(models.Model):
     exposed_ports = models.JSONField(default=_default_ports, blank=True)
     container_command = models.JSONField(default=_default_command, blank=True)
     env_defaults = models.JSONField(default=dict, blank=True)
+    drive_mounts = models.JSONField(
+        default=_default_drive_mounts,
+        blank=True,
+        help_text='Default mount paths, e.g. [{"mount_path": "/app/data"}]',
+    )
     sort_order = models.PositiveIntegerField(default=0)
     is_active = models.BooleanField(default=True)
 
