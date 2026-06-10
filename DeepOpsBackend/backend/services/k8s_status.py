@@ -198,6 +198,11 @@ def _workspace_pods_by_id(workspace_ids: set[str]) -> dict[str, list[dict]]:
     return pods_by_id
 
 
+def workspace_pods_for_id(workspace_id: str) -> list[dict]:
+    """Live pod rows for a single workspace id."""
+    return _workspace_pods_by_id({workspace_id}).get(workspace_id, [])
+
+
 def _empty_workspace_k8s_status() -> dict:
     return {
         'display': 'Not deployed',

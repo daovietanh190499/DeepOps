@@ -511,6 +511,23 @@ const appVue = new Vue({
         sshPrivateKeyOnce: '',
         sshSyncMessage: '',
         sshSyncError: '',
+        modalTab: 'general',
+        workspaceLogs: {
+            text: '',
+            loading: false,
+            error: '',
+            pods: [],
+            selectedPod: '',
+            containers: [],
+            selectedContainer: '',
+        },
+        workspaceDescribe: {
+            text: '',
+            loading: false,
+            error: '',
+        },
+        workspaceLogsTimer: null,
+        workspaceLogsAutoScroll: true,
         userList: [],
         adminUserFilter: '',
         adminUserStatus: '',
@@ -669,6 +686,7 @@ const appVue = new Vue({
     },
     beforeDestroy() {
         this.stopStatusPolling()
+        this.stopWorkspaceLogsPoll()
     },
     methods: {
         startStatusPolling() {
@@ -922,6 +940,19 @@ const appVue = new Vue({
             }
         },
         openWorkspaceModal(ws) {
+            this.stopWorkspaceLogsPoll()
+            this.modalTab = 'general'
+            this.workspaceLogs = {
+                text: '',
+                loading: false,
+                error: '',
+                pods: [],
+                selectedPod: '',
+                containers: [],
+                selectedContainer: '',
+            }
+            this.workspaceDescribe = { text: '', loading: false, error: '' }
+            this.workspaceLogsAutoScroll = true
             this.modalWorkspace = { ...ws, env_vars: { ...(ws.env_vars || {}) } }
             this.sshPrivateKeyOnce = ''
             this.sshSyncMessage = ''
@@ -929,10 +960,112 @@ const appVue = new Vue({
             this.loadWorkspaceSsh(ws)
         },
         closeWorkspaceModal() {
+            this.stopWorkspaceLogsPoll()
+            this.modalTab = 'general'
             this.modalWorkspace = null
             this.sshPrivateKeyOnce = ''
             this.sshSyncMessage = ''
             this.sshSyncError = ''
+        },
+        switchModalTab(tab) {
+            this.modalTab = tab
+            if (tab === 'logs') {
+                this.fetchWorkspaceLogs()
+                this.startWorkspaceLogsPoll()
+                return
+            }
+            this.stopWorkspaceLogsPoll()
+            if (tab === 'describe' && !this.workspaceDescribe.text && !this.workspaceDescribe.loading) {
+                this.fetchWorkspaceDescribe()
+            }
+        },
+        startWorkspaceLogsPoll() {
+            this.stopWorkspaceLogsPoll()
+            this.workspaceLogsTimer = setInterval(() => {
+                if (this.modalTab === 'logs' && this.modalWorkspace) {
+                    this.fetchWorkspaceLogs(true)
+                }
+            }, 2000)
+        },
+        stopWorkspaceLogsPoll() {
+            if (this.workspaceLogsTimer) {
+                clearInterval(this.workspaceLogsTimer)
+                this.workspaceLogsTimer = null
+            }
+        },
+        onWorkspaceLogsScroll(event) {
+            const el = event.target
+            this.workspaceLogsAutoScroll = el.scrollHeight - el.scrollTop - el.clientHeight < 48
+        },
+        onWorkspaceLogsPodChange() {
+            this.workspaceLogs.selectedContainer = ''
+            this.fetchWorkspaceLogs()
+        },
+        async fetchWorkspaceLogs(silent) {
+            if (!this.modalWorkspace) return
+            if (!silent) this.workspaceLogs.loading = true
+            const ws = this.modalWorkspace
+            const params = new URLSearchParams({ tail: '500' })
+            if (this.workspaceLogs.selectedPod) params.set('pod', this.workspaceLogs.selectedPod)
+            if (this.workspaceLogs.selectedContainer) params.set('container', this.workspaceLogs.selectedContainer)
+            try {
+                const res = await fetch('workspaces/' + ws.id + '/logs?' + params.toString())
+                if (!this.modalWorkspace || this.modalWorkspace.id !== ws.id) return
+                const data = await res.json().catch(() => ({}))
+                const result = data.result || {}
+                if (res.status !== 200) {
+                    this.workspaceLogs.error = data.message || 'Failed to load logs'
+                    return
+                }
+                this.workspaceLogs.text = result.logs || ''
+                this.workspaceLogs.pods = result.pods || []
+                this.workspaceLogs.containers = result.containers || []
+                if (result.selected_pod) this.workspaceLogs.selectedPod = result.selected_pod
+                if (!this.workspaceLogs.selectedPod && this.workspaceLogs.pods.length) {
+                    this.workspaceLogs.selectedPod = this.workspaceLogs.pods[0].name
+                }
+                this.workspaceLogs.error = result.error || ''
+            } catch (e) {
+                if (this.modalWorkspace && this.modalWorkspace.id === ws.id) {
+                    this.workspaceLogs.error = e.message || 'Failed to load logs'
+                }
+            } finally {
+                if (this.modalWorkspace && this.modalWorkspace.id === ws.id) {
+                    this.workspaceLogs.loading = false
+                    this.$nextTick(() => {
+                        const el = this.$refs.workspaceLogsTerminal
+                        if (el && this.workspaceLogsAutoScroll) el.scrollTop = el.scrollHeight
+                    })
+                }
+            }
+        },
+        async fetchWorkspaceDescribe() {
+            if (!this.modalWorkspace) return
+            const ws = this.modalWorkspace
+            this.workspaceDescribe.loading = true
+            this.workspaceDescribe.error = ''
+            const params = new URLSearchParams()
+            if (this.workspaceLogs.selectedPod) params.set('pod', this.workspaceLogs.selectedPod)
+            try {
+                const qs = params.toString()
+                const res = await fetch('workspaces/' + ws.id + '/describe' + (qs ? '?' + qs : ''))
+                if (!this.modalWorkspace || this.modalWorkspace.id !== ws.id) return
+                const data = await res.json().catch(() => ({}))
+                if (res.status !== 200) {
+                    this.workspaceDescribe.error = data.message || 'Failed to load describe output'
+                    this.workspaceDescribe.text = ''
+                    return
+                }
+                this.workspaceDescribe.text = (data.result && data.result.text) || ''
+            } catch (e) {
+                if (this.modalWorkspace && this.modalWorkspace.id === ws.id) {
+                    this.workspaceDescribe.error = e.message || 'Failed to load describe output'
+                }
+            } finally {
+                if (this.modalWorkspace && this.modalWorkspace.id === ws.id) {
+                    this.workspaceDescribe.loading = false
+                }
+            }
         },
         applySshModalFields(result) {
             if (!this.modalWorkspace || !result) return

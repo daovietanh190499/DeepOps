@@ -674,18 +674,35 @@
 
     <!-- Workspace detail modal -->
     <div v-if="modalWorkspace" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50">
-        <div class="max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-2xl border border-slate-200 bg-white shadow-xl">
-            <div class="sticky top-0 flex items-center justify-between border-b border-slate-100 bg-white px-5 py-4">
-                <h3 class="text-lg font-bold text-slate-900" v-text="modalWorkspace.name"></h3>
+        <div class="max-h-[90vh] w-full overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-xl flex flex-col"
+             :class="modalTab === 'general' ? 'max-w-2xl' : 'max-w-4xl'">
+            <div class="shrink-0 flex items-center justify-between border-b border-slate-100 bg-white px-5 py-4">
+                <div class="min-w-0 flex-1 pr-3">
+                    <h3 class="text-lg font-bold text-slate-900 truncate" v-text="modalWorkspace.name"></h3>
+                    <div class="mt-1 flex items-center gap-2">
+                        <span class="font-mono text-[10px] text-slate-500 truncate" v-text="workspaceUrl(modalWorkspace)"></span>
+                        <button type="button" @click="copyWorkspaceUrl(modalWorkspace)" class="shrink-0 rounded p-1 text-slate-400 hover:bg-slate-100 hover:text-blue-600" title="Copy URL">
+                            <i class="fa fa-copy text-xs"></i>
+                        </button>
+                    </div>
+                </div>
                 <button type="button" @click="closeWorkspaceModal" class="text-slate-400 hover:text-slate-700"><i class="fa fa-times text-xl"></i></button>
             </div>
-            <div class="space-y-4 px-5 py-4 text-sm">
-                <div class="flex items-center gap-2">
-                    <span class="font-mono text-xs text-slate-500 truncate flex-1" v-text="workspaceUrl(modalWorkspace)"></span>
-                    <button type="button" @click="copyWorkspaceUrl(modalWorkspace)" class="shrink-0 rounded-lg border px-2 py-1 text-xs hover:bg-slate-50" title="Copy URL">
-                        <i class="fa fa-copy"></i>
-                    </button>
-                </div>
+            <div class="shrink-0 flex gap-1 border-b border-slate-100 bg-slate-50 px-5 pt-2">
+                <button type="button" @click="switchModalTab('general')"
+                        :class="modalTab==='general' ? 'border-blue-600 text-blue-700 bg-white' : 'border-transparent text-slate-500 hover:text-slate-700'"
+                        class="rounded-t-lg border-b-2 px-4 py-2 text-xs font-semibold">General</button>
+                <button type="button" @click="switchModalTab('logs')"
+                        :class="modalTab==='logs' ? 'border-blue-600 text-blue-700 bg-white' : 'border-transparent text-slate-500 hover:text-slate-700'"
+                        class="rounded-t-lg border-b-2 px-4 py-2 text-xs font-semibold">Logs</button>
+                <button type="button" @click="switchModalTab('describe')"
+                        :class="modalTab==='describe' ? 'border-blue-600 text-blue-700 bg-white' : 'border-transparent text-slate-500 hover:text-slate-700'"
+                        class="rounded-t-lg border-b-2 px-4 py-2 text-xs font-semibold">Describe</button>
+            </div>
+            <div class="flex-1 overflow-y-auto px-5 py-4 text-sm min-h-0">
+
+            <!-- General tab -->
+            <div v-show="modalTab==='general'" class="space-y-4">
                 <span class="inline-block rounded-full px-2 py-0.5 text-xs font-bold"
                       :class="modalK8sDisplay.toLowerCase()==='running' ? 'bg-emerald-100 text-emerald-700' : modalK8sDisplay.toLowerCase()==='terminating' ? 'bg-rose-100 text-rose-700' : modalWorkspace.state==='offline' ? 'bg-slate-100 text-slate-600' : 'bg-amber-100 text-amber-700'"
                       v-text="modalK8sDisplay"></span>
@@ -778,6 +795,50 @@
                     <button @click="exportWorkspace(modalWorkspace)" class="rounded-lg border px-4 py-2 text-xs font-semibold">Export JSON</button>
                     <button @click="exportModalConfig" class="rounded-lg border px-4 py-2 text-xs font-semibold">Download config</button>
                 </div>
+            </div>
+
+            <!-- Logs tab -->
+            <div v-show="modalTab==='logs'" class="space-y-3 flex flex-col min-h-[50vh]">
+                <div class="flex flex-wrap items-center gap-2">
+                    <label class="text-xs text-slate-500">Pod</label>
+                    <select v-model="workspaceLogs.selectedPod" @change="onWorkspaceLogsPodChange"
+                            class="rounded-lg border px-2 py-1 text-xs font-mono min-w-[10rem]">
+                        <option v-if="!workspaceLogs.pods.length" value="">No pods</option>
+                        <option v-for="p in workspaceLogs.pods" :key="p.name" :value="p.name" v-text="p.name + ' (' + p.display + ')'"></option>
+                    </select>
+                    <label class="text-xs text-slate-500 ml-2">Container</label>
+                    <select v-model="workspaceLogs.selectedContainer" @change="fetchWorkspaceLogs()"
+                            class="rounded-lg border px-2 py-1 text-xs font-mono">
+                        <option value="">All (prefixed)</option>
+                        <option v-for="c in workspaceLogs.containers" :key="c" :value="c" v-text="c"></option>
+                    </select>
+                    <button type="button" @click="fetchWorkspaceLogs()" :disabled="workspaceLogs.loading"
+                            class="ml-auto rounded-lg border px-3 py-1 text-xs font-semibold hover:bg-slate-50 disabled:opacity-50">
+                        <i class="fa fa-refresh" :class="workspaceLogs.loading ? 'fa-spin' : ''"></i> Refresh
+                    </button>
+                </div>
+                <p class="text-[10px] text-slate-400">Auto-refreshes every 2s · <code class="rounded bg-slate-100 px-1">kubectl logs</code></p>
+                <p v-if="workspaceLogs.error" class="text-xs text-amber-700 whitespace-pre-wrap" v-text="workspaceLogs.error"></p>
+                <pre ref="workspaceLogsTerminal"
+                     @scroll="onWorkspaceLogsScroll"
+                     class="flex-1 min-h-[40vh] max-h-[60vh] overflow-auto rounded-lg bg-[#0d1117] p-4 font-mono text-[11px] leading-relaxed text-[#c9d1d9] whitespace-pre-wrap border border-slate-800"
+                     v-text="workspaceLogs.text || (workspaceLogs.loading ? 'Loading logs…' : 'No logs yet.')"></pre>
+            </div>
+
+            <!-- Describe tab -->
+            <div v-show="modalTab==='describe'" class="space-y-3 flex flex-col min-h-[50vh]">
+                <div class="flex flex-wrap items-center gap-2">
+                    <p class="text-xs text-slate-500"><code class="rounded bg-slate-100 px-1">kubectl describe deployment,pod</code></p>
+                    <button type="button" @click="fetchWorkspaceDescribe()" :disabled="workspaceDescribe.loading"
+                            class="ml-auto rounded-lg border px-3 py-1 text-xs font-semibold hover:bg-slate-50 disabled:opacity-50">
+                        <i class="fa fa-refresh" :class="workspaceDescribe.loading ? 'fa-spin' : ''"></i> Refresh
+                    </button>
+                </div>
+                <p v-if="workspaceDescribe.error" class="text-xs text-rose-600 whitespace-pre-wrap" v-text="workspaceDescribe.error"></p>
+                <pre class="flex-1 min-h-[40vh] max-h-[60vh] overflow-auto rounded-lg bg-slate-900 p-4 font-mono text-[11px] leading-relaxed text-slate-100 whitespace-pre-wrap"
+                     v-text="workspaceDescribe.text || (workspaceDescribe.loading ? 'Loading describe output…' : 'Click Refresh to load kubectl describe output.')"></pre>
+            </div>
+
             </div>
         </div>
     </div>

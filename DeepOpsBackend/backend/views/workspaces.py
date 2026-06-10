@@ -22,6 +22,7 @@ from backend.services.platform_catalog import parse_cpu_value
 from backend.services.env_templates import expand_env_vars
 from backend.services.resource_limits import can_change_privileged, validate_server_count, validate_workspace_resources
 from backend.services.ssh_keys import ssh_info_payload
+from backend.services.workspace_kubectl import workspace_describe, workspace_logs
 from backend.services.workspace_mounts import (
     apply_drive_mounts_from_data,
     drive_mounts_payload,
@@ -414,6 +415,37 @@ def workspace_stop(request, user, workspace_id):
     if not workspace_is_active(state):
         return JsonResponse({'message': 'not running'}, status=400)
     return _stop_workspace(ws)
+
+
+@auth.verify
+@require_http_methods(['GET'])
+def workspace_logs_view(request, user, workspace_id):
+    denied = _require_accepted(user)
+    if denied:
+        return denied
+    ws, err = _get_workspace_for_user(user, workspace_id)
+    if err:
+        return err
+    try:
+        tail = int(request.GET.get('tail', '500') or 500)
+    except (TypeError, ValueError):
+        tail = 500
+    pod = (request.GET.get('pod') or '').strip() or None
+    container = (request.GET.get('container') or '').strip() or None
+    return JsonResponse({'result': workspace_logs(ws, pod_name=pod, container=container, tail=tail)})
+
+
+@auth.verify
+@require_http_methods(['GET'])
+def workspace_describe_view(request, user, workspace_id):
+    denied = _require_accepted(user)
+    if denied:
+        return denied
+    ws, err = _get_workspace_for_user(user, workspace_id)
+    if err:
+        return err
+    pod = (request.GET.get('pod') or '').strip() or None
+    return JsonResponse({'result': workspace_describe(ws, pod_name=pod)})
 
 
 @auth.verify
