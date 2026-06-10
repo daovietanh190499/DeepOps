@@ -38,7 +38,7 @@ class PlatformEquipmentOption(models.Model):
 class ServerPlanTemplate(models.Model):
     name = models.CharField(max_length=128, unique=True)
     image = models.CharField(max_length=255, default='logo.png')
-    cpu = models.PositiveIntegerField(default=2)
+    cpu = models.FloatField(default=2)
     ram = models.CharField(max_length=64, default='4G')
     gpu = models.CharField(max_length=64, default='none')
     docker_repository = models.CharField(max_length=512, blank=True, default='')

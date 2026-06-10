@@ -4,7 +4,19 @@ from __future__ import annotations
 
 from backend.models import PlatformEquipmentOption, ServerPlanTemplate
 
-FALLBACK_CPU = [2, 4, 8, 16, 32]
+FALLBACK_CPU = [2.0, 4.0, 8.0, 16.0, 32.0]
+
+
+def parse_cpu_value(value) -> float:
+    if value is None or value == '':
+        raise ValueError('invalid cpu')
+    try:
+        cpu = float(value)
+    except (TypeError, ValueError):
+        raise ValueError(f'invalid cpu: {value!r}')
+    if cpu <= 0:
+        raise ValueError(f'invalid cpu: {value!r}')
+    return cpu
 FALLBACK_RAM = ['2G', '4G', '8G', '16G', '32G', '64G']
 # GPU values: "count" or "count:gpumem_mib" (nvidia.com/gpu + nvidia.com/gpumem)
 FALLBACK_GPU = ['none', '1:1024', '1:10240', '1:40960', '2:20480']
@@ -31,11 +43,17 @@ def _option_values(category: str, *, active_only: bool = True) -> list:
     return [row.value for row in qs.order_by('sort_order', 'value')]
 
 
-def all_cpu(*, active_only: bool = True) -> list[int]:
+def all_cpu(*, active_only: bool = True) -> list[float]:
     values = _option_values(PlatformEquipmentOption.CATEGORY_CPU, active_only=active_only)
     if not values:
         return FALLBACK_CPU[:]
-    return [int(v) for v in values]
+    cpus: list[float] = []
+    for value in values:
+        try:
+            cpus.append(parse_cpu_value(value))
+        except ValueError:
+            continue
+    return cpus or FALLBACK_CPU[:]
 
 
 def all_ram(*, active_only: bool = True) -> list[str]:

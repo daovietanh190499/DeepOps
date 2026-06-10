@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from collections import Counter
+
 from backend.models import User, UserDrive, Workspace, WorkspaceDriveMount
 from backend.services.bulk import resolve_user_drive_ref
 
@@ -11,6 +13,12 @@ def normalize_mount_path(path: str) -> str:
     if not text.startswith('/'):
         text = '/' + text
     return text[:256]
+
+
+def pvc_sub_path(mount_path: str) -> str:
+    """subPath inside the PVC matches mountPath (no leading slash for Kubernetes)."""
+    text = normalize_mount_path(mount_path)
+    return text.lstrip('/') or text
 
 
 def normalize_drive_mounts_data(data: dict) -> list[dict]:
@@ -72,20 +80,56 @@ def drive_mounts_payload(workspace: Workspace) -> list[dict]:
             'mount_path': mount.mount_path,
             'claim_name': drive.claim_name,
         })
+
+    claim_counts = Counter(row['claim_name'] for row in rows)
+    for row in rows:
+        if claim_counts[row['claim_name']] > 1:
+            row['sub_path'] = pvc_sub_path(row['mount_path'])
+        else:
+            row['sub_path'] = ''
     return rows
 
 
 def spawn_drive_mounts(workspace: Workspace) -> list[dict]:
-    """Mounts for Helm: claim_name, mount_path, volume_name."""
+    """Mounts for Helm: claim_name, mount_path, optional sub_path (multi-path same PVC)."""
     mounts = []
-    for i, row in enumerate(drive_mounts_payload(workspace)):
+    for row in drive_mounts_payload(workspace):
         mounts.append({
             'claim_name': row['claim_name'],
             'mount_path': row['mount_path'],
-            'volume_name': 'workspace-volume' if i == 0 else f'drive-extra-{i}',
-            'primary': i == 0,
+            'sub_path': row.get('sub_path') or '',
         })
     return mounts
+
+
+def build_pvc_volume_specs(mount_entries: list[dict]) -> tuple[list[dict], list[dict]]:
+    """One Kubernetes volume per PVC; reuse volume name for multiple mount paths."""
+    volumes: list[dict] = []
+    volume_mounts: list[dict] = []
+    claim_to_volume: dict[str, str] = {}
+    vol_counter = 0
+
+    for entry in mount_entries:
+        claim = entry['claim_name']
+        if claim not in claim_to_volume:
+            vol_name = 'workspace-volume' if vol_counter == 0 else f'drive-volume-{vol_counter}'
+            claim_to_volume[claim] = vol_name
+            volumes.append({
+                'name': vol_name,
+                'persistentVolumeClaim': {'claimName': claim},
+            })
+            vol_counter += 1
+
+        vm: dict = {
+            'name': claim_to_volume[claim],
+            'mountPath': entry['mount_path'],
+        }
+        sub_path = (entry.get('sub_path') or '').strip()
+        if sub_path:
+            vm['subPath'] = sub_path
+        volume_mounts.append(vm)
+
+    return volumes, volume_mounts
 
 
 def apply_drive_mounts_from_data(
@@ -100,23 +144,18 @@ def apply_drive_mounts_from_data(
             workspace.user_drive = None
         return None
 
-    seen_drives: set[str] = set()
     seen_paths: set[str] = set()
     resolved: list[tuple[UserDrive, str]] = []
 
     for item in mounts_data:
-        drive_ref = item['drive_ref']
-        if drive_ref in seen_drives:
-            return 'duplicate drive in mount list'
         mount_path = item['mount_path']
         if mount_path in seen_paths:
             return 'duplicate mount path in mount list'
-        seen_drives.add(drive_ref)
         seen_paths.add(mount_path)
 
-        drive = resolve_user_drive_ref(owner, drive_ref)
+        drive = resolve_user_drive_ref(owner, item['drive_ref'])
         if not drive:
-            return f'drive not found: {drive_ref}'
+            return f'drive not found: {item["drive_ref"]}'
 
         resolved.append((drive, mount_path))
 
@@ -124,7 +163,6 @@ def apply_drive_mounts_from_data(
     workspace.user_drive = primary_drive
     workspace.mount_path = primary_path
 
-    # UUID pk is assigned before save; use _state.adding, not workspace.pk.
     if workspace._state.adding:
         workspace._pending_extra_mounts = resolved[1:]
     else:
@@ -156,8 +194,13 @@ def validate_workspace_drives_for_start(workspace: Workspace) -> str | None:
     from backend.models import UserDrive
     from backend.services.k8s_status import drive_is_in_use
 
+    seen_drive_ids: set[str] = set()
     for row in drive_mounts_payload(workspace):
-        drive = UserDrive.objects.filter(id=row['drive_id']).first()
+        drive_id = row['drive_id']
+        if drive_id in seen_drive_ids:
+            continue
+        seen_drive_ids.add(drive_id)
+        drive = UserDrive.objects.filter(id=drive_id).first()
         if not drive:
             continue
         if drive_is_in_use(drive, exclude_workspace_id=workspace.id):

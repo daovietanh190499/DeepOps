@@ -6,7 +6,12 @@ from django.views.decorators.http import require_http_methods
 
 from backend.models import PlatformEquipmentOption, ServerPlanTemplate, User
 from backend.services.github_auth import auth
-from backend.services.platform_catalog import _template_payload, admin_catalog_payload, catalog_payload
+from backend.services.platform_catalog import (
+    _template_payload,
+    admin_catalog_payload,
+    catalog_payload,
+    parse_cpu_value,
+)
 
 
 def _require_admin(user):
@@ -170,7 +175,7 @@ def admin_platform_template_create(request, user):
     template = ServerPlanTemplate.objects.create(
         name=name,
         image=(data.get('image') or 'logo.png').strip(),
-        cpu=int(data.get('cpu', 2) or 2),
+        cpu=parse_cpu_value(data.get('cpu', 2) or 2),
         ram=(data.get('ram') or '4G').strip(),
         gpu=(data.get('gpu') or 'none').strip() or 'none',
         docker_repository=(data.get('docker_repository') or '').strip(),
@@ -214,7 +219,10 @@ def admin_platform_template_detail(request, user, template_id):
         if field in data and data[field] is not None:
             setattr(template, field, str(data[field]).strip())
     if 'cpu' in data:
-        template.cpu = int(data['cpu'] or 2)
+        try:
+            template.cpu = parse_cpu_value(data['cpu'] or 2)
+        except ValueError:
+            return JsonResponse({'message': 'invalid cpu'}, status=400)
     if 'exposed_ports' in data:
         template.exposed_ports = _parse_exposed_ports(data['exposed_ports'])
     if any(key in data for key in ('container_command', 'command_text', 'command')):

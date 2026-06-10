@@ -74,7 +74,6 @@ class WorkspaceDriveMount(models.Model):
     class Meta:
         ordering = ['sort_order', 'created_at']
         unique_together = (
-            ('workspace', 'user_drive'),
             ('workspace', 'mount_path'),
         )
 
@@ -98,7 +97,7 @@ class Workspace(models.Model):
     user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='workspaces')
     name = models.CharField(max_length=128)
     slug = models.SlugField(max_length=48)
-    cpu = models.PositiveIntegerField(default=2)
+    cpu = models.FloatField(default=2)
     ram = models.CharField(max_length=64, default='4G')
     user_drive = models.ForeignKey(
         UserDrive,

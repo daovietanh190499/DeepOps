@@ -11,6 +11,7 @@ persistence:
   createPvc: false  # drives are created separately; mount existing claim
   claimName: ""
   mountPath: /home/coder
+  subPath: ""  # set when the same PVC is mounted at multiple paths
   storageClassName: directpv-min-io
   volumeMode: Filesystem
   accessModes:
@@ -84,6 +85,10 @@ env:
 # (code-server only applies PASSWORD on first init; old PVC keeps old hash)
 auth:
   resetConfigOnDeploy: false
+  # Used when persistence.enabled=false and PVC mounts come from volumeMounts JSON
+  resetVolumeName: ""
+  resetMountPath: ""
+  resetSubPath: ""
 
 extraEnv: []
 

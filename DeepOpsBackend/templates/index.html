@@ -594,7 +594,7 @@
                         </table>
                         <div class="grid gap-2 sm:grid-cols-6 pt-2">
                             <input v-model="newPlanTemplate.name" placeholder="Name" class="rounded-lg border px-2 py-1.5 text-sm">
-                            <input v-model.number="newPlanTemplate.cpu" type="number" placeholder="CPU" class="rounded-lg border px-2 py-1.5 text-sm">
+                            <input v-model.number="newPlanTemplate.cpu" type="number" min="0.1" step="0.1" placeholder="CPU" class="rounded-lg border px-2 py-1.5 text-sm">
                             <input v-model="newPlanTemplate.ram" placeholder="RAM" class="rounded-lg border px-2 py-1.5 text-sm font-mono">
                             <input v-model="newPlanTemplate.gpu" placeholder="GPU" class="rounded-lg border px-2 py-1.5 text-sm font-mono">
                             <input v-model="newPlanTemplate.image" placeholder="icon.png" class="rounded-lg border px-2 py-1.5 text-sm font-mono">
@@ -614,7 +614,7 @@
                     </div>
 
                     <div class="grid gap-4 lg:grid-cols-3">
-                        <div v-for="cat in [{id:'cpu',label:'CPU options',placeholder:'4'},{id:'ram',label:'RAM options',placeholder:'8G'},{id:'gpu',label:'GPU options (count:MiB)',placeholder:'1:1024'}]"
+                        <div v-for="cat in [{id:'cpu',label:'CPU options',placeholder:'0.5'},{id:'ram',label:'RAM options',placeholder:'8G'},{id:'gpu',label:'GPU options (count:MiB)',placeholder:'1:1024'}]"
                              :key="cat.id" class="space-y-2">
                             <h4 class="text-xs font-semibold uppercase tracking-wide text-slate-500" v-text="cat.label"></h4>
                             <div class="flex flex-wrap gap-1.5">
@@ -696,11 +696,13 @@
                     <spec-row label="Slug" :value="modalWorkspace.slug"></spec-row>
                     <spec-row label="CPU" :value="modalWorkspace.cpu + ' vCPU'"></spec-row>
                     <spec-row label="RAM" :value="modalWorkspace.ram"></spec-row>
-                    <spec-row v-for="(m, midx) in (modalWorkspace.drive_mounts || [])" :key="m.drive_id || midx"
-                              :label="'Drive ' + (midx + 1)"
-                              :value="(m.drive_name || '—') + ' → ' + m.mount_path"></spec-row>
-                    <spec-row v-if="!(modalWorkspace.drive_mounts || []).length"
-                              label="Drive" :value="(modalWorkspace.drive_name || '—') + ' → ' + (modalWorkspace.mount_path || '/home/coder')"></spec-row>
+                    <spec-row v-for="(m, midx) in (modalWorkspace.drive_mounts || [])" :key="m.drive_id + '-' + m.mount_path + '-' + midx"
+                              :label="'Mount ' + (midx + 1)"
+                              :value="(m.drive_name || '—') + ' → ' + m.mount_path + (m.sub_path ? ' (subPath: ' + m.sub_path + ')' : '')"></spec-row>
+                    <spec-row v-if="!(modalWorkspace.drive_mounts || []).length && !modalWorkspace.drive_name"
+                              label="Drives" value="none (ephemeral)"></spec-row>
+                    <spec-row v-else-if="!(modalWorkspace.drive_mounts || []).length"
+                              label="Drive" :value="modalWorkspace.drive_name + ' → ' + (modalWorkspace.mount_path || '/home/coder')"></spec-row>
                     <spec-row label="GPU" :value="modalWorkspace.gpu || 'none'"></spec-row>
                     <spec-row label="Privileged" :value="modalWorkspace.privileged ? 'yes' : 'no'"></spec-row>
                     <spec-row label="Image" :value="modalWorkspace.docker_repository + ':' + modalWorkspace.docker_tag"></spec-row>
@@ -825,23 +827,25 @@
                                 </select></div>
                             <div class="sm:col-span-2 space-y-2">
                                 <div class="flex items-center justify-between gap-2">
-                                    <label class="text-sm font-medium text-slate-600">Mount drives (DirectPV)</label>
+                                    <label class="text-sm font-medium text-slate-600">Mount drives (optional)</label>
                                     <button type="button" @click="addDriveMount"
                                             class="rounded-lg border border-blue-200 bg-blue-50 px-2.5 py-1 text-xs font-semibold text-blue-700 hover:bg-blue-100">
-                                        + Add
+                                        + Add drive
                                     </button>
                                 </div>
-                                <p v-if="!myDrivesAll.length" class="text-xs text-amber-700">No drives yet. Create one in the <strong>Drives</strong> tab.</p>
+                                <p class="text-xs text-slate-500">Leave empty for ephemeral storage. The same drive may be mounted at multiple paths — each path uses a matching PVC <code class="text-[10px]">subPath</code>.</p>
+                                <p v-if="!myDrivesAll.length && form.drive_mounts.length" class="text-xs text-amber-700">No drives yet. Create one in the <strong>Drives</strong> tab or remove mount rows.</p>
+                                <p v-if="!form.drive_mounts.length" class="text-xs text-slate-400 italic">No drives mounted.</p>
                                 <div v-for="(mount, idx) in form.drive_mounts" :key="'mount-' + idx"
                                      class="rounded-lg border border-slate-200 bg-slate-50/60 p-3 space-y-2">
                                     <div class="flex items-center justify-between gap-2">
                                         <span class="text-xs font-semibold text-slate-500" v-text="'Drive ' + (idx + 1)"></span>
-                                        <button v-if="form.drive_mounts.length > 1" type="button" @click="removeDriveMount(idx)"
+                                        <button type="button" @click="removeDriveMount(idx)"
                                                 class="text-xs text-rose-600 hover:underline">Remove</button>
                                     </div>
                                     <select v-model="mount.drive_id" class="w-full rounded-lg border px-3 py-2 text-sm bg-white">
                                         <option value="">— Select drive —</option>
-                                        <option v-for="d in drivesForMountRow(idx)" :key="d.id" :value="d.id"
+                                        <option v-for="d in drivesForMountRow()" :key="d.id" :value="d.id"
                                                 v-text="driveOptionLabel(d) + (d.status !== 'bound' ? ' · ' + d.status : '')"></option>
                                     </select>
                                     <input v-model="mount.mount_path" type="text" placeholder="/home/coder"
@@ -966,7 +970,8 @@
                 </div>
                 <p class="text-xs text-slate-500" v-if="bulkMode==='json'">
                     Example:
-                    <code class="block mt-1 rounded bg-slate-100 p-2 text-[10px] overflow-x-auto">[{"name":"ws1","cpu":2,"ram":"4G","drive_mounts":[{"drive_id":"&lt;uuid-or-claim-name&gt;","mount_path":"/home/coder"},{"drive_id":"drive-dohub-user-slug","mount_path":"/data"}],"docker_repository":"codercom/code-server","docker_tag":"4.89.0-ubuntu"}]</code>
+                    <code class="block mt-1 rounded bg-slate-100 p-2 text-[10px] overflow-x-auto">[{"name":"ws1","cpu":2,"ram":"4G","drive_mounts":[{"drive_id":"&lt;uuid&gt;","mount_path":"/app/data"},{"drive_id":"&lt;uuid&gt;","mount_path":"/app/logs"}],"docker_repository":"codercom/code-server","docker_tag":"4.89.0-ubuntu"}]</code>
+                    Same <code class="text-[10px]">drive_id</code> twice mounts one PVC at multiple paths (subPath = mount path).
                     Use <code class="text-[10px]">drive_name</code> or <code class="text-[10px]">drive_slug</code> instead of <code class="text-[10px]">drive_id</code> if you prefer.
                 </p>
                 <p class="text-xs text-slate-500" v-else>
@@ -1149,7 +1154,7 @@
                 <div class="grid gap-3 sm:grid-cols-2">
                     <div>
                         <label class="block text-xs font-medium text-slate-600">CPU (vCPU)</label>
-                        <input v-model.number="planTemplateForm.cpu" type="number" min="1" class="mt-1 w-full rounded-lg border px-3 py-2 text-sm">
+                        <input v-model.number="planTemplateForm.cpu" type="number" min="0.1" step="0.1" class="mt-1 w-full rounded-lg border px-3 py-2 text-sm">
                     </div>
                     <div>
                         <label class="block text-xs font-medium text-slate-600">RAM</label>

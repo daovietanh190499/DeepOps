@@ -78,9 +78,16 @@ Vue.component('workspace-card', {
         workspaceDriveSummary(ws) {
             const mounts = ws.drive_mounts || []
             if (mounts.length) {
-                return 'Drives: ' + mounts.map((m) => (m.drive_name || '?') + ' → ' + m.mount_path).join(', ')
+                return 'Drives: ' + mounts.map((m) => {
+                    let s = (m.drive_name || '?') + ' → ' + m.mount_path
+                    if (m.sub_path) s += ' (subPath)'
+                    return s
+                }).join(', ')
             }
-            return 'Drive: ' + (ws.drive_name || '—') + ' → ' + (ws.mount_path || '/home/coder')
+            if (ws.drive_name) {
+                return 'Drive: ' + ws.drive_name + ' → ' + (ws.mount_path || '/home/coder')
+            }
+            return 'Drives: none (ephemeral)'
         },
         onCardClick() {
             if (this.disabled) return
@@ -171,6 +178,17 @@ function defaultDriveMount() {
     return { drive_id: '', mount_path: '/home/coder' }
 }
 
+function parseCpuValue(value) {
+    const n = Number(value)
+    return Number.isFinite(n) && n > 0 ? n : NaN
+}
+
+function cpuListIncludes(list, cpu) {
+    const n = parseCpuValue(cpu)
+    if (Number.isNaN(n)) return false
+    return (list || []).some((c) => parseCpuValue(c) === n)
+}
+
 function defaultPlanTemplateForm() {
     return {
         name: '',
@@ -218,7 +236,7 @@ function defaultForm() {
         name: 'My workspace',
         cpu: 2,
         ram: '4G',
-        drive_mounts: [defaultDriveMount()],
+        drive_mounts: [],
         gpu: 'none',
         docker_image_id: '',
         docker_repository: 'codercom/code-server',
@@ -354,7 +372,10 @@ function parseCsvBulk(text) {
             } else item[h] = val
         })
         if (Object.keys(env_vars).length) item.env_vars = env_vars
-        if (item.cpu) item.cpu = parseInt(item.cpu, 10)
+        if (item.cpu != null && item.cpu !== '') {
+            const cpu = parseCpuValue(item.cpu)
+            if (!Number.isNaN(cpu)) item.cpu = cpu
+        }
         return normalizeBulkItem(item)
     })
 }
@@ -523,11 +544,8 @@ const appVue = new Vue({
         },
         selectedDrivesLabel() {
             const mounts = (this.form.drive_mounts || []).filter((m) => m.drive_id)
-            if (!mounts.length) return '—'
-            return mounts.map((m) => {
-                const d = this.myDrivesAll.find((x) => x.id === m.drive_id)
-                return (d ? this.driveOptionLabel(d) : '?') + ' → ' + (m.mount_path || '/home/coder')
-            }).join(', ')
+            if (!mounts.length) return 'none (ephemeral)'
+            return mounts.map((m) => this.driveMountSummary(m)).join(', ')
         },
         userTabs() {
             return [
@@ -589,7 +607,7 @@ const appVue = new Vue({
             const rams = eq.ram || []
             const gpus = eq.gpu || []
             return this.planTemplates.filter((t) =>
-                cpus.includes(t.cpu) && rams.includes(t.ram) && gpus.includes(t.gpu),
+                cpuListIncludes(cpus, t.cpu) && rams.includes(t.ram) && gpus.includes(t.gpu),
             )
         },
         canCreateMoreServers() {
@@ -1399,7 +1417,7 @@ const appVue = new Vue({
         clampFormToLimits() {
             const eq = this.resourceLimits.equipment
             if (!eq) return
-            if (!eq.cpu.includes(this.form.cpu)) {
+            if (!cpuListIncludes(eq.cpu, this.form.cpu)) {
                 this.form.cpu = eq.cpu[eq.cpu.length - 1] || this.form.cpu
             }
             if (!eq.ram.includes(this.form.ram)) {
@@ -1413,7 +1431,7 @@ const appVue = new Vue({
             if (!this.resourceLimits.limited) return null
             const eq = this.resourceLimits.equipment || {}
             const gpuVal = normalizeGpuValue(gpu)
-            if (eq.cpu && !eq.cpu.includes(Number(cpu))) {
+            if (eq.cpu && !cpuListIncludes(eq.cpu, cpu)) {
                 return `CPU exceeds group limit (${this.resourceLimits.limits.max_cpu} vCPU)`
             }
             if (eq.ram && !eq.ram.includes(ram)) {
@@ -1756,24 +1774,37 @@ const appVue = new Vue({
             this.showToast('Drive deleted')
             await this.reloadDriveLists()
         },
-        driveSelectableForMount(drive, rowIndex) {
-            if ((this.form.drive_mounts[rowIndex] || {}).drive_id === drive.id) return true
-            if ((this.form.drive_mounts || []).some((m, i) => i !== rowIndex && m.drive_id === drive.id)) {
-                return false
-            }
-            return true
+        drivesForMountRow() {
+            return this.myDrivesAll
         },
-        drivesForMountRow(rowIndex) {
-            return this.myDrivesAll.filter((d) => this.driveSelectableForMount(d, rowIndex))
+        suggestMountPath(rowIndex) {
+            const defaults = ['/home/coder', '/app/data', '/app/logs', '/data']
+            if (rowIndex < defaults.length) return defaults[rowIndex]
+            return `/mnt/path${rowIndex + 1}`
         },
         addDriveMount() {
             if (!this.form.drive_mounts) this.$set(this.form, 'drive_mounts', [])
             const idx = this.form.drive_mounts.length
-            const mountPath = idx === 0 ? '/home/coder' : (idx === 1 ? '/data' : `/mnt/drive${idx + 1}`)
-            this.form.drive_mounts.push({ drive_id: '', mount_path: mountPath })
+            const prev = this.form.drive_mounts[idx - 1]
+            const mountPath = this.suggestMountPath(idx)
+            this.form.drive_mounts.push({
+                drive_id: prev && prev.drive_id ? prev.drive_id : '',
+                mount_path: mountPath,
+            })
+        },
+        driveMountSummary(m) {
+            if (!m || !m.drive_id) return '—'
+            const d = this.myDrivesAll.find((x) => x.id === m.drive_id)
+            const name = d ? d.name : '?'
+            let line = name + ' → ' + (m.mount_path || '/home/coder')
+            const sameDrive = (this.form.drive_mounts || []).filter(
+                (row) => row.drive_id === m.drive_id,
+            ).length
+            if (sameDrive > 1) line += ' (subPath)'
+            return line
         },
         removeDriveMount(index) {
-            if (!this.form.drive_mounts || this.form.drive_mounts.length <= 1) return
+            if (!this.form.drive_mounts) return
             this.form.drive_mounts.splice(index, 1)
         },
         resetCreateServerForm() {
@@ -1809,10 +1840,6 @@ const appVue = new Vue({
             this.showBulkCreateServerModal = false
         },
         async runWorkspace() {
-            if (!(this.form.drive_mounts || []).some((m) => m.drive_id)) {
-                this.runError = 'Select at least one drive to mount'
-                return
-            }
             const limitErr = this.checkServerCountLimit()
                 || this.checkWorkspaceLimits(this.form.cpu, this.form.ram, this.form.gpu)
             if (limitErr) {

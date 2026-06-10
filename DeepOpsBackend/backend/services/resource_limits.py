@@ -12,6 +12,7 @@ from backend.services.platform_catalog import (
     all_gpu,
     all_ram,
     get_gpu_vram_map,
+    parse_cpu_value,
 )
 
 
@@ -133,10 +134,10 @@ def validate_workspace_resources(user: User, *, cpu, ram, gpu) -> str | None:
     if group is None:
         return None
     try:
-        cpu_val = int(cpu)
-    except (TypeError, ValueError):
+        cpu_val = parse_cpu_value(cpu)
+    except ValueError:
         return 'invalid cpu'
-    if cpu_val > group.max_cpu:
+    if cpu_val > float(group.max_cpu):
         return f'CPU exceeds group limit ({group.max_cpu} vCPU)'
     ram_g = parse_ram_g(str(ram))
     if ram_g > group.max_ram_g:

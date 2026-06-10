@@ -18,6 +18,7 @@ from backend.services.k8s_status import (
     workspace_is_active,
 )
 from backend.services.gpu_resources import normalize_gpu_value
+from backend.services.platform_catalog import parse_cpu_value
 from backend.services.env_templates import expand_env_vars
 from backend.services.resource_limits import can_change_privileged, validate_server_count, validate_workspace_resources
 from backend.services.ssh_keys import ssh_info_payload
@@ -145,9 +146,14 @@ def _validate_workspace_limits(user: User, data: dict, ws: Workspace | None = No
 
 def _apply_workspace_fields(ws: Workspace, data: dict, owner: User | None = None) -> str | None:
     owner = owner or ws.user
-    for field in ('name', 'cpu', 'ram', 'docker_repository', 'docker_tag'):
+    for field in ('name', 'ram', 'docker_repository', 'docker_tag'):
         if field in data and data[field] is not None:
             setattr(ws, field, data[field])
+    if 'cpu' in data and data['cpu'] is not None:
+        try:
+            ws.cpu = parse_cpu_value(data['cpu'])
+        except ValueError:
+            return 'invalid cpu'
     if 'gpu' in data:
         ws.gpu = normalize_gpu_value(data.get('gpu'))
     mount_fields = (
@@ -289,8 +295,6 @@ def workspace_create(request, user):
     err = _apply_workspace_fields(ws, data, owner=user)
     if err:
         return JsonResponse({'message': err}, status=400)
-    if not ws.user_drive_id:
-        return JsonResponse({'message': 'at least one drive mount required'}, status=400)
     ws.save()
     persist_pending_drive_mounts(ws)
     return JsonResponse({'result': _workspace_payload(ws)}, status=201)
@@ -352,8 +356,6 @@ def workspace_export(request, user, workspace_id):
 
 
 def _start_workspace(ws: Workspace, *, cleanup_on_failure: bool = False):
-    if not ws.user_drive_id:
-        return JsonResponse({'message': 'select a drive to mount'}, status=400)
     spawn_err = spawn_workspace(ws)
     if spawn_err:
         if cleanup_on_failure:
@@ -435,8 +437,6 @@ def workspace_run(request, user):
     err = _apply_workspace_fields(ws, data, owner=user)
     if err:
         return JsonResponse({'message': err}, status=400)
-    if not ws.user_drive_id:
-        return JsonResponse({'message': 'at least one drive mount required'}, status=400)
     ws.save()
     persist_pending_drive_mounts(ws)
     return _start_workspace(ws, cleanup_on_failure=True)
@@ -475,14 +475,6 @@ def workspace_bulk_run(request, user):
         err = _apply_workspace_fields(ws, item, owner=user)
         if err:
             results.append({'index': i, 'ok': False, 'error': err, 'name': name})
-            continue
-
-        if not ws.user_drive_id:
-            drive_ref = item.get('drive_id') or item.get('drive_name') or item.get('drive_slug')
-            err_msg = 'at least one drive mount required'
-            if drive_ref:
-                err_msg = f'drive not found: {drive_ref}'
-            results.append({'index': i, 'ok': False, 'error': err_msg})
             continue
 
         ws.save()

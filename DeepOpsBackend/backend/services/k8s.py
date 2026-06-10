@@ -13,7 +13,7 @@ def _storage_class() -> str:
 
 
 def build_spawn_config(workspace) -> dict:
-    from .workspace_mounts import spawn_drive_mounts
+    from .workspace_mounts import build_pvc_volume_specs, spawn_drive_mounts
 
     gpu_spec = parse_gpu_resources(workspace.gpu)
     ram_str = str(workspace.ram)
@@ -26,11 +26,8 @@ def build_spawn_config(workspace) -> dict:
 
     user = workspace.user
     slug = workspace.slug
-    mounts = spawn_drive_mounts(workspace)
-    if not mounts:
-        raise ValueError('workspace has no drive assigned')
-
-    primary = mounts[0]
+    mount_entries = spawn_drive_mounts(workspace)
+    pvc_volumes, pvc_volume_mounts = build_pvc_volume_specs(mount_entries)
     ssh_record = get_or_none(workspace)
 
     return {
@@ -53,9 +50,8 @@ def build_spawn_config(workspace) -> dict:
         'env_vars': dict(workspace.env_vars or {}),
         'container_command': list(workspace.container_command or []),
         'storage_class': _storage_class(),
-        'claim_name': primary['claim_name'],
-        'mount_path': primary['mount_path'],
-        'extra_mounts': mounts[1:],
+        'pvc_volumes': pvc_volumes,
+        'pvc_volume_mounts': pvc_volume_mounts,
         'secret_name': f'{user.username}-{slug}-secret',
         'ssh_enabled': ssh_record is not None,
         'ssh_secret_name': ssh_secret_name(workspace),
@@ -117,16 +113,18 @@ def _helm_base_cmd(config: dict) -> list[str]:
         '--set', 'ingress.hosts[0].paths[0].pathType=Prefix',
         '--set', f'ingress.tls[0].secretName=tls-{NAMESPACE}-secret',
         '--set', f'ingress.tls[0].hosts[0]={config["hostname"]}',
-        '--set', 'persistence.enabled=true',
-        '--set', 'persistence.createPvc=false',
-        '--set', f'persistence.claimName={config["claim_name"]}',
-        '--set', f'mainVolume.claimName={config["claim_name"]}',
-        '--set', f'persistence.mountPath={config["mount_path"]}',
         '--set', f'resources.limits.cpu={config["max_cpu"]}',
         '--set', f'resources.limits.memory={config["max_ram"]}',
         '--set', f'resources.requests.cpu={config["cpu"]}',
         '--set', f'resources.requests.memory={config["ram"]}',
     ]
+
+    pvc_volumes = config.get('pvc_volumes') or []
+    pvc_volume_mounts = config.get('pvc_volume_mounts') or []
+    if pvc_volumes:
+        cmd.extend(['--set', 'persistence.enabled=false'])
+    else:
+        cmd.extend(['--set', 'persistence.enabled=false'])
 
     if config.get('replica_count') is not None:
         cmd.extend(['--set', f'replicaCount={int(config["replica_count"])}'])
@@ -141,6 +139,14 @@ def _helm_base_cmd(config: dict) -> list[str]:
             has_auth = True
     if has_auth:
         cmd.extend(['--set', 'auth.resetConfigOnDeploy=true'])
+        if pvc_volume_mounts:
+            first_mount = pvc_volume_mounts[0]
+            cmd.extend([
+                '--set-string', f'auth.resetVolumeName={first_mount["name"]}',
+                '--set-string', f'auth.resetMountPath={first_mount["mountPath"]}',
+            ])
+            if first_mount.get('subPath'):
+                cmd.extend(['--set-string', f'auth.resetSubPath={first_mount["subPath"]}'])
 
     env_list = [{'name': k, 'value': str(v)} for k, v in env_vars.items()]
     if env_list:
@@ -157,17 +163,8 @@ def _helm_base_cmd(config: dict) -> list[str]:
     if command:
         cmd.extend(['--set-json', f'container.command={json.dumps(command)}'])
 
-    volumes = [{'name': 'shm-volume', 'emptyDir': {'medium': 'Memory'}}]
-    volume_mounts = [{'name': 'shm-volume', 'mountPath': '/dev/shm'}]
-    for extra in config.get('extra_mounts') or []:
-        volumes.append({
-            'name': extra['volume_name'],
-            'persistentVolumeClaim': {'claimName': extra['claim_name']},
-        })
-        volume_mounts.append({
-            'name': extra['volume_name'],
-            'mountPath': extra['mount_path'],
-        })
+    volumes = [{'name': 'shm-volume', 'emptyDir': {'medium': 'Memory'}}] + pvc_volumes
+    volume_mounts = [{'name': 'shm-volume', 'mountPath': '/dev/shm'}] + pvc_volume_mounts
     cmd.extend(['--set-json', f'volumes={json.dumps(volumes)}'])
     cmd.extend(['--set-json', f'volumeMounts={json.dumps(volume_mounts)}'])
 
