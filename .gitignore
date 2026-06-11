@@ -5,3 +5,4 @@ __pycache__
 dohub.db
 env
 db.sqlite3
+.env
