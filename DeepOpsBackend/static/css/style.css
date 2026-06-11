@@ -1,4 +1,12 @@
-/* Minimal extras — main UI uses Tailwind CDN */
+/* Dohub responsive extras — main UI uses Tailwind CDN */
+
+html {
+  -webkit-text-size-adjust: 100%;
+}
+
+body {
+  overflow-x: hidden;
+}
 
 input[type="range"].dohub-range {
   -webkit-appearance: none;
@@ -28,4 +36,173 @@ input[type="range"].dohub-range:disabled {
 
 input[type="range"].dohub-range:disabled::-webkit-slider-thumb {
   background: #94a3b8;
+}
+
+/* Horizontal scroll for wide tables on small screens */
+.dohub-table-scroll {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  max-width: 100%;
+}
+
+.dohub-table-scroll table {
+  width: 100%;
+}
+
+/* Modals: bottom sheet on phones, centered dialog on sm+ */
+.dohub-modal-backdrop {
+  align-items: flex-end;
+  padding: 0;
+}
+
+@media (min-width: 640px) {
+  .dohub-modal-backdrop {
+    align-items: center;
+    padding: 1rem;
+  }
+}
+
+.dohub-modal-panel {
+  width: 100%;
+  max-height: min(92dvh, 100%);
+  border-radius: 1rem 1rem 0 0;
+  border-bottom: none;
+}
+
+@media (min-width: 640px) {
+  .dohub-modal-panel {
+    max-height: 90vh;
+    border-radius: 1rem;
+    border-bottom-width: 1px;
+  }
+}
+
+/* Modal tab bar horizontal scroll on narrow viewports */
+.dohub-modal-tabs {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  flex-wrap: nowrap;
+  scrollbar-width: none;
+}
+
+.dohub-modal-tabs::-webkit-scrollbar {
+  display: none;
+}
+
+.dohub-modal-tabs button {
+  flex-shrink: 0;
+  white-space: nowrap;
+}
+
+/* Full-width filters / toolbars on mobile */
+.dohub-filter-input {
+  width: 100%;
+  min-width: 0;
+}
+
+@media (min-width: 640px) {
+  .dohub-filter-input {
+    width: auto;
+    min-width: 12rem;
+  }
+}
+
+/* Toast: centered on mobile */
+.dohub-toast {
+  left: 1rem;
+  right: 1rem;
+  bottom: 1rem;
+  text-align: center;
+}
+
+@media (min-width: 640px) {
+  .dohub-toast {
+    left: auto;
+    right: 1.5rem;
+    bottom: 1.5rem;
+    text-align: left;
+    max-width: 24rem;
+  }
+}
+
+/* Grid cards must shrink on narrow viewports (default min-width: auto overflows) */
+.dohub-card-grid {
+  width: 100%;
+  min-width: 0;
+}
+
+.dohub-card-grid > * {
+  min-width: 0;
+}
+
+.dohub-workspace-card {
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.dohub-break-long {
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+/* Workspace card action buttons */
+.dohub-card-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.5rem;
+  width: 100%;
+  min-width: 0;
+}
+
+.dohub-card-actions .dohub-card-action-main {
+  min-width: 0;
+  width: 100%;
+  padding: 0.625rem 0.75rem;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  line-height: 1.25;
+  border-radius: 0.5rem;
+}
+
+.dohub-card-actions .dohub-card-action-main--wide {
+  grid-column: 1 / -1;
+}
+
+.dohub-card-actions .dohub-card-action-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 0;
+  padding: 0.625rem 0.75rem;
+  font-size: 0.8125rem;
+  border-radius: 0.5rem;
+}
+
+@media (min-width: 640px) {
+  .dohub-card-actions {
+    display: flex;
+    flex-direction: row;
+    flex-wrap: nowrap;
+    align-items: stretch;
+    gap: 0.5rem;
+  }
+
+  .dohub-card-actions .dohub-card-action-main {
+    flex: 1 1 0;
+    padding: 0.75rem 1rem;
+    font-size: 0.875rem;
+  }
+
+  .dohub-card-actions .dohub-card-action-main--wide {
+    grid-column: auto;
+  }
+
+  .dohub-card-actions .dohub-card-action-icon {
+    flex: 0 0 2.75rem;
+    width: 2.75rem;
+    padding: 0.75rem 0;
+    font-size: 0.875rem;
+  }
 }

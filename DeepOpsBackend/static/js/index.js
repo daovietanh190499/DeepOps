@@ -1,8 +1,8 @@
 Vue.component('spec-row', {
     props: ['label', 'value'],
-    template: `<div class="flex justify-between gap-4 border-b border-slate-100 py-2 last:border-0">
-      <span class="font-medium text-slate-500" v-text="label"></span>
-      <span class="font-semibold text-slate-800 text-right truncate" v-text="value"></span>
+    template: `<div class="flex flex-col gap-0.5 border-b border-slate-100 py-2 last:border-0 sm:flex-row sm:justify-between sm:gap-4">
+      <span class="shrink-0 font-medium text-slate-500" v-text="label"></span>
+      <span class="font-semibold text-slate-800 sm:text-right sm:max-w-[65%] break-words" v-text="value"></span>
     </div>`,
 })
 
@@ -20,24 +20,28 @@ Vue.component('user-row', {
         else this.last_activity = Math.round(d / 86400) + 'd ago'
     },
     template: `
-    <div class="rounded-xl border border-slate-200 bg-white p-4 shadow-sm mb-3 flex flex-wrap gap-4 items-center">
-      <img :src="user.image || '/static/img/logo.png'" class="h-10 w-10 rounded-full border object-cover" alt="">
-      <div class="flex-1 min-w-[8rem]">
-        <p class="font-semibold" v-text="user.username"></p>
-        <p v-if="user.email" class="text-xs text-slate-500 truncate" v-text="user.email"></p>
-        <p class="text-xs text-slate-500" v-text="user.role + ' · ' + last_activity + (user.group_name ? ' · ' + user.group_name : '')"></p>
-      </div>
-      <span class="text-xs px-2 py-0.5 rounded-full" :class="user.is_accept ? 'bg-emerald-50 text-emerald-700' : 'bg-amber-50 text-amber-700'"
-            v-text="user.is_accept ? 'accepted' : 'pending'"></span>
-      <div class="relative">
-        <button @click="showRole=!showRole" class="px-3 py-1 rounded-lg bg-indigo-600 text-white text-xs" v-text="user.role"></button>
-        <div v-if="showRole" class="absolute z-10 mt-1 bg-white border rounded-lg shadow py-1">
-          <button class="block w-full text-left px-3 py-1 text-sm hover:bg-slate-50" @click="$emit('role','admin'); showRole=false">admin</button>
-          <button class="block w-full text-left px-3 py-1 text-sm hover:bg-slate-50" @click="$emit('role','normal_user'); showRole=false">normal_user</button>
+    <div class="rounded-xl border border-slate-200 bg-white p-4 shadow-sm mb-3 flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center sm:gap-4">
+      <div class="flex items-center gap-3 min-w-0 sm:flex-1">
+        <img :src="user.image || '/static/img/logo.png'" class="h-10 w-10 shrink-0 rounded-full border object-cover" alt="">
+        <div class="min-w-0 flex-1">
+          <p class="font-semibold truncate" v-text="user.username"></p>
+          <p v-if="user.email" class="text-xs text-slate-500 truncate" v-text="user.email"></p>
+          <p class="text-xs text-slate-500 break-words" v-text="user.role + ' · ' + last_activity + (user.group_name ? ' · ' + user.group_name : '')"></p>
         </div>
       </div>
-      <button v-if="!user.is_accept" @click="$emit('accept')" class="px-3 py-1 rounded-lg bg-emerald-600 text-white text-xs">Accept</button>
-      <button @click="$emit('delete')" class="px-3 py-1 rounded-lg border text-slate-600 text-xs">Delete</button>
+      <div class="flex flex-wrap items-center gap-2 sm:justify-end">
+        <span class="text-xs px-2 py-0.5 rounded-full" :class="user.is_accept ? 'bg-emerald-50 text-emerald-700' : 'bg-amber-50 text-amber-700'"
+              v-text="user.is_accept ? 'accepted' : 'pending'"></span>
+        <div class="relative">
+          <button @click="showRole=!showRole" class="px-3 py-1.5 rounded-lg bg-indigo-600 text-white text-xs" v-text="user.role"></button>
+          <div v-if="showRole" class="absolute z-10 mt-1 right-0 bg-white border rounded-lg shadow py-1 min-w-[8rem]">
+            <button class="block w-full text-left px-3 py-1 text-sm hover:bg-slate-50" @click="$emit('role','admin'); showRole=false">admin</button>
+            <button class="block w-full text-left px-3 py-1 text-sm hover:bg-slate-50" @click="$emit('role','normal_user'); showRole=false">normal_user</button>
+          </div>
+        </div>
+        <button v-if="!user.is_accept" @click="$emit('accept')" class="px-3 py-1.5 rounded-lg bg-emerald-600 text-white text-xs">Accept</button>
+        <button @click="$emit('delete')" class="px-3 py-1.5 rounded-lg border text-slate-600 text-xs">Delete</button>
+      </div>
     </div>`,
 })
 
@@ -95,34 +99,39 @@ Vue.component('workspace-card', {
         },
     },
     template: `
-    <div class="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm flex flex-col gap-3 transition"
+    <div class="dohub-workspace-card rounded-2xl border border-slate-200 bg-white p-4 shadow-sm flex flex-col gap-3 transition"
          :class="disabled ? 'opacity-60 pointer-events-none select-none' : 'cursor-pointer hover:border-blue-300 hover:shadow-md'"
          @click="onCardClick">
-      <div class="flex justify-between items-start gap-2">
-        <div class="min-w-0 flex-1">
+      <div class="flex justify-between items-start gap-2 min-w-0">
+        <div class="min-w-0 flex-1 overflow-hidden">
           <h3 class="font-bold text-slate-900 truncate" v-text="ws.name"></h3>
-          <p v-if="showOwner" class="text-xs text-slate-500" v-text="'@' + ws.owner"></p>
-          <div class="flex items-center gap-1 mt-0.5">
-            <p class="text-xs font-mono text-slate-400 truncate flex-1" v-text="ws.hostname"></p>
+          <p v-if="showOwner" class="text-xs text-slate-500 truncate" v-text="'@' + ws.owner"></p>
+          <div class="flex items-start gap-1 mt-0.5 min-w-0">
+            <p class="dohub-break-long text-xs font-mono text-slate-400 flex-1 min-w-0" v-text="ws.hostname"></p>
             <button type="button" @click.stop="$emit('copy', ws)" class="shrink-0 rounded p-1 text-slate-400 hover:bg-slate-100 hover:text-blue-600" title="Copy URL">
               <i class="fa fa-copy text-xs"></i>
             </button>
           </div>
         </div>
-        <span class="shrink-0 rounded-full px-2 py-0.5 text-xs font-bold" :class="stateClass" v-text="k8sDisplay"></span>
+        <span class="shrink-0 rounded-full px-2 py-0.5 text-xs font-bold max-w-[40%] text-right leading-tight" :class="stateClass" v-text="k8sDisplay"></span>
       </div>
-      <div class="text-xs text-slate-600 space-y-0.5 pointer-events-none">
-        <p v-text="ws.cpu + ' vCPU · ' + ws.ram"></p>
-        <p v-text="workspaceDriveSummary(ws)"></p>
-        <p v-text="'GPU: ' + (ws.gpu || 'none')"></p>
-        <p class="font-mono truncate" v-text="ws.docker_repository + ':' + ws.docker_tag"></p>
+      <div class="text-xs text-slate-600 space-y-0.5 pointer-events-none min-w-0">
+        <p class="dohub-break-long" v-text="ws.cpu + ' vCPU · ' + ws.ram"></p>
+        <p class="dohub-break-long" v-text="workspaceDriveSummary(ws)"></p>
+        <p class="dohub-break-long" v-text="'GPU: ' + (ws.gpu || 'none')"></p>
+        <p class="dohub-break-long font-mono" v-text="ws.docker_repository + ':' + ws.docker_tag"></p>
       </div>
-      <div class="flex flex-wrap gap-2 mt-auto" @click.stop>
-        <button v-if="canStart" @click="$emit('start', ws)" class="flex-1 rounded-lg bg-blue-600 text-white text-xs py-2 font-semibold">Start</button>
-        <button v-if="canStop" @click="$emit('stop', ws)" class="flex-1 rounded-lg bg-rose-600 text-white text-xs py-2 font-semibold">Stop</button>
-        <button v-if="canOpen" @click="$emit('open', ws)" class="flex-1 rounded-lg border border-blue-600 text-blue-600 text-xs py-2 font-semibold">Open</button>
-        <button @click="$emit('export', ws)" class="rounded-lg border px-2 py-2 text-xs" title="Export"><i class="fa fa-download"></i></button>
-        <button v-if="canDelete" @click="$emit('delete', ws)" class="rounded-lg border border-rose-200 text-rose-600 px-2 py-2 text-xs"><i class="fa fa-trash"></i></button>
+      <div class="dohub-card-actions mt-auto" @click.stop>
+        <button v-if="canStart" @click="$emit('start', ws)"
+                class="dohub-card-action-main dohub-card-action-main--wide rounded-lg bg-blue-600 text-white">Start</button>
+        <button v-if="canStop" @click="$emit('stop', ws)"
+                class="dohub-card-action-main rounded-lg bg-rose-600 text-white">Stop</button>
+        <button v-if="canOpen" @click="$emit('open', ws)"
+                class="dohub-card-action-main rounded-lg border border-blue-600 text-blue-600 bg-white">Open</button>
+        <button @click="$emit('export', ws)"
+                class="dohub-card-action-icon rounded-lg border bg-white text-slate-700" title="Export"><i class="fa fa-download"></i></button>
+        <button v-if="canDelete" @click="$emit('delete', ws)"
+                class="dohub-card-action-icon rounded-lg border border-rose-200 bg-white text-rose-600" title="Delete"><i class="fa fa-trash"></i></button>
       </div>
     </div>`,
 })
@@ -586,6 +595,7 @@ const appVue = new Vue({
         deleteInProgress: false,
         toastMessage: '',
         toastTimer: null,
+        mobileNavOpen: false,
         statusPollTimer: null,
         listLoading: 0,
         statusPending: {
@@ -954,6 +964,7 @@ const appVue = new Vue({
             }
         },
         openWorkspaceModal(ws) {
+            this.mobileNavOpen = false
             this.stopWorkspaceLogsPoll()
             this.modalTab = 'general'
             this.workspaceLogs = {
@@ -1246,6 +1257,7 @@ const appVue = new Vue({
         async changeMenu(menu) {
             this.stopStatusPolling()
             this.menu = menu
+            this.mobileNavOpen = false
             window.history.replaceState({}, '', '/?tab=' + menu)
             if (menu === 'drives') await this.reloadMyDrives(1)
             if (menu === 'servers') await this.reloadMyWorkspaces(1)
@@ -1976,6 +1988,7 @@ const appVue = new Vue({
             this.adminDrivePagination = data.pagination || this.adminDrivePagination
         },
         openCreateDriveModal() {
+            this.mobileNavOpen = false
             const limitErr = this.checkDriveCountLimit()
             if (limitErr) {
                 this.showToast(limitErr)
@@ -2084,6 +2097,7 @@ const appVue = new Vue({
             this.runError = ''
         },
         async openCreateServerModal() {
+            this.mobileNavOpen = false
             const limitErr = this.checkServerCountLimit()
             if (limitErr) {
                 this.showToast(limitErr)

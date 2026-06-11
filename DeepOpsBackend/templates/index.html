@@ -14,50 +14,80 @@
         tailwind.config = { theme: { extend: { fontFamily: { sans: ['DM Sans', 'system-ui', 'sans-serif'] } } } }
     </script>
 </head>
-<body class="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50/30 to-slate-100 font-sans text-slate-800 antialiased">
+<body class="min-h-screen overflow-x-hidden bg-gradient-to-br from-slate-50 via-blue-50/30 to-slate-100 font-sans text-slate-800 antialiased">
 
-<div id="root" class="flex min-h-screen flex-col">
+<div id="root" class="flex min-h-screen min-w-0 flex-col overflow-x-hidden">
     <header class="sticky top-0 z-30 border-b border-slate-200/80 bg-white/95 backdrop-blur-md">
-        <div class="mx-auto flex h-14 max-w-[1600px] items-center justify-between gap-4 px-4 sm:px-6 lg:px-8">
-            <a href="/" class="flex shrink-0 items-center gap-2.5 no-underline">
+        <div class="mx-auto flex h-14 max-w-[1600px] items-center justify-between gap-3 px-4 sm:px-6 lg:px-8">
+            <a href="/" class="flex min-w-0 shrink-0 items-center gap-2.5 no-underline">
                 <img src="/static/img/logo.png" alt="Dohub" class="h-8 w-8 object-contain sm:h-9 sm:w-9">
-                <span class="text-lg font-bold tracking-tight text-slate-900 sm:text-xl">Dohub</span>
+                <span class="truncate text-lg font-bold tracking-tight text-slate-900 sm:text-xl">Dohub</span>
             </a>
             <p v-if="is_login" class="hidden min-w-0 flex-1 truncate text-center text-sm text-slate-500 md:block">
                 Welcome, <span class="font-semibold text-slate-800" v-text="current_user"></span>
             </p>
-            <div class="flex shrink-0 flex-col items-end gap-2 sm:flex-row sm:items-center sm:gap-3">
-                <nav v-if="is_login" class="flex flex-wrap justify-end rounded-lg bg-slate-100 p-1 gap-0.5">
+            <div class="flex shrink-0 items-center gap-2 sm:gap-3">
+                <nav v-if="is_login" class="hidden lg:flex flex-wrap justify-end rounded-lg bg-slate-100 p-1 gap-0.5">
                     <button type="button" v-for="tab in userTabs" :key="tab.id"
                             @click="changeMenu(tab.id)"
                             :class="menu===tab.id ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-600 hover:text-slate-900'"
-                            class="rounded-md px-2.5 py-1.5 text-xs font-semibold transition sm:px-3 sm:text-sm"
+                            class="rounded-md px-2.5 py-1.5 text-xs font-semibold transition sm:px-3 sm:text-sm whitespace-nowrap"
                             v-text="tab.label"></button>
                 </nav>
-                <nav v-if="is_login && is_admin" class="flex flex-wrap justify-end rounded-lg border border-indigo-200/70 bg-indigo-50 p-1 gap-0.5">
+                <nav v-if="is_login && is_admin" class="hidden lg:flex flex-wrap justify-end rounded-lg border border-indigo-200/70 bg-indigo-50 p-1 gap-0.5">
                     <button type="button" v-for="tab in adminTabs" :key="tab.id"
                             @click="changeMenu(tab.id)"
                             :class="menu===tab.id ? 'bg-white text-indigo-700 shadow-sm ring-1 ring-indigo-200' : 'text-indigo-800/80 hover:text-indigo-900'"
-                            class="rounded-md px-2.5 py-1.5 text-xs font-semibold transition sm:px-3 sm:text-sm"
+                            class="rounded-md px-2.5 py-1.5 text-xs font-semibold transition sm:px-3 sm:text-sm whitespace-nowrap"
                             v-text="tab.label"></button>
                 </nav>
+                <button v-if="is_login" type="button" @click="mobileNavOpen = !mobileNavOpen"
+                        class="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-700 hover:bg-slate-50 lg:hidden"
+                        :aria-expanded="mobileNavOpen ? 'true' : 'false'" aria-label="Toggle navigation">
+                    <i class="fa" :class="mobileNavOpen ? 'fa-times' : 'fa-bars'"></i>
+                </button>
                 <button v-if="!is_login" @click="loginWithGithub()"
                         class="inline-flex items-center gap-2 rounded-lg bg-slate-900 px-3 py-2 text-sm font-semibold text-white hover:bg-slate-800">
                     <img src="/static/img/github.png" class="h-4 w-4" alt="">
                     <span class="hidden sm:inline">Login with GitHub</span>
+                    <span class="sm:hidden">Login</span>
                 </button>
                 <button v-if="is_login" @click="logout()"
                         class="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50">
                     <i class="fa fa-sign-out"></i>
+                    <span class="hidden sm:inline">Logout</span>
                 </button>
             </div>
         </div>
+        <div v-if="is_login && mobileNavOpen" class="border-t border-slate-100 px-4 py-3 lg:hidden sm:px-6">
+            <p class="mb-2 truncate text-xs text-slate-500 md:hidden">
+                Welcome, <span class="font-semibold text-slate-800" v-text="current_user"></span>
+            </p>
+            <p class="mb-2 text-[10px] font-semibold uppercase tracking-wide text-slate-400">Workspace</p>
+            <nav class="mb-3 flex flex-col gap-1 rounded-lg bg-slate-100 p-1">
+                <button type="button" v-for="tab in userTabs" :key="'m-' + tab.id"
+                        @click="changeMenu(tab.id)"
+                        :class="menu===tab.id ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-600'"
+                        class="rounded-md px-3 py-2 text-left text-sm font-semibold"
+                        v-text="tab.label"></button>
+            </nav>
+            <template v-if="is_admin">
+                <p class="mb-2 text-[10px] font-semibold uppercase tracking-wide text-indigo-400">Admin</p>
+                <nav class="flex flex-col gap-1 rounded-lg border border-indigo-200/70 bg-indigo-50 p-1">
+                    <button type="button" v-for="tab in adminTabs" :key="'ma-' + tab.id"
+                            @click="changeMenu(tab.id)"
+                            :class="menu===tab.id ? 'bg-white text-indigo-700 shadow-sm' : 'text-indigo-800/80'"
+                            class="rounded-md px-3 py-2 text-left text-sm font-semibold"
+                            v-text="tab.label"></button>
+                </nav>
+            </template>
+        </div>
     </header>
 
-    <main class="mx-auto w-full max-w-[1600px] flex-1 px-4 py-6 sm:px-6 lg:px-8">
+    <main class="mx-auto w-full max-w-[1600px] flex-1 min-w-0 px-4 py-4 sm:px-6 sm:py-6 lg:px-8">
         <!-- Login prompt -->
         <section v-if="!is_login" class="flex min-h-[50vh] items-center justify-center">
-            <div class="w-full max-w-md rounded-2xl border border-slate-200 bg-white p-8 text-center shadow-sm">
+            <div class="w-full max-w-md rounded-2xl border border-slate-200 bg-white p-6 text-center shadow-sm sm:p-8">
                 <img src="/static/img/logo.png" alt="Dohub" class="mx-auto mb-5 h-12 w-12">
                 <h2 class="text-xl font-bold text-slate-900">Please login to continue</h2>
                 <p class="mt-3 text-sm text-slate-500">Sign in with GitHub to create and run codehub workspaces on Kubernetes.</p>
@@ -73,13 +103,13 @@
                     <p v-if="resourceLimits.limited && resourceLimits.limits.max_drives" class="text-xs text-slate-500 mt-0.5"
                        v-text="'Drives: ' + (resourceLimits.limits.drive_count ?? myDrivePagination.total) + ' / ' + resourceLimits.limits.max_drives"></p>
                 </div>
-                <div class="flex flex-wrap items-center gap-2">
+                <div class="flex flex-wrap items-center gap-2 w-full sm:w-auto">
                     <button type="button" @click="openCreateDriveModal" :disabled="!canCreateMoreDrives"
-                            class="rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700 disabled:opacity-40">
+                            class="w-full sm:w-auto rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700 disabled:opacity-40">
                         Create drive
                     </button>
                     <button type="button" @click="openBulkCreateDriveModal" :disabled="!canCreateMoreDrives"
-                            class="rounded-lg border border-indigo-200 bg-indigo-50 px-4 py-2 text-sm font-semibold text-indigo-700 hover:bg-indigo-100 disabled:opacity-40">
+                            class="w-full sm:w-auto rounded-lg border border-indigo-200 bg-indigo-50 px-4 py-2 text-sm font-semibold text-indigo-700 hover:bg-indigo-100 disabled:opacity-40">
                         Bulk create drive
                     </button>
                 </div>
@@ -87,14 +117,14 @@
 
             <div class="flex flex-wrap items-center gap-3">
                 <input v-model="myDriveFilter" @input="reloadMyDrives(1)" placeholder="Filter by name…"
-                       class="rounded-lg border px-3 py-1.5 text-sm">
+                       class="dohub-filter-input rounded-lg border px-3 py-1.5 text-sm">
                 <span class="text-sm text-slate-500" v-text="'Page ' + myDrivePagination.page + ' / ' + myDrivePagination.pages"></span>
             </div>
 
             <p v-if="myDrivePagination.total===0 && !myDriveFilter" class="text-sm text-slate-500">No drives yet. Use <strong>Create drive</strong> or <strong>Bulk create drive</strong> to provision a DirectPV volume.</p>
             <p v-else-if="myDrives.length===0" class="text-sm text-slate-500">No drives match your filter.</p>
 
-            <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            <div class="dohub-card-grid grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
                 <div v-for="d in myDrives" :key="d.id"
                      class="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm transition"
                      :class="statusPending.myDrives ? 'opacity-60 pointer-events-none select-none' : ''">
@@ -130,7 +160,7 @@
                 </button>
             </div>
 
-            <section class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm space-y-4">
+            <section class="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm space-y-4 sm:p-5">
                 <h3 class="font-bold text-slate-900">Cluster information</h3>
                 <p v-if="clusterLoading && !clusterOverview" class="text-sm text-slate-500">Loading cluster data…</p>
                 <template v-else-if="clusterOverview">
@@ -178,7 +208,7 @@
                 </div>
             </section>
 
-            <section class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm space-y-3">
+            <section class="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm space-y-3 sm:p-5">
                 <h3 class="font-bold text-slate-900">Kubernetes nodes</h3>
                 <p v-if="clusterOverview && clusterOverview.nodes.error" class="text-sm text-rose-600" v-text="clusterOverview.nodes.error"></p>
                 <div v-else-if="clusterOverview && clusterOverview.nodes.nodes.length" class="overflow-x-auto">
@@ -218,7 +248,7 @@
                 <p v-else class="text-sm text-slate-500">No nodes reported.</p>
             </section>
 
-            <section class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm space-y-3">
+            <section class="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm space-y-3 sm:p-5">
                 <h3 class="font-bold text-slate-900">DirectPV drives</h3>
                 <p class="text-xs text-slate-500">From <code class="rounded bg-slate-100 px-1">kubectl directpv list drives</code></p>
                 <p v-if="clusterOverview && clusterOverview.directpv.error" class="text-sm text-rose-600" v-text="clusterOverview.directpv.error"></p>
@@ -250,7 +280,7 @@
                 <p v-else class="text-sm text-slate-500">No DirectPV drives listed.</p>
             </section>
 
-            <section class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm space-y-4">
+            <section class="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm space-y-4 sm:p-5">
                 <div class="flex flex-wrap items-start justify-between gap-3">
                     <div>
                         <h3 class="font-bold text-slate-900">DirectPV discover</h3>
@@ -330,8 +360,8 @@
         </section>
 
         <!-- DirectPV init confirm -->
-        <div v-if="showDirectpvInitConfirm" class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-            <div class="w-full max-w-md rounded-2xl border border-rose-200 bg-white p-6 shadow-xl">
+        <div v-if="showDirectpvInitConfirm" class="dohub-modal-backdrop fixed inset-0 z-50 flex justify-center bg-black/40">
+            <div class="dohub-modal-panel w-full max-w-md border border-rose-200 bg-white p-6 shadow-xl sm:mx-auto sm:rounded-2xl">
                 <h3 class="text-lg font-bold text-rose-700">Initialize DirectPV drives?</h3>
                 <p class="mt-2 text-sm text-slate-600">
                     This runs <code class="rounded bg-slate-100 px-1">kubectl directpv init … --dangerous</code>
@@ -370,7 +400,7 @@
             <template v-if="adminDrivesTab==='drives'">
                 <div class="flex flex-wrap items-center gap-3">
                     <input v-model="adminDriveFilter" @input="reloadAdminDrives(1)" placeholder="Filter by username…"
-                           class="rounded-lg border px-3 py-1.5 text-sm">
+                           class="dohub-filter-input rounded-lg border px-3 py-1.5 text-sm">
                     <span class="text-sm text-slate-500" v-text="'Page ' + adminDrivePagination.page + ' / ' + adminDrivePagination.pages"></span>
                 </div>
                 <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
@@ -415,34 +445,34 @@
         </section>
 
         <!-- My servers -->
-        <section v-if="is_login && menu==='servers'" class="space-y-4">
+        <section v-if="is_login && menu==='servers'" class="min-w-0 space-y-4">
             <div class="flex flex-wrap items-center justify-between gap-3">
                 <div>
                     <h2 class="text-lg font-bold text-slate-900">My servers</h2>
                     <p v-if="resourceLimits.limited && resourceLimits.limits.max_servers" class="text-xs text-slate-500 mt-0.5"
                        v-text="'Servers: ' + (resourceLimits.limits.server_count ?? myServerPagination.total) + ' / ' + resourceLimits.limits.max_servers"></p>
                 </div>
-                <div class="flex flex-wrap items-center gap-2">
+                <div class="flex flex-wrap items-center gap-2 w-full sm:w-auto">
                     <button type="button" @click="openCreateServerModal" :disabled="!canCreateMoreServers"
-                            class="rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700 disabled:opacity-40">
+                            class="w-full sm:w-auto rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700 disabled:opacity-40">
                         Create server
                     </button>
                     <button type="button" @click="openBulkCreateServerModal" :disabled="!canCreateMoreServers"
-                            class="rounded-lg border border-indigo-200 bg-indigo-50 px-4 py-2 text-sm font-semibold text-indigo-700 hover:bg-indigo-100 disabled:opacity-40">
+                            class="w-full sm:w-auto rounded-lg border border-indigo-200 bg-indigo-50 px-4 py-2 text-sm font-semibold text-indigo-700 hover:bg-indigo-100 disabled:opacity-40">
                         Bulk create server
                     </button>
                 </div>
             </div>
             <div class="flex flex-wrap items-center gap-3">
                 <input v-model="myServerFilter" @input="reloadMyWorkspaces(1)" placeholder="Filter by name…"
-                       class="rounded-lg border px-3 py-1.5 text-sm">
+                       class="dohub-filter-input rounded-lg border px-3 py-1.5 text-sm">
                 <span class="text-sm text-slate-500" v-text="'Page ' + myServerPagination.page + ' / ' + myServerPagination.pages"></span>
             </div>
 
             <p v-if="myServerPagination.total===0 && !myServerFilter" class="text-sm text-slate-500">No servers yet. Use <strong>Create server</strong> or <strong>Bulk create server</strong> to get started.</p>
             <p v-else-if="myWorkspaces.length===0" class="text-sm text-slate-500">No servers match your filter.</p>
 
-            <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+            <div class="dohub-card-grid grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
                 <workspace-card v-for="ws in myWorkspaces" :key="ws.id" :ws="ws"
                                 :disabled="statusPending.myWorkspaces"
                                 @detail="openWorkspaceModal" @copy="copyWorkspaceUrl"
@@ -474,16 +504,16 @@
             <template v-if="adminUsersTab==='users'">
                 <div class="flex flex-wrap items-center gap-3">
                     <input v-model="adminUserFilter" @input="loadAdminUsers(1)" placeholder="Filter by username or email…"
-                           class="rounded-lg border px-3 py-1.5 text-sm">
+                           class="dohub-filter-input rounded-lg border px-3 py-1.5 text-sm">
                     <select v-model="adminUserStatus" @change="loadAdminUsers(1)"
-                            class="rounded-lg border px-3 py-1.5 text-sm">
+                            class="dohub-filter-input rounded-lg border px-3 py-1.5 text-sm">
                         <option value="">All statuses</option>
                         <option value="accepted">Accepted</option>
                         <option value="pending">Pending</option>
                     </select>
                     <span class="text-sm text-slate-500" v-text="'Page ' + adminUserPagination.page + ' / ' + adminUserPagination.pages + ' (' + adminUserPagination.total + ' users)'"></span>
                 </div>
-                <div class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+                <div class="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
                     <p v-if="userList.length===0" class="text-sm text-slate-500">No users match this filter.</p>
                     <user-row v-for="u in userList" :key="u.username" :user="u"
                               @accept="adminAcceptUser(u)" @delete="adminDeleteUser(u)"
@@ -549,10 +579,10 @@
             <template v-if="adminServersTab==='servers'">
                 <div class="flex flex-wrap items-center gap-3">
                     <input v-model="adminServerFilter" @input="reloadAdminWorkspaces(1)" placeholder="Filter by username…"
-                           class="rounded-lg border px-3 py-1.5 text-sm">
+                           class="dohub-filter-input rounded-lg border px-3 py-1.5 text-sm">
                     <span class="text-sm text-slate-500" v-text="'Page ' + adminPagination.page + ' / ' + adminPagination.pages"></span>
                 </div>
-                <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+                <div class="dohub-card-grid grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
                     <workspace-card v-for="ws in adminWorkspaces" :key="ws.id" :ws="ws" :show-owner="true"
                                     :disabled="statusPending.adminWorkspaces"
                                     @detail="openWorkspaceModal" @copy="copyWorkspaceUrl"
@@ -573,7 +603,8 @@
 
                     <div class="space-y-2">
                         <h4 class="text-xs font-semibold uppercase tracking-wide text-slate-500">Quick templates</h4>
-                        <table class="w-full text-xs">
+                        <div class="dohub-table-scroll -mx-1 px-1">
+                        <table class="w-full min-w-[640px] text-xs">
                             <thead><tr class="border-b text-left text-slate-500">
                                 <th class="py-1 pr-2">Name</th><th>CPU</th><th>RAM</th><th>GPU</th><th>Icon</th><th>Docker</th><th>Ports</th><th>Mounts</th><th>Active</th><th></th>
                             </tr></thead>
@@ -594,7 +625,8 @@
                                 </tr>
                             </tbody>
                         </table>
-                        <div class="grid gap-2 sm:grid-cols-6 pt-2">
+                        </div>
+                        <div class="grid gap-2 grid-cols-1 sm:grid-cols-6 pt-2">
                             <input v-model="newPlanTemplate.name" placeholder="Name" class="rounded-lg border px-2 py-1.5 text-sm">
                             <input v-model.number="newPlanTemplate.cpu" type="number" min="0.1" step="0.1" placeholder="CPU" class="rounded-lg border px-2 py-1.5 text-sm">
                             <input v-model="newPlanTemplate.ram" placeholder="RAM" class="rounded-lg border px-2 py-1.5 text-sm font-mono">
@@ -645,7 +677,7 @@
         </section>
 
         <!-- Admin docker images -->
-        <section v-if="is_login && menu==='admin-images' && is_admin" class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm space-y-4">
+        <section v-if="is_login && menu==='admin-images' && is_admin" class="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm space-y-4 sm:p-5">
             <h2 class="text-lg font-bold text-slate-900">Docker images</h2>
             <div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
                 <input v-model="newImage.label" placeholder="Label" class="rounded-lg border px-3 py-2 text-sm">
@@ -654,7 +686,8 @@
                 <input v-model="newImage.tags_text" placeholder="Tags (comma-separated)" class="rounded-lg border px-3 py-2 text-sm font-mono sm:col-span-2 lg:col-span-3">
             </div>
             <button @click="createDockerImage" class="rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white">Add image</button>
-            <table class="w-full text-sm">
+            <div class="dohub-table-scroll -mx-1 px-1">
+            <table class="w-full min-w-[560px] text-sm">
                 <thead><tr class="border-b text-left text-slate-500">
                     <th class="py-2">Label</th><th>Repository</th><th>Default tag</th><th>Tags</th><th>Active</th><th></th>
                 </tr></thead>
@@ -669,14 +702,15 @@
                     </tr>
                 </tbody>
             </table>
+            </div>
         </section>
     </main>
 
     <!-- Workspace detail modal -->
-    <div v-if="modalWorkspace" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50">
-        <div class="max-h-[90vh] w-full overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-xl flex flex-col"
-             :class="modalTab === 'general' ? 'max-w-2xl' : 'max-w-4xl'">
-            <div class="shrink-0 flex items-center justify-between border-b border-slate-100 bg-white px-5 py-4">
+    <div v-if="modalWorkspace" class="dohub-modal-backdrop fixed inset-0 z-50 flex justify-center bg-slate-900/50">
+        <div class="dohub-modal-panel max-h-[90vh] w-full overflow-hidden border border-slate-200 bg-white shadow-xl flex flex-col"
+             :class="modalTab === 'general' ? 'max-w-2xl sm:mx-auto' : 'max-w-4xl sm:mx-auto'">
+            <div class="shrink-0 flex items-center justify-between border-b border-slate-100 bg-white px-4 py-3 sm:px-5 sm:py-4">
                 <div class="min-w-0 flex-1 pr-3">
                     <h3 class="text-lg font-bold text-slate-900 truncate" v-text="modalWorkspace.name"></h3>
                     <div class="mt-1 flex items-center gap-2">
@@ -688,7 +722,7 @@
                 </div>
                 <button type="button" @click="closeWorkspaceModal" class="text-slate-400 hover:text-slate-700"><i class="fa fa-times text-xl"></i></button>
             </div>
-            <div class="shrink-0 flex gap-1 border-b border-slate-100 bg-slate-50 px-5 pt-2">
+            <div class="shrink-0 dohub-modal-tabs flex gap-1 border-b border-slate-100 bg-slate-50 px-3 pt-2 sm:px-5">
                 <button type="button" @click="switchModalTab('general')"
                         :class="modalTab==='general' ? 'border-blue-600 text-blue-700 bg-white' : 'border-transparent text-slate-500 hover:text-slate-700'"
                         class="rounded-t-lg border-b-2 px-4 py-2 text-xs font-semibold">General</button>
@@ -699,7 +733,7 @@
                         :class="modalTab==='describe' ? 'border-blue-600 text-blue-700 bg-white' : 'border-transparent text-slate-500 hover:text-slate-700'"
                         class="rounded-t-lg border-b-2 px-4 py-2 text-xs font-semibold">Describe</button>
             </div>
-            <div class="flex-1 overflow-y-auto px-5 py-4 text-sm min-h-0">
+            <div class="flex-1 overflow-y-auto px-4 py-4 text-sm min-h-0 sm:px-5">
 
             <!-- General tab -->
             <div v-show="modalTab==='general'" class="space-y-4">
@@ -900,9 +934,9 @@
     </div>
 
     <!-- Create server modal -->
-    <div v-if="showCreateServerModal" class="fixed inset-0 z-[55] flex items-center justify-center p-4 bg-slate-900/50">
-        <div class="w-full max-w-5xl rounded-2xl border border-slate-200 bg-white shadow-xl max-h-[92vh] overflow-y-auto">
-            <div class="flex items-center justify-between border-b border-slate-100 px-5 py-4 sticky top-0 bg-white z-10">
+    <div v-if="showCreateServerModal" class="dohub-modal-backdrop fixed inset-0 z-[55] flex justify-center bg-slate-900/50">
+        <div class="dohub-modal-panel w-full max-w-5xl border border-slate-200 bg-white shadow-xl max-h-[92vh] overflow-y-auto sm:mx-auto">
+            <div class="flex items-center justify-between border-b border-slate-100 px-4 py-3 sticky top-0 bg-white z-10 sm:px-5 sm:py-4">
                 <div>
                     <h3 class="text-lg font-bold text-slate-900">Create server</h3>
                     <p class="mt-0.5 text-xs text-slate-500">Configure and deploy a codehub workspace.</p>
@@ -1061,9 +1095,9 @@
     </div>
 
     <!-- Bulk create server modal -->
-    <div v-if="showBulkCreateServerModal" class="fixed inset-0 z-[55] flex items-center justify-center p-4 bg-slate-900/50">
-        <div class="w-full max-w-lg rounded-2xl border border-slate-200 bg-white shadow-xl max-h-[90vh] overflow-y-auto">
-            <div class="flex items-center justify-between border-b border-slate-100 px-5 py-4 sticky top-0 bg-white">
+    <div v-if="showBulkCreateServerModal" class="dohub-modal-backdrop fixed inset-0 z-[55] flex justify-center bg-slate-900/50">
+        <div class="dohub-modal-panel w-full max-w-lg border border-slate-200 bg-white shadow-xl max-h-[90vh] overflow-y-auto sm:mx-auto">
+            <div class="flex items-center justify-between border-b border-slate-100 px-4 py-3 sticky top-0 bg-white sm:px-5 sm:py-4">
                 <div>
                     <h3 class="text-lg font-bold text-slate-900">Bulk create server</h3>
                     <p class="mt-0.5 text-xs text-slate-500">Import many servers from JSON or CSV.</p>
@@ -1121,8 +1155,8 @@
     </div>
 
     <!-- Create drive modal -->
-    <div v-if="showCreateDriveModal" class="fixed inset-0 z-[55] flex items-center justify-center p-4 bg-slate-900/50">
-        <div class="w-full max-w-md rounded-2xl border border-slate-200 bg-white shadow-xl">
+    <div v-if="showCreateDriveModal" class="dohub-modal-backdrop fixed inset-0 z-[55] flex justify-center bg-slate-900/50">
+        <div class="dohub-modal-panel w-full max-w-md border border-slate-200 bg-white shadow-xl sm:mx-auto">
             <div class="flex items-center justify-between border-b border-slate-100 px-5 py-4">
                 <div>
                     <h3 class="text-lg font-bold text-slate-900">Create drive</h3>
@@ -1158,9 +1192,9 @@
     </div>
 
     <!-- Bulk create drive modal -->
-    <div v-if="showBulkCreateDriveModal" class="fixed inset-0 z-[55] flex items-center justify-center p-4 bg-slate-900/50">
-        <div class="w-full max-w-lg rounded-2xl border border-slate-200 bg-white shadow-xl max-h-[90vh] overflow-y-auto">
-            <div class="flex items-center justify-between border-b border-slate-100 px-5 py-4 sticky top-0 bg-white">
+    <div v-if="showBulkCreateDriveModal" class="dohub-modal-backdrop fixed inset-0 z-[55] flex justify-center bg-slate-900/50">
+        <div class="dohub-modal-panel w-full max-w-lg border border-slate-200 bg-white shadow-xl max-h-[90vh] overflow-y-auto sm:mx-auto">
+            <div class="flex items-center justify-between border-b border-slate-100 px-4 py-3 sticky top-0 bg-white sm:px-5 sm:py-4">
                 <div>
                     <h3 class="text-lg font-bold text-slate-900">Bulk create drive</h3>
                     <p class="mt-0.5 text-xs text-slate-500">Import many drives from JSON or CSV.</p>
@@ -1210,8 +1244,8 @@
     </div>
 
     <!-- Delete drive confirmation -->
-    <div v-if="deleteModalDrive" class="fixed inset-0 z-[55] flex items-center justify-center p-4 bg-slate-900/50">
-        <div class="w-full max-w-md rounded-2xl border border-slate-200 bg-white shadow-xl">
+    <div v-if="deleteModalDrive" class="dohub-modal-backdrop fixed inset-0 z-[55] flex justify-center bg-slate-900/50">
+        <div class="dohub-modal-panel w-full max-w-md border border-slate-200 bg-white shadow-xl sm:mx-auto">
             <div class="border-b border-slate-100 px-5 py-4">
                 <h3 class="text-lg font-bold text-slate-900">Delete drive</h3>
                 <p class="mt-1 text-sm text-slate-500">Type <kbd class="rounded bg-slate-100 px-1 font-mono text-xs">delete</kbd> to remove <strong v-text="deleteModalDrive.name"></strong> and its PVC.</p>
@@ -1228,8 +1262,8 @@
     </div>
 
     <!-- Delete server confirmation -->
-    <div v-if="deleteModalWorkspace" class="fixed inset-0 z-[55] flex items-center justify-center p-4 bg-slate-900/50">
-        <div class="w-full max-w-md rounded-2xl border border-slate-200 bg-white shadow-xl">
+    <div v-if="deleteModalWorkspace" class="dohub-modal-backdrop fixed inset-0 z-[55] flex justify-center bg-slate-900/50">
+        <div class="dohub-modal-panel w-full max-w-md border border-slate-200 bg-white shadow-xl sm:mx-auto">
             <div class="border-b border-slate-100 px-5 py-4">
                 <h3 class="text-lg font-bold text-slate-900">Delete server</h3>
                 <p class="mt-1 text-sm text-slate-500">
@@ -1261,9 +1295,9 @@
     </div>
 
     <!-- Edit quick template -->
-    <div v-if="showPlanTemplateModal" class="fixed inset-0 z-[55] flex items-center justify-center p-4 bg-slate-900/50">
-        <div class="w-full max-w-lg rounded-2xl border border-slate-200 bg-white shadow-xl max-h-[90vh] overflow-y-auto">
-            <div class="flex items-center justify-between border-b border-slate-100 px-5 py-4 sticky top-0 bg-white z-10">
+    <div v-if="showPlanTemplateModal" class="dohub-modal-backdrop fixed inset-0 z-[55] flex justify-center bg-slate-900/50">
+        <div class="dohub-modal-panel w-full max-w-lg border border-slate-200 bg-white shadow-xl max-h-[90vh] overflow-y-auto sm:mx-auto">
+            <div class="flex items-center justify-between border-b border-slate-100 px-4 py-3 sticky top-0 bg-white z-10 sm:px-5 sm:py-4">
                 <h3 class="text-lg font-bold text-slate-900">Edit quick template</h3>
                 <button type="button" @click="closePlanTemplateModal" class="text-slate-400 hover:text-slate-700"><i class="fa fa-times text-xl"></i></button>
             </div>
@@ -1340,8 +1374,8 @@
     </div>
 
     <!-- Create / edit resource group -->
-    <div v-if="showGroupFormModal" class="fixed inset-0 z-[55] flex items-center justify-center p-4 bg-slate-900/50">
-        <div class="w-full max-w-md rounded-2xl border border-slate-200 bg-white shadow-xl">
+    <div v-if="showGroupFormModal" class="dohub-modal-backdrop fixed inset-0 z-[55] flex justify-center bg-slate-900/50">
+        <div class="dohub-modal-panel w-full max-w-md border border-slate-200 bg-white shadow-xl sm:mx-auto">
             <div class="flex items-center justify-between border-b border-slate-100 px-5 py-4">
                 <h3 class="text-lg font-bold text-slate-900" v-text="editingGroup ? 'Edit group' : 'Create group'"></h3>
                 <button type="button" @click="closeGroupFormModal" class="text-slate-400 hover:text-slate-700"><i class="fa fa-times text-xl"></i></button>
@@ -1395,9 +1429,9 @@
     </div>
 
     <!-- Group members -->
-    <div v-if="groupMembersModal" class="fixed inset-0 z-[55] flex items-center justify-center p-4 bg-slate-900/50">
-        <div class="w-full max-w-lg rounded-2xl border border-slate-200 bg-white shadow-xl max-h-[90vh] overflow-y-auto">
-            <div class="flex items-center justify-between border-b border-slate-100 px-5 py-4 sticky top-0 bg-white z-10">
+    <div v-if="groupMembersModal" class="dohub-modal-backdrop fixed inset-0 z-[55] flex justify-center bg-slate-900/50">
+        <div class="dohub-modal-panel w-full max-w-lg border border-slate-200 bg-white shadow-xl max-h-[90vh] overflow-y-auto sm:mx-auto">
+            <div class="flex items-center justify-between border-b border-slate-100 px-4 py-3 sticky top-0 bg-white z-10 sm:px-5 sm:py-4">
                 <div>
                     <h3 class="text-lg font-bold text-slate-900" v-text="'Members — ' + groupMembersModal.name"></h3>
                     <p class="text-xs text-slate-500 mt-0.5">Search by username or email, or paste a list of emails.</p>
@@ -1449,9 +1483,9 @@
         </div>
     </div>
 
-    <div v-if="toastMessage" class="fixed bottom-6 right-6 z-[60] rounded-lg bg-slate-900 px-4 py-2 text-sm text-white shadow-lg" v-text="toastMessage"></div>
+    <div v-if="toastMessage" class="dohub-toast fixed z-[60] rounded-lg bg-slate-900 px-4 py-2.5 text-sm text-white shadow-lg" v-text="toastMessage"></div>
 
-    <footer class="border-t border-slate-200 bg-white py-4 text-center text-sm text-slate-500">
+    <footer class="border-t border-slate-200 bg-white px-4 py-4 text-center text-sm text-slate-500">
         <span class="font-semibold text-slate-700">Dohub</span>
         <span class="mx-2 text-slate-300">·</span>
         <span>Contribute by <a href="https://daovietanh190499.github.io" target="_blank" rel="noopener noreferrer"
