@@ -54,6 +54,7 @@ sidecarIngress:
   enabled: false
   host: ""
   tlsSecretName: tls-dohub-secret
+  priority: "1000"
 
 # Expose main-container TCP ports through wstunnel over HTTPS (separate from SSH tunnel)
 portTunnel:
@@ -86,6 +87,10 @@ monitor:
 
 ingress:
   enabled: true
+  # Ingress implementation: auto | nginx | traefik | both
+  # - auto: Traefik when traefik.io Middleware CRD exists, else nginx
+  # - both: nginx rewrite annotations + Traefik middleware (works on most clusters)
+  controller: both
   className: nginx
   annotations:
     nginx.ingress.kubernetes.io/proxy-body-size: "0"

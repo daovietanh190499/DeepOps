@@ -19,7 +19,9 @@ metadata:
   labels:
     {{- include "codehub.labels" . | nindent 4 }}
   annotations:
+    {{- if eq (include "codehub.ingressUsesNginx" .) "true" }}
     nginx.ingress.kubernetes.io/websocket-services: {{ $fullName | quote }}
+    {{- end }}
     {{- with .Values.ingress.annotations }}
     {{- toYaml . | nindent 4 }}
     {{- end }}

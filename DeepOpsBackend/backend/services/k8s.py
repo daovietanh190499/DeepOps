@@ -12,6 +12,40 @@ def _storage_class() -> str:
     return get_hub_config().get('storage', {}).get('storageClassName', 'directpv-min-io')
 
 
+def _ingress_settings() -> dict:
+    ingress = get_hub_config().get('ingress') or {}
+    if not isinstance(ingress, dict):
+        ingress = {}
+    controller = str(ingress.get('controller') or 'both').strip().lower()
+    if controller not in ('auto', 'nginx', 'traefik', 'both'):
+        controller = 'both'
+    class_name = str(ingress.get('className') or 'nginx').strip() or 'nginx'
+    return {'controller': controller, 'className': class_name}
+
+
+def _ingress_uses_nginx() -> bool:
+    controller = _ingress_settings()['controller']
+    return controller in ('nginx', 'both')
+
+
+def _ingress_helm_flags() -> list[str]:
+    settings = _ingress_settings()
+    flags = [
+        '--set', 'ingress.enabled=true',
+        '--set-string', f'ingress.controller={settings["controller"]}',
+        '--set', f'ingress.className={settings["className"]}',
+    ]
+    if _ingress_uses_nginx():
+        flags.extend([
+            '--set-string', 'ingress.annotations.nginx\\.ingress\\.kubernetes\\.io/proxy-body-size=0',
+            '--set-string', 'ingress.annotations.nginx\\.ingress\\.kubernetes\\.io/proxy-read-timeout=600',
+            '--set-string', 'ingress.annotations.nginx\\.ingress\\.kubernetes\\.io/proxy-send-timeout=600',
+            '--set-string', 'ingress.annotations.nginx\\.ingress\\.kubernetes\\.io/proxy-buffering=off',
+            '--set-string', 'ingress.annotations.nginx\\.ingress\\.kubernetes\\.io/proxy-http-version=1.1',
+        ])
+    return flags
+
+
 def _helm_release_status(release_name: str) -> str | None:
     """Return helm release status, or None if the release name is not reserved."""
     result = subprocess.run(
@@ -180,13 +214,7 @@ def _helm_base_cmd(config: dict) -> list[str]:
         *_security_context_helm_flags(config.get('privileged', False)),
         '--set', 'service.type=ClusterIP',
         '--set', f'service.port={config["defaultPort"]}',
-        '--set', 'ingress.enabled=true',
-        '--set-string', 'ingress.annotations.nginx\\.ingress\\.kubernetes\\.io/proxy-body-size=0',
-        '--set-string', 'ingress.annotations.nginx\\.ingress\\.kubernetes\\.io/proxy-read-timeout=600',
-        '--set-string', 'ingress.annotations.nginx\\.ingress\\.kubernetes\\.io/proxy-send-timeout=600',
-        '--set-string', 'ingress.annotations.nginx\\.ingress\\.kubernetes\\.io/proxy-buffering=off',
-        '--set-string', 'ingress.annotations.nginx\\.ingress\\.kubernetes\\.io/proxy-http-version=1.1',
-        '--set', 'ingress.className=nginx',
+        *_ingress_helm_flags(),
         '--set', f'ingress.hosts[0].host={config["hostname"]}',
         '--set', 'ingress.hosts[0].paths[0].path=/',
         '--set', 'ingress.hosts[0].paths[0].pathType=Prefix',

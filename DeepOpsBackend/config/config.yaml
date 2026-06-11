@@ -1,3 +1,7 @@
+ingress:
+  controller: both
+  className: nginx
+
 storage:
   storageClassName: directpv-min-io
   volumeMode: Filesystem
