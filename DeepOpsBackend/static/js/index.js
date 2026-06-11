@@ -549,7 +549,26 @@ const appVue = new Vue({
             loading: false,
             error: '',
         },
+        monitorWindowOptions: [
+            { minutes: 5, label: '5 min' },
+            { minutes: 15, label: '15 min' },
+            { minutes: 30, label: '30 min' },
+            { minutes: 60, label: '1 hour' },
+            { minutes: 300, label: '5 hours' },
+        ],
+        workspaceMonitor: {
+            points: [],
+            loading: false,
+            error: '',
+            pods: [],
+            selectedPod: '',
+            hasGpu: false,
+            windowMinutes: 300,
+            windowLabel: '5 hours',
+        },
         workspaceLogsTimer: null,
+        workspaceMonitorTimer: null,
+        monitorChartInstances: {},
         workspaceLogsAutoScroll: true,
         userList: [],
         adminUserFilter: '',
@@ -977,6 +996,17 @@ const appVue = new Vue({
                 selectedContainer: '',
             }
             this.workspaceDescribe = { text: '', loading: false, error: '' }
+            this.workspaceMonitor = {
+                points: [],
+                loading: false,
+                error: '',
+                pods: [],
+                selectedPod: '',
+                hasGpu: false,
+                windowMinutes: 300,
+                windowLabel: '5 hours',
+            }
+            this.destroyMonitorCharts()
             this.workspaceLogsAutoScroll = true
             this.modalWorkspace = { ...ws, env_vars: { ...(ws.env_vars || {}) } }
             this.sshPrivateKeyOnce = ''
@@ -1001,6 +1031,8 @@ const appVue = new Vue({
         },
         closeWorkspaceModal() {
             this.stopWorkspaceLogsPoll()
+            this.stopWorkspaceMonitorPoll()
+            this.destroyMonitorCharts()
             this.modalTab = 'general'
             this.modalWorkspace = null
             this.sshPrivateKeyOnce = ''
@@ -1011,12 +1043,20 @@ const appVue = new Vue({
         },
         switchModalTab(tab) {
             this.modalTab = tab
+            this.stopWorkspaceLogsPoll()
+            this.stopWorkspaceMonitorPoll()
             if (tab === 'logs') {
+                this.destroyMonitorCharts()
                 this.fetchWorkspaceLogs()
                 this.startWorkspaceLogsPoll()
                 return
             }
-            this.stopWorkspaceLogsPoll()
+            if (tab === 'monitor') {
+                this.fetchWorkspaceMonitor()
+                this.startWorkspaceMonitorPoll()
+                return
+            }
+            this.destroyMonitorCharts()
             if (tab === 'describe' && !this.workspaceDescribe.text && !this.workspaceDescribe.loading) {
                 this.fetchWorkspaceDescribe()
             }
@@ -1106,6 +1146,198 @@ const appVue = new Vue({
             } finally {
                 if (this.modalWorkspace && this.modalWorkspace.id === ws.id) {
                     this.workspaceDescribe.loading = false
+                }
+            }
+        },
+        startWorkspaceMonitorPoll() {
+            this.stopWorkspaceMonitorPoll()
+            this.workspaceMonitorTimer = setInterval(() => {
+                if (this.modalTab === 'monitor' && this.modalWorkspace) {
+                    this.fetchWorkspaceMonitor(true)
+                }
+            }, 2000)
+        },
+        stopWorkspaceMonitorPoll() {
+            if (this.workspaceMonitorTimer) {
+                clearInterval(this.workspaceMonitorTimer)
+                this.workspaceMonitorTimer = null
+            }
+        },
+        onWorkspaceMonitorPodChange() {
+            this.fetchWorkspaceMonitor()
+        },
+        onWorkspaceMonitorWindowChange() {
+            this.fetchWorkspaceMonitor()
+        },
+        formatMonitorTime(iso) {
+            if (!iso) return ''
+            const d = new Date(iso)
+            if (Number.isNaN(d.getTime())) return iso
+            const mins = this.workspaceMonitor.windowMinutes || 300
+            if (mins <= 30) {
+                return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })
+            }
+            return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+        },
+        destroyMonitorCharts() {
+            const keys = ['cpu', 'memory', 'gpuUtil', 'gpuMem']
+            keys.forEach((key) => {
+                if (this.monitorChartInstances[key]) {
+                    this.monitorChartInstances[key].destroy()
+                    this.monitorChartInstances[key] = null
+                }
+            })
+        },
+        monitorChartOptions(title, color) {
+            return {
+                responsive: true,
+                maintainAspectRatio: false,
+                animation: false,
+                interaction: { intersect: false, mode: 'index' },
+                plugins: {
+                    legend: { display: false },
+                    title: {
+                        display: true,
+                        text: title,
+                        color: '#334155',
+                        font: { size: 12, weight: '600' },
+                        padding: { bottom: 8 },
+                    },
+                },
+                scales: {
+                    x: {
+                        display: true,
+                        ticks: {
+                            maxTicksLimit: 8,
+                            color: '#94a3b8',
+                            font: { size: 10 },
+                        },
+                        grid: { display: false },
+                    },
+                    y: {
+                        min: 0,
+                        max: 100,
+                        ticks: {
+                            stepSize: 25,
+                            color: '#94a3b8',
+                            font: { size: 10 },
+                            callback: (v) => v + '%',
+                        },
+                        grid: { color: 'rgba(148, 163, 184, 0.2)' },
+                    },
+                },
+                elements: {
+                    line: { borderWidth: 2, tension: 0.15 },
+                    point: { radius: 0, hitRadius: 8, hoverRadius: 3 },
+                },
+            }
+        },
+        upsertMonitorChart(key, canvasRef, title, borderColor, fillColor, labels, values) {
+            if (typeof Chart === 'undefined') return
+            const canvas = canvasRef
+            if (!canvas) return
+            const dataset = {
+                label: title,
+                data: values,
+                borderColor: borderColor,
+                backgroundColor: fillColor,
+                fill: true,
+            }
+            if (this.monitorChartInstances[key]) {
+                const chart = this.monitorChartInstances[key]
+                chart.data.labels = labels
+                chart.data.datasets[0].data = values
+                chart.update('none')
+                return
+            }
+            this.monitorChartInstances[key] = new Chart(canvas, {
+                type: 'line',
+                data: { labels, datasets: [dataset] },
+                options: this.monitorChartOptions(title, borderColor),
+            })
+        },
+        renderMonitorCharts() {
+            const pts = this.workspaceMonitor.points || []
+            const labels = pts.map((p) => this.formatMonitorTime(p.ts))
+            this.$nextTick(() => {
+                this.upsertMonitorChart(
+                    'cpu',
+                    this.$refs.monitorChartCpu,
+                    'CPU utilization',
+                    'rgb(59, 130, 246)',
+                    'rgba(59, 130, 246, 0.28)',
+                    labels,
+                    pts.map((p) => p.cpu_pct),
+                )
+                this.upsertMonitorChart(
+                    'memory',
+                    this.$refs.monitorChartMemory,
+                    'RAM utilization',
+                    'rgb(16, 185, 129)',
+                    'rgba(16, 185, 129, 0.28)',
+                    labels,
+                    pts.map((p) => p.memory_pct),
+                )
+                if (this.workspaceMonitor.hasGpu) {
+                    this.upsertMonitorChart(
+                        'gpuUtil',
+                        this.$refs.monitorChartGpuUtil,
+                        'GPU utilization',
+                        'rgb(168, 85, 247)',
+                        'rgba(168, 85, 247, 0.28)',
+                        labels,
+                        pts.map((p) => (p.gpu_util_pct == null ? null : p.gpu_util_pct)),
+                    )
+                    this.upsertMonitorChart(
+                        'gpuMem',
+                        this.$refs.monitorChartGpuMem,
+                        'GPU memory',
+                        'rgb(245, 158, 11)',
+                        'rgba(245, 158, 11, 0.28)',
+                        labels,
+                        pts.map((p) => (p.gpu_mem_pct == null ? null : p.gpu_mem_pct)),
+                    )
+                }
+            })
+        },
+        async fetchWorkspaceMonitor(silent) {
+            if (!this.modalWorkspace) return
+            if (!silent) this.workspaceMonitor.loading = true
+            const ws = this.modalWorkspace
+            const params = new URLSearchParams()
+            if (this.workspaceMonitor.selectedPod) params.set('pod', this.workspaceMonitor.selectedPod)
+            params.set('window', String(this.workspaceMonitor.windowMinutes || 300))
+            try {
+                const qs = params.toString()
+                const res = await fetch('workspaces/' + ws.id + '/monitor' + (qs ? '?' + qs : ''))
+                if (!this.modalWorkspace || this.modalWorkspace.id !== ws.id) return
+                const data = await res.json().catch(() => ({}))
+                const result = data.result || {}
+                if (res.status !== 200) {
+                    this.workspaceMonitor.error = data.message || 'Failed to load monitor metrics'
+                    return
+                }
+                this.workspaceMonitor.points = result.points || []
+                this.workspaceMonitor.pods = result.pods || []
+                this.workspaceMonitor.hasGpu = !!result.has_gpu
+                if (result.window_minutes) this.workspaceMonitor.windowMinutes = result.window_minutes
+                this.workspaceMonitor.windowLabel = result.window_label || this.workspaceMonitor.windowLabel
+                if (result.window_options && result.window_options.length) {
+                    this.monitorWindowOptions = result.window_options
+                }
+                if (result.selected_pod) this.workspaceMonitor.selectedPod = result.selected_pod
+                if (!this.workspaceMonitor.selectedPod && this.workspaceMonitor.pods.length) {
+                    this.workspaceMonitor.selectedPod = this.workspaceMonitor.pods[0].name
+                }
+                this.workspaceMonitor.error = result.error || ''
+                this.renderMonitorCharts()
+            } catch (e) {
+                if (this.modalWorkspace && this.modalWorkspace.id === ws.id) {
+                    this.workspaceMonitor.error = e.message || 'Failed to load monitor metrics'
+                }
+            } finally {
+                if (this.modalWorkspace && this.modalWorkspace.id === ws.id) {
+                    this.workspaceMonitor.loading = false
                 }
             }
         },

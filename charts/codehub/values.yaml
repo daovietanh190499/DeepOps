@@ -61,6 +61,22 @@ portTunnel:
   targetHost: 127.0.0.1
   ports: []
 
+# Resource monitor sidecar (kubectl top + optional nvidia-smi → JSONL log)
+monitor:
+  enabled: false
+  image:
+    repository: localhost:32000/monitor-sidecar
+    tag: latest
+    pullPolicy: Always
+  intervalSec: 2
+  maxLines: 9000
+  logDir: /tmp/monitor
+  targetContainer: codehub
+  cpuLimitMillicores: 2000
+  memoryLimitBytes: 4294967296
+  rbac:
+    create: true
+
 ingress:
   enabled: true
   className: nginx
@@ -109,6 +125,10 @@ serviceAccount:
   create: false
   automount: false
   name: default
+
+sidecar:
+  serviceAccount:
+    name: ""
 
 podSecurityContext:
   fsGroup: 100

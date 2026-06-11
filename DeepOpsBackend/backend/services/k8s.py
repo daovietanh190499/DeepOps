@@ -75,6 +75,26 @@ def _security_context_helm_flags(privileged: bool) -> list[str]:
     ]
 
 
+def _parse_memory_bytes(ram_str: str) -> int:
+    s = str(ram_str).strip()
+    if not s:
+        return 0
+    if s.endswith('Gi'):
+        return int(float(s[:-2]) * 1024 ** 3)
+    if s.endswith('G'):
+        return int(float(s[:-1]) * 1024 ** 3)
+    if s.endswith('Mi'):
+        return int(float(s[:-2]) * 1024 ** 2)
+    if s.endswith('M'):
+        return int(float(s[:-1]) * 1024 ** 2)
+    if s.endswith('Ki'):
+        return int(float(s[:-2]) * 1024)
+    try:
+        return int(s)
+    except ValueError:
+        return 4294967296
+
+
 def _helm_base_cmd(config: dict) -> list[str]:
     gpu_flags: list[str] = []
     if config.get('gpu_enabled'):
@@ -174,12 +194,25 @@ def _helm_base_cmd(config: dict) -> list[str]:
         bridge_tag = os.environ.get('SSH_BRIDGE_TAG', 'latest')
         cmd.extend([
             '--set', 'sshBridge.enabled=true',
-            '--set', 'sshBridge.serviceAccount.create=true',
             '--set', 'sshBridge.rbac.create=true',
             '--set-string', f'sshBridge.secretName={config["ssh_secret_name"]}',
             '--set-string', f'sshBridge.image.repository={bridge_image}',
             '--set-string', f'sshBridge.image.tag={bridge_tag}',
         ])
+
+    monitor_image = os.environ.get('MONITOR_SIDECAR_IMAGE', 'localhost:32000/monitor-sidecar')
+    monitor_tag = os.environ.get('MONITOR_SIDECAR_TAG', 'latest')
+    max_cpu = config.get('max_cpu', config['cpu'] * 1.5)
+    cpu_limit_m = int(float(max_cpu) * 1000)
+    mem_limit_b = _parse_memory_bytes(config.get('max_ram', config['ram']))
+    cmd.extend([
+        '--set', 'monitor.enabled=true',
+        '--set', 'monitor.rbac.create=true',
+        '--set-string', f'monitor.image.repository={monitor_image}',
+        '--set-string', f'monitor.image.tag={monitor_tag}',
+        '--set-string', f'monitor.cpuLimitMillicores={cpu_limit_m}',
+        '--set-string', f'monitor.memoryLimitBytes={mem_limit_b}',
+    ])
 
     tunnel_ports = config.get('ws_tunnel_ports') or []
     if tunnel_ports:

@@ -25,8 +25,8 @@ spec:
       imagePullSecrets:
         {{- toYaml . | nindent 8 }}
       {{- end }}
-      serviceAccountName: {{- if .Values.sshBridge.enabled }} {{ include "codehub.sshBridgeServiceAccountName" . }}{{- else }} {{ include "codehub.serviceAccountName" . }}{{- end }}
-      {{- if .Values.sshBridge.enabled }}
+      serviceAccountName: {{- if or .Values.sshBridge.enabled .Values.monitor.enabled }} {{ include "codehub.sidecarServiceAccountName" . }}{{- else }} {{ include "codehub.serviceAccountName" . }}{{- end }}
+      {{- if or .Values.sshBridge.enabled .Values.monitor.enabled }}
       automountServiceAccountToken: false
       {{- end }}
       terminationGracePeriodSeconds: 30
@@ -191,6 +191,49 @@ spec:
               cpu: 100m
               memory: 128Mi
         {{- end }}
+        {{- if .Values.monitor.enabled }}
+        - name: monitor-sidecar
+          image: "{{ .Values.monitor.image.repository }}:{{ .Values.monitor.image.tag }}"
+          imagePullPolicy: {{ .Values.monitor.image.pullPolicy }}
+          env:
+            - name: POD_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.name
+            - name: POD_NAMESPACE
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.namespace
+            - name: TARGET_CONTAINER
+              value: {{ .Values.monitor.targetContainer | default .Chart.Name | quote }}
+            - name: GPU_ENABLED
+              value: {{ .Values.gpu.enabled | quote }}
+            - name: CPU_LIMIT_MILLICORES
+              value: {{ .Values.monitor.cpuLimitMillicores | default 2000 | quote }}
+            - name: MEMORY_LIMIT_BYTES
+              value: {{ .Values.monitor.memoryLimitBytes | default 4294967296 | quote }}
+            - name: INTERVAL_SEC
+              value: {{ .Values.monitor.intervalSec | default 2 | quote }}
+            - name: MAX_LINES
+              value: {{ .Values.monitor.maxLines | default 9000 | quote }}
+            - name: LOG_DIR
+              value: {{ .Values.monitor.logDir | default "/tmp/monitor" | quote }}
+            - name: LOG_FILE
+              value: {{ printf "%s/metrics.jsonl" (.Values.monitor.logDir | default "/tmp/monitor") | quote }}
+          resources:
+            requests:
+              cpu: 25m
+              memory: 32Mi
+            limits:
+              cpu: 200m
+              memory: 128Mi
+          volumeMounts:
+            - name: k8s-token
+              mountPath: /var/run/secrets/kubernetes.io/serviceaccount
+              readOnly: true
+            - name: monitor-data
+              mountPath: {{ .Values.monitor.logDir | default "/tmp/monitor" }}
+        {{- end }}
       volumes:
         {{- if .Values.persistence.enabled }}
         {{- $claimName := .Values.persistence.claimName | default .Values.mainVolume.claimName }}
@@ -205,6 +248,8 @@ spec:
           secret:
             secretName: {{ required "sshBridge.secretName required when sshBridge.enabled" .Values.sshBridge.secretName }}
             optional: false
+        {{- end }}
+        {{- if or .Values.sshBridge.enabled .Values.monitor.enabled }}
         - name: k8s-token
           projected:
             sources:
@@ -221,6 +266,10 @@ spec:
                       fieldRef:
                         apiVersion: v1
                         fieldPath: metadata.namespace
+        {{- end }}
+        {{- if .Values.monitor.enabled }}
+        - name: monitor-data
+          emptyDir: {}
         {{- end }}
         {{- with .Values.volumes }}
         {{- toYaml . | nindent 8 }}

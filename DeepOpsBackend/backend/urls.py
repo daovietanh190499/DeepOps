@@ -59,6 +59,7 @@ urlpatterns = [
     path('workspaces/<uuid:workspace_id>/tunnel', tunnel_views.workspace_tunnel_info, name='workspace-tunnel-info'),
     path('workspaces/<uuid:workspace_id>/logs', ws_views.workspace_logs_view, name='workspace-logs'),
     path('workspaces/<uuid:workspace_id>/describe', ws_views.workspace_describe_view, name='workspace-describe'),
+    path('workspaces/<uuid:workspace_id>/monitor', ws_views.workspace_monitor_view, name='workspace-monitor'),
     path('workspaces/<uuid:workspace_id>/export', ws_views.workspace_export, name='workspace-export'),
     path('workspaces/<uuid:workspace_id>/start', ws_views.workspace_start, name='workspace-start'),
     path('workspaces/<uuid:workspace_id>/stop', ws_views.workspace_stop, name='workspace-stop'),

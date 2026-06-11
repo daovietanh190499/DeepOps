@@ -94,6 +94,33 @@ input[type="range"].dohub-range:disabled::-webkit-slider-thumb {
   white-space: nowrap;
 }
 
+.dohub-monitor-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 1rem;
+}
+
+@media (min-width: 768px) {
+  .dohub-monitor-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+.dohub-monitor-chart-wrap {
+  position: relative;
+  height: 11rem;
+  border: 1px solid #e2e8f0;
+  border-radius: 0.75rem;
+  background: #f8fafc;
+  padding: 0.5rem 0.75rem 0.75rem;
+}
+
+@media (min-width: 640px) {
+  .dohub-monitor-chart-wrap {
+    height: 12.5rem;
+  }
+}
+
 /* Full-width filters / toolbars on mobile */
 .dohub-filter-input {
   width: 100%;

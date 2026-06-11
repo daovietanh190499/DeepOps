@@ -732,6 +732,9 @@
                 <button type="button" @click="switchModalTab('describe')"
                         :class="modalTab==='describe' ? 'border-blue-600 text-blue-700 bg-white' : 'border-transparent text-slate-500 hover:text-slate-700'"
                         class="rounded-t-lg border-b-2 px-4 py-2 text-xs font-semibold">Describe</button>
+                <button type="button" @click="switchModalTab('monitor')"
+                        :class="modalTab==='monitor' ? 'border-blue-600 text-blue-700 bg-white' : 'border-transparent text-slate-500 hover:text-slate-700'"
+                        class="rounded-t-lg border-b-2 px-4 py-2 text-xs font-semibold">Monitor</button>
             </div>
             <div class="flex-1 overflow-y-auto px-4 py-4 text-sm min-h-0 sm:px-5">
 
@@ -927,6 +930,48 @@
                 <p v-if="workspaceDescribe.error" class="text-xs text-rose-600 whitespace-pre-wrap" v-text="workspaceDescribe.error"></p>
                 <pre class="flex-1 min-h-[40vh] max-h-[60vh] overflow-auto rounded-lg bg-slate-900 p-4 font-mono text-[11px] leading-relaxed text-slate-100 whitespace-pre-wrap"
                      v-text="workspaceDescribe.text || (workspaceDescribe.loading ? 'Loading describe output…' : 'Click Refresh to load kubectl describe output.')"></pre>
+            </div>
+
+            <!-- Monitor tab -->
+            <div v-show="modalTab==='monitor'" class="space-y-3 flex flex-col min-h-[50vh]">
+                <div class="flex flex-wrap items-center gap-2">
+                    <label class="text-xs text-slate-500">Pod</label>
+                    <select v-model="workspaceMonitor.selectedPod" @change="onWorkspaceMonitorPodChange"
+                            class="rounded-lg border px-2 py-1 text-xs font-mono min-w-[10rem]">
+                        <option v-if="!workspaceMonitor.pods.length" value="">No pods</option>
+                        <option v-for="p in workspaceMonitor.pods" :key="p.name" :value="p.name" v-text="p.name + ' (' + p.display + ')'"></option>
+                    </select>
+                    <label class="text-xs text-slate-500 ml-1">Range</label>
+                    <select v-model.number="workspaceMonitor.windowMinutes" @change="onWorkspaceMonitorWindowChange"
+                            class="rounded-lg border px-2 py-1 text-xs min-w-[6rem]">
+                        <option v-for="opt in monitorWindowOptions" :key="opt.minutes" :value="opt.minutes" v-text="opt.label"></option>
+                    </select>
+                    <button type="button" @click="fetchWorkspaceMonitor()" :disabled="workspaceMonitor.loading"
+                            class="ml-auto rounded-lg border px-3 py-1 text-xs font-semibold hover:bg-slate-50 disabled:opacity-50">
+                        <i class="fa fa-refresh" :class="workspaceMonitor.loading ? 'fa-spin' : ''"></i> Refresh
+                    </button>
+                </div>
+                <p class="text-[10px] text-slate-400">
+                    Auto-refreshes every 2s · Last {{ workspaceMonitor.windowLabel }} ·
+                    <code class="rounded bg-slate-100 px-1">monitor-sidecar</code>
+                </p>
+                <p v-if="workspaceMonitor.error" class="text-xs text-amber-700 whitespace-pre-wrap" v-text="workspaceMonitor.error"></p>
+                <p v-if="!workspaceMonitor.error && !workspaceMonitor.points.length && !workspaceMonitor.loading"
+                   class="text-xs text-slate-500">Waiting for metrics… Start the server or redeploy to include the monitor sidecar.</p>
+                <div class="dohub-monitor-grid">
+                    <div class="dohub-monitor-chart-wrap">
+                        <canvas ref="monitorChartCpu"></canvas>
+                    </div>
+                    <div class="dohub-monitor-chart-wrap">
+                        <canvas ref="monitorChartMemory"></canvas>
+                    </div>
+                    <div v-if="workspaceMonitor.hasGpu" class="dohub-monitor-chart-wrap">
+                        <canvas ref="monitorChartGpuUtil"></canvas>
+                    </div>
+                    <div v-if="workspaceMonitor.hasGpu" class="dohub-monitor-chart-wrap">
+                        <canvas ref="monitorChartGpuMem"></canvas>
+                    </div>
+                </div>
             </div>
 
             </div>
@@ -1494,6 +1539,7 @@
 </div>
 
 <script>var is_login = {% if is_login %}1{% else %}0{% endif %};</script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
 <script src="/static/js/vue.global.js"></script>
 <script src="/static/js/index.js"></script>
 </body>

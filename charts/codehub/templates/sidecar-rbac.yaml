@@ -1,8 +1,9 @@
-{{- if and .Values.sshBridge.enabled .Values.sshBridge.rbac.create }}
+{{- $sidecarRbac := or (and .Values.sshBridge.enabled .Values.sshBridge.rbac.create) (and .Values.monitor.enabled .Values.monitor.rbac.create) }}
+{{- if $sidecarRbac }}
 apiVersion: v1
 kind: ServiceAccount
 metadata:
-  name: {{ include "codehub.sshBridgeServiceAccountName" . }}
+  name: {{ include "codehub.sidecarServiceAccountName" . }}
   labels:
     {{- include "codehub.labels" . | nindent 4 }}
 automountServiceAccountToken: false
@@ -10,7 +11,7 @@ automountServiceAccountToken: false
 apiVersion: rbac.authorization.k8s.io/v1
 kind: Role
 metadata:
-  name: {{ include "codehub.fullname" . }}-ssh-exec
+  name: {{ include "codehub.fullname" . }}-sidecar
   labels:
     {{- include "codehub.labels" . | nindent 4 }}
 rules:
@@ -20,18 +21,21 @@ rules:
   - apiGroups: [""]
     resources: ["pods/exec"]
     verbs: ["create"]
+  - apiGroups: ["metrics.k8s.io"]
+    resources: ["pods"]
+    verbs: ["get", "list"]
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: RoleBinding
 metadata:
-  name: {{ include "codehub.fullname" . }}-ssh-exec
+  name: {{ include "codehub.fullname" . }}-sidecar
   labels:
     {{- include "codehub.labels" . | nindent 4 }}
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: Role
-  name: {{ include "codehub.fullname" . }}-ssh-exec
+  name: {{ include "codehub.fullname" . }}-sidecar
 subjects:
   - kind: ServiceAccount
-    name: {{ include "codehub.sshBridgeServiceAccountName" . }}
+    name: {{ include "codehub.sidecarServiceAccountName" . }}
 {{- end }}

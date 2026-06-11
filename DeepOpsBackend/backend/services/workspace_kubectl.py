@@ -1,11 +1,37 @@
-"""kubectl logs/describe for workspace pods."""
+"""kubectl logs/describe/monitor for workspace pods."""
 
+import json
 import subprocess
+from datetime import datetime, timedelta, timezone
 
 from backend.models import Workspace
 
+from .gpu_resources import parse_gpu_resources
 from .k8s_env import NAMESPACE
 from .k8s_status import workspace_pods_for_id
+
+MONITOR_CONTAINER = 'monitor-sidecar'
+MONITOR_LOG_FILE = '/tmp/monitor/metrics.jsonl'
+MONITOR_MAX_LINES = 9000
+MONITOR_DEFAULT_WINDOW_MINUTES = 300
+MONITOR_WINDOW_OPTIONS_MINUTES = (5, 15, 30, 60, 300)
+
+
+def _parse_monitor_window_minutes(raw: str | int | None) -> int:
+    try:
+        value = int(raw if raw is not None else MONITOR_DEFAULT_WINDOW_MINUTES)
+    except (TypeError, ValueError):
+        return MONITOR_DEFAULT_WINDOW_MINUTES
+    if value in MONITOR_WINDOW_OPTIONS_MINUTES:
+        return value
+    return MONITOR_DEFAULT_WINDOW_MINUTES
+
+
+def _monitor_window_label(minutes: int) -> str:
+    if minutes < 60:
+        return f'{minutes} min'
+    hours = minutes // 60
+    return '1 hour' if hours == 1 else f'{hours} hours'
 
 
 def _kubectl(args: list[str], timeout: int = 60) -> tuple[str, str, int]:
@@ -132,4 +158,139 @@ def workspace_describe(
         'pods': pods,
         'selected_pod': pod_name or (pods[0]['name'] if pods else ''),
         'release_name': release,
+    }
+
+
+def _parse_metric_ts(raw: str) -> datetime | None:
+    text = (raw or '').strip()
+    if not text:
+        return None
+    if text.endswith('Z'):
+        text = text[:-1] + '+00:00'
+    try:
+        parsed = datetime.fromisoformat(text)
+    except ValueError:
+        return None
+    if parsed.tzinfo is None:
+        return parsed.replace(tzinfo=timezone.utc)
+    return parsed.astimezone(timezone.utc)
+
+
+def _pct(used: int | float, limit: int | float) -> float:
+    if not limit:
+        return 0.0
+    return round(min(100.0, max(0.0, (float(used) / float(limit)) * 100.0)), 2)
+
+
+def workspace_monitor_metrics(
+    workspace: Workspace,
+    *,
+    pod_name: str | None = None,
+    window_minutes: int | None = None,
+) -> dict:
+    window_minutes = _parse_monitor_window_minutes(window_minutes)
+    window_options = [
+        {'minutes': m, 'label': _monitor_window_label(m)}
+        for m in MONITOR_WINDOW_OPTIONS_MINUTES
+    ]
+    pods = workspace_pods_for_id(str(workspace.id))
+    gpu_spec = parse_gpu_resources(workspace.gpu)
+    if not pods:
+        return {
+            'points': [],
+            'pods': [],
+            'selected_pod': '',
+            'has_gpu': gpu_spec['enabled'],
+            'window_minutes': window_minutes,
+            'window_label': _monitor_window_label(window_minutes),
+            'window_options': window_options,
+            'error': 'No pods found. The server may be stopped or not deployed yet.',
+        }
+
+    selected = pod_name or pods[0]['name']
+    if not any(item['name'] == selected for item in pods):
+        selected = pods[0]['name']
+
+    stdout, stderr, code = _kubectl([
+        'exec', selected,
+        '-n', NAMESPACE,
+        '-c', MONITOR_CONTAINER,
+        '--', 'tail', '-n', str(MONITOR_MAX_LINES), MONITOR_LOG_FILE,
+    ], timeout=45)
+
+    error = ''
+    if code != 0:
+        error = (stderr or stdout or '').strip() or 'Failed to read monitor metrics from sidecar.'
+        return {
+            'points': [],
+            'pods': pods,
+            'selected_pod': selected,
+            'has_gpu': gpu_spec['enabled'],
+            'window_minutes': window_minutes,
+            'window_label': _monitor_window_label(window_minutes),
+            'window_options': window_options,
+            'error': error,
+        }
+
+    cutoff = datetime.now(timezone.utc) - timedelta(minutes=window_minutes)
+    points: list[dict] = []
+    saw_gpu = False
+
+    for line in (stdout or '').splitlines():
+        line = line.strip()
+        if not line:
+            continue
+        try:
+            row = json.loads(line)
+        except json.JSONDecodeError:
+            continue
+
+        ts = _parse_metric_ts(str(row.get('ts', '')))
+        if ts is None or ts < cutoff:
+            continue
+
+        cpu_limit = int(row.get('cpu_limit_millicores') or 0)
+        mem_limit = int(row.get('memory_limit_bytes') or 0)
+        cpu_used = int(row.get('cpu_millicores') or 0)
+        mem_used = int(row.get('memory_bytes') or 0)
+
+        gpu_util = row.get('gpu_util_pct')
+        gpu_mem_used = row.get('gpu_mem_used_mib')
+        gpu_mem_total = row.get('gpu_mem_total_mib')
+
+        gpu_util_pct = None
+        gpu_mem_pct = None
+        if gpu_util is not None and gpu_util != 'null':
+            try:
+                gpu_util_pct = float(gpu_util)
+                saw_gpu = True
+            except (TypeError, ValueError):
+                gpu_util_pct = None
+        if gpu_mem_used is not None and gpu_mem_total is not None and gpu_mem_used != 'null':
+            try:
+                used_mib = float(gpu_mem_used)
+                total_mib = float(gpu_mem_total)
+                if total_mib > 0:
+                    gpu_mem_pct = _pct(used_mib, total_mib)
+                    saw_gpu = True
+            except (TypeError, ValueError):
+                gpu_mem_pct = None
+
+        points.append({
+            'ts': ts.isoformat().replace('+00:00', 'Z'),
+            'cpu_pct': _pct(cpu_used, cpu_limit),
+            'memory_pct': _pct(mem_used, mem_limit),
+            'gpu_util_pct': gpu_util_pct,
+            'gpu_mem_pct': gpu_mem_pct,
+        })
+
+    return {
+        'points': points,
+        'pods': pods,
+        'selected_pod': selected,
+        'has_gpu': gpu_spec['enabled'] and saw_gpu,
+        'window_minutes': window_minutes,
+        'window_label': _monitor_window_label(window_minutes),
+        'window_options': window_options,
+        'error': error,
     }

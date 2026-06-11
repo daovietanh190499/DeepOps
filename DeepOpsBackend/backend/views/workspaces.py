@@ -22,7 +22,12 @@ from backend.services.platform_catalog import parse_cpu_value
 from backend.services.env_templates import expand_env_vars
 from backend.services.resource_limits import can_change_privileged, validate_server_count, validate_workspace_resources
 from backend.services.ssh_keys import ssh_info_payload
-from backend.services.workspace_kubectl import workspace_describe, workspace_logs
+from backend.services.workspace_kubectl import (
+    MONITOR_DEFAULT_WINDOW_MINUTES,
+    workspace_describe,
+    workspace_logs,
+    workspace_monitor_metrics,
+)
 from backend.services.workspace_mounts import (
     apply_drive_mounts_from_data,
     drive_mounts_payload,
@@ -446,6 +451,22 @@ def workspace_describe_view(request, user, workspace_id):
         return err
     pod = (request.GET.get('pod') or '').strip() or None
     return JsonResponse({'result': workspace_describe(ws, pod_name=pod)})
+
+
+@auth.verify
+@require_http_methods(['GET'])
+def workspace_monitor_view(request, user, workspace_id):
+    denied = _require_accepted(user)
+    if denied:
+        return denied
+    ws, err = _get_workspace_for_user(user, workspace_id)
+    if err:
+        return err
+    pod = (request.GET.get('pod') or '').strip() or None
+    raw_window = (request.GET.get('window') or '').strip() or str(MONITOR_DEFAULT_WINDOW_MINUTES)
+    return JsonResponse({
+        'result': workspace_monitor_metrics(ws, pod_name=pod, window_minutes=raw_window),
+    })
 
 
 @auth.verify

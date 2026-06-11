@@ -61,13 +61,13 @@ Create the name of the service account to use
 {{- end }}
 {{- end }}
 
+{{- define "codehub.sidecarServiceAccountName" -}}
+{{- default (printf "%s-sidecar" (include "codehub.fullname" .)) .Values.sidecar.serviceAccount.name }}
+{{- end }}
+
 {{/*
-Service account used by the pod when ssh-bridge is enabled.
+Legacy alias for ssh-bridge RBAC templates.
 */}}
 {{- define "codehub.sshBridgeServiceAccountName" -}}
-{{- if .Values.sshBridge.serviceAccount.create }}
-{{- default (printf "%s-ssh" (include "codehub.fullname" .)) .Values.sshBridge.serviceAccount.name }}
-{{- else }}
-{{- include "codehub.serviceAccountName" . }}
-{{- end }}
+{{- include "codehub.sidecarServiceAccountName" . }}
 {{- end }}
