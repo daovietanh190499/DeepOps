@@ -1,0 +1,737 @@
+<!DOCTYPE html>
+<html lang="en" class="scroll-smooth">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>DeepOps / DoHub — Cluster Installation Guide</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            brand: { 50: '#eef2ff', 100: '#e0e7ff', 500: '#6366f1', 600: '#4f46e5', 700: '#4338ca', 900: '#312e81' },
+          },
+          fontFamily: {
+            sans: ['Inter', 'ui-sans-serif', 'system-ui', 'sans-serif'],
+            mono: ['JetBrains Mono', 'ui-monospace', 'monospace'],
+          },
+        },
+      },
+    };
+  </script>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <style>
+    pre code { font-family: 'JetBrains Mono', ui-monospace, monospace; }
+    .step-badge { counter-increment: step; }
+    .step-badge::before { content: counter(step); }
+    ol.steps { counter-reset: step; }
+  </style>
+</head>
+<body class="bg-slate-50 text-slate-800 antialiased">
+
+  <!-- Header -->
+  <header class="sticky top-0 z-40 border-b border-slate-200 bg-white/90 backdrop-blur">
+    <div class="mx-auto flex max-w-7xl items-center justify-between px-4 py-4 sm:px-6 lg:px-8">
+      <div>
+        <p class="text-xs font-semibold uppercase tracking-wider text-brand-600">DeepOps / DoHub</p>
+        <h1 class="text-lg font-bold text-slate-900">Cluster Installation Guide</h1>
+      </div>
+      <a href="#prerequisites" class="hidden rounded-lg bg-brand-600 px-4 py-2 text-sm font-medium text-white hover:bg-brand-700 sm:inline-block">Get started</a>
+    </div>
+  </header>
+
+  <div class="mx-auto flex max-w-7xl gap-8 px-4 py-8 sm:px-6 lg:px-8">
+
+    <!-- Sidebar TOC -->
+    <aside class="hidden w-64 shrink-0 lg:block">
+      <nav class="sticky top-24 space-y-1 text-sm">
+        <p class="mb-3 text-xs font-semibold uppercase tracking-wider text-slate-400">Contents</p>
+        <a href="#overview" class="block rounded-md px-3 py-2 text-slate-600 hover:bg-slate-100">Overview</a>
+        <a href="#prerequisites" class="block rounded-md px-3 py-2 text-slate-600 hover:bg-slate-100">1. Prerequisites</a>
+        <a href="#microk8s-install" class="block rounded-md px-3 py-2 text-slate-600 hover:bg-slate-100">2. Install MicroK8s</a>
+        <a href="#cluster-join" class="block rounded-md px-3 py-2 text-slate-600 hover:bg-slate-100">3. Join cluster nodes</a>
+        <a href="#addons" class="block rounded-md px-3 py-2 text-slate-600 hover:bg-slate-100">4. Enable addons</a>
+        <a href="#tls" class="block rounded-md px-3 py-2 text-slate-600 hover:bg-slate-100">TLS — Let's Encrypt</a>
+        <a href="#directpv" class="block rounded-md px-3 py-2 text-slate-600 hover:bg-slate-100">5. Install DirectPV</a>
+        <a href="#directpv-plugin" class="block rounded-md px-3 py-2 text-slate-600 hover:bg-slate-100">6. kubectl-directpv plugin</a>
+        <a href="#directpv-init" class="block rounded-md px-3 py-2 text-slate-600 hover:bg-slate-100">7. Discover &amp; init drives</a>
+        <a href="#nvidia-runtime" class="block rounded-md px-3 py-2 text-slate-600 hover:bg-slate-100">8. NVIDIA runtime (GPU nodes)</a>
+        <a href="#hami" class="block rounded-md px-3 py-2 text-slate-600 hover:bg-slate-100">9. Install HAMi</a>
+        <a href="#dohub" class="block rounded-md px-3 py-2 text-slate-600 hover:bg-slate-100">10. Deploy DoHub</a>
+        <a href="#verify" class="block rounded-md px-3 py-2 text-slate-600 hover:bg-slate-100">11. Verification</a>
+        <a href="#troubleshooting" class="block rounded-md px-3 py-2 text-slate-600 hover:bg-slate-100">Troubleshooting</a>
+      </nav>
+    </aside>
+
+    <!-- Main content -->
+    <main class="min-w-0 flex-1 space-y-12 pb-20">
+
+      <!-- Overview -->
+      <section id="overview" class="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm sm:p-8">
+        <h2 class="text-2xl font-bold text-slate-900">Overview</h2>
+        <p class="mt-3 text-slate-600 leading-relaxed">
+          This guide walks through bringing up a production DeepOps (DoHub) cluster on Ubuntu nodes using
+          <strong>MicroK8s</strong>, <strong>DirectPV</strong> for local storage, and <strong>HAMi</strong> for GPU / vGPU scheduling.
+          Workspaces are spawned via the <code class="rounded bg-slate-100 px-1.5 py-0.5 text-sm">charts/codehub</code> Helm chart; the hub itself is deployed from <code class="rounded bg-slate-100 px-1.5 py-0.5 text-sm">dohub/</code>.
+        </p>
+
+        <div class="mt-6 grid gap-4 sm:grid-cols-2">
+          <div class="rounded-xl border border-brand-100 bg-brand-50 p-4">
+            <h3 class="font-semibold text-brand-900">Pipeline summary</h3>
+            <ol class="steps mt-3 space-y-2 text-sm text-brand-900">
+              <li class="step-badge flex gap-3"><span class="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-brand-600 text-xs font-bold text-white"></span><span>Install prerequisites on every node</span></li>
+              <li class="step-badge flex gap-3"><span class="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-brand-600 text-xs font-bold text-white"></span><span>Install MicroK8s on each node</span></li>
+              <li class="step-badge flex gap-3"><span class="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-brand-600 text-xs font-bold text-white"></span><span>Join worker / HA nodes to the master</span></li>
+              <li class="step-badge flex gap-3"><span class="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-brand-600 text-xs font-bold text-white"></span><span>Enable core MicroK8s addons</span></li>
+              <li class="step-badge flex gap-3"><span class="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-brand-600 text-xs font-bold text-white"></span><span>Configure Let's Encrypt TLS (<code>letsencrypt-cert-issuer.yaml</code>)</span></li>
+              <li class="step-badge flex gap-3"><span class="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-brand-600 text-xs font-bold text-white"></span><span>Install DirectPV via Helm</span></li>
+              <li class="step-badge flex gap-3"><span class="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-brand-600 text-xs font-bold text-white"></span><span>Install matching <code>kubectl-directpv</code> plugin</span></li>
+              <li class="step-badge flex gap-3"><span class="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-brand-600 text-xs font-bold text-white"></span><span>Discover and initialize drives</span></li>
+              <li class="step-badge flex gap-3"><span class="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-brand-600 text-xs font-bold text-white"></span><span>Configure NVIDIA runtime on GPU nodes</span></li>
+              <li class="step-badge flex gap-3"><span class="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-brand-600 text-xs font-bold text-white"></span><span>Label GPU nodes and install HAMi</span></li>
+              <li class="step-badge flex gap-3"><span class="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-brand-600 text-xs font-bold text-white"></span><span>Build and deploy DoHub</span></li>
+            </ol>
+          </div>
+          <div class="rounded-xl border border-slate-200 bg-slate-50 p-4">
+            <h3 class="font-semibold text-slate-900">Architecture</h3>
+            <ul class="mt-3 space-y-2 text-sm text-slate-600">
+              <li><strong>Hub domain</strong> — DoHub UI, OAuth, admin (e.g. <code>iaihub.uet.edu.vn</code>)</li>
+              <li><strong>Workspace subdomains</strong> — per-user code-server instances</li>
+              <li><strong>StorageClass</strong> — <code>directpv-min-io</code> (WaitForFirstConsumer)</li>
+              <li><strong>Registry</strong> — MicroK8s built-in at <code>localhost:32000</code></li>
+              <li><strong>GPU</strong> — HAMi scheduler + <code>nvidia.com/gpu</code> / <code>nvidia.com/gpumem</code></li>
+            </ul>
+          </div>
+        </div>
+      </section>
+
+      <!-- 1. Prerequisites -->
+      <section id="prerequisites" class="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm sm:p-8">
+        <div class="flex items-center gap-3">
+          <span class="flex h-10 w-10 items-center justify-center rounded-xl bg-brand-600 text-lg font-bold text-white">1</span>
+          <h2 class="text-2xl font-bold text-slate-900">Prerequisites</h2>
+        </div>
+        <p class="mt-4 text-slate-600">Install the following on <strong>every cluster node</strong> (control plane and workers). GPU nodes additionally need NVIDIA drivers and the container toolkit.</p>
+
+        <div class="mt-6 overflow-x-auto">
+          <table class="w-full min-w-[640px] text-left text-sm">
+            <thead>
+              <tr class="border-b border-slate-200 bg-slate-50">
+                <th class="px-4 py-3 font-semibold text-slate-900">Component</th>
+                <th class="px-4 py-3 font-semibold text-slate-900">Version</th>
+                <th class="px-4 py-3 font-semibold text-slate-900">Notes</th>
+              </tr>
+            </thead>
+            <tbody class="divide-y divide-slate-100">
+              <tr><td class="px-4 py-3">Operating system</td><td class="px-4 py-3 font-mono text-xs">Ubuntu 22.04 LTS</td><td class="px-4 py-3 text-slate-600">Recommended; DoHub image is based on Ubuntu 22.04</td></tr>
+              <tr><td class="px-4 py-3">MicroK8s</td><td class="px-4 py-3 font-mono text-xs">1.30+ (tested 1.35)</td><td class="px-4 py-3 text-slate-600">Installed via snap; provides Kubernetes, containerd, Helm</td></tr>
+              <tr><td class="px-4 py-3">Helm</td><td class="px-4 py-3 font-mono text-xs">3.14+</td><td class="px-4 py-3 text-slate-600">Via <code>microk8s enable helm3</code> or host install</td></tr>
+              <tr><td class="px-4 py-3">kubectl</td><td class="px-4 py-3 font-mono text-xs">match cluster (1.30+)</td><td class="px-4 py-3 text-slate-600">Use <code>microk8s kubectl</code> or alias</td></tr>
+              <tr><td class="px-4 py-3">Docker</td><td class="px-4 py-3 font-mono text-xs">24+</td><td class="px-4 py-3 text-slate-600">Required on the build machine for <code>build-and-deploy.sh</code></td></tr>
+              <tr><td class="px-4 py-3">DirectPV (driver)</td><td class="px-4 py-3 font-mono text-xs">v5.1.1</td><td class="px-4 py-3 text-slate-600">Pinned in <code>directpv-install.yaml</code></td></tr>
+              <tr><td class="px-4 py-3">kubectl-directpv plugin</td><td class="px-4 py-3 font-mono text-xs">v5.1.1</td><td class="px-4 py-3 text-slate-600"><strong>Must match</strong> the DirectPV driver version</td></tr>
+              <tr><td class="px-4 py-3">NVIDIA driver (GPU nodes)</td><td class="px-4 py-3 font-mono text-xs">≥ 440</td><td class="px-4 py-3 text-slate-600">Required for HAMi and GPU workspaces</td></tr>
+              <tr><td class="px-4 py-3">nvidia-container-toolkit</td><td class="px-4 py-3 font-mono text-xs">latest stable</td><td class="px-4 py-3 text-slate-600">Provides <code>nvidia-container-runtime</code></td></tr>
+              <tr><td class="px-4 py-3">HAMi</td><td class="px-4 py-3 font-mono text-xs">latest chart</td><td class="px-4 py-3 text-slate-600">Helm chart from <code>hami-charts</code> repo</td></tr>
+              <tr><td class="px-4 py-3">Git</td><td class="px-4 py-3 font-mono text-xs">2.x</td><td class="px-4 py-3 text-slate-600">Clone DeepOps repository</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <h3 class="mt-8 text-lg font-semibold text-slate-900">Base packages (all nodes)</h3>
+        <pre class="mt-3 overflow-x-auto rounded-xl bg-slate-900 p-4 text-sm text-slate-100"><code>sudo apt-get update && sudo apt-get install -y \
+  curl wget jq snapd ca-certificates gnupg lsb-release \
+  open-iscsi util-linux
+
+# Optional: convenience aliases
+echo 'alias kubectl="microk8s kubectl"' >> ~/.bashrc
+echo 'alias helm="microk8s helm"' >> ~/.bashrc</code></pre>
+
+        <h3 class="mt-8 text-lg font-semibold text-slate-900">GPU nodes only — NVIDIA driver &amp; container toolkit</h3>
+        <pre class="mt-3 overflow-x-auto rounded-xl bg-slate-900 p-4 text-sm text-slate-100"><code># Install NVIDIA driver (example — use your distro's recommended method)
+sudo apt-get install -y nvidia-driver-550
+
+# Install nvidia-container-toolkit
+curl -fsSL https://nvidia.github.io/libnvidia-container/gpgkey \
+  | sudo gpg --dearmor -o /usr/share/keyrings/nvidia-container-toolkit-keyring.gpg
+
+curl -s -L https://nvidia.github.io/libnvidia-container/stable/deb/nvidia-container-toolkit.list \
+  | sed 's#deb https://#deb [signed-by=/usr/share/keyrings/nvidia-container-toolkit-keyring.gpg] https://#g' \
+  | sudo tee /etc/apt/sources.list.d/nvidia-container-toolkit.list
+
+sudo apt-get update && sudo apt-get install -y nvidia-container-toolkit
+
+# Verify driver
+nvidia-smi</code></pre>
+
+        <div class="mt-6 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
+          <strong>Hardware notes:</strong> DirectPV requires raw, unformatted block devices (or partitions) dedicated to storage.
+          Do not use the OS boot disk. Each node needs network connectivity to all other nodes on the Kubernetes API port (16443 by default).
+        </div>
+      </section>
+
+      <!-- 2. MicroK8s -->
+      <section id="microk8s-install" class="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm sm:p-8">
+        <div class="flex items-center gap-3">
+          <span class="flex h-10 w-10 items-center justify-center rounded-xl bg-brand-600 text-lg font-bold text-white">2</span>
+          <h2 class="text-2xl font-bold text-slate-900">Install MicroK8s on each node</h2>
+        </div>
+        <p class="mt-4 text-slate-600">Run these steps on <strong>every node</strong> in the cluster. Pick one node as the initial control-plane (master).</p>
+
+        <pre class="mt-6 overflow-x-auto rounded-xl bg-slate-900 p-4 text-sm text-slate-100"><code># Install MicroK8s (pin channel if needed, e.g. 1.30/stable)
+sudo snap install microk8s --classic --channel=1.30/stable
+
+# Add your user to the microk8s group (log out/in afterward)
+sudo usermod -a -G microk8s $USER
+sudo chown -f -R $USER ~/.kube
+newgrp microk8s
+
+# Wait until the node is ready (on the first / master node)
+microk8s status --wait-ready
+
+# Verify
+microk8s kubectl get nodes</code></pre>
+
+        <h3 class="mt-8 text-lg font-semibold text-slate-900">High availability (optional)</h3>
+        <p class="mt-2 text-slate-600">For a multi-master HA cluster, enable HA on the first node, then join additional control-plane nodes:</p>
+        <pre class="mt-3 overflow-x-auto rounded-xl bg-slate-900 p-4 text-sm text-slate-100"><code># On the first master node only
+microk8s enable ha-cluster
+
+# Generate join token for additional masters
+microk8s add-node --token-ttl 3600</code></pre>
+        <p class="mt-3 text-sm text-slate-600">Run the printed <code>microk8s join …</code> command on each additional master node.</p>
+      </section>
+
+      <!-- 3. Join cluster -->
+      <section id="cluster-join" class="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm sm:p-8">
+        <div class="flex items-center gap-3">
+          <span class="flex h-10 w-10 items-center justify-center rounded-xl bg-brand-600 text-lg font-bold text-white">3</span>
+          <h2 class="text-2xl font-bold text-slate-900">Connect all nodes to the master</h2>
+        </div>
+        <p class="mt-4 text-slate-600">After MicroK8s is installed on worker nodes, join them to the cluster from the <strong>master node</strong>.</p>
+
+        <h3 class="mt-6 text-lg font-semibold text-slate-900">On the master node</h3>
+        <pre class="mt-3 overflow-x-auto rounded-xl bg-slate-900 p-4 text-sm text-slate-100"><code># Generate a join command (default TTL 24h)
+microk8s add-node
+
+# Example output:
+# microk8s join 10.10.126.127:25000/abc123…</code></pre>
+
+        <h3 class="mt-6 text-lg font-semibold text-slate-900">On each worker node</h3>
+        <pre class="mt-3 overflow-x-auto rounded-xl bg-slate-900 p-4 text-sm text-slate-100"><code># Paste the join command from the master
+microk8s join 10.10.126.127:25000/&lt;token&gt;</code></pre>
+
+        <h3 class="mt-6 text-lg font-semibold text-slate-900">Verify cluster membership</h3>
+        <pre class="mt-3 overflow-x-auto rounded-xl bg-slate-900 p-4 text-sm text-slate-100"><code># On the master
+microk8s kubectl get nodes -o wide
+
+# All nodes should show Ready
+# HA clusters show multiple control-plane nodes in microk8s status</code></pre>
+
+        <div class="mt-6 rounded-xl border border-blue-200 bg-blue-50 p-4 text-sm text-blue-900">
+          DoHub can also generate join commands from the admin UI (<em>Cluster → Add node</em>), which runs
+          <code>microk8s add-node</code> on the host where the hub pod has access to the MicroK8s CLI.
+        </div>
+      </section>
+
+      <!-- 4. Addons -->
+      <section id="addons" class="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm sm:p-8">
+        <div class="flex items-center gap-3">
+          <span class="flex h-10 w-10 items-center justify-center rounded-xl bg-brand-600 text-lg font-bold text-white">4</span>
+          <h2 class="text-2xl font-bold text-slate-900">Enable MicroK8s addons</h2>
+        </div>
+        <p class="mt-4 text-slate-600">Run on the <strong>master node</strong> (addons apply cluster-wide). Wait for each addon to become ready before continuing.</p>
+
+        <pre class="mt-6 overflow-x-auto rounded-xl bg-slate-900 p-4 text-sm text-slate-100"><code># Core addons required by DeepOps
+microk8s enable rbac            # Role-based access control (often pre-enabled)
+microk8s enable dns             # CoreDNS
+microk8s enable helm3           # Helm 3 package manager
+microk8s enable registry        # Local registry at localhost:32000
+microk8s enable metrics-server  # Required for kubectl top / monitor sidecar
+microk8s enable ingress         # Ingress controller (Traefik or nginx class)
+microk8s enable cert-manager      # TLS certificate management
+
+# Verify
+microk8s status</code></pre>
+
+        <div class="mt-6 overflow-x-auto">
+          <table class="w-full text-left text-sm">
+            <thead>
+              <tr class="border-b border-slate-200 bg-slate-50">
+                <th class="px-4 py-3 font-semibold">Addon</th>
+                <th class="px-4 py-3 font-semibold">Purpose in DeepOps</th>
+              </tr>
+            </thead>
+            <tbody class="divide-y divide-slate-100">
+              <tr><td class="px-4 py-3 font-mono text-xs">rbac</td><td class="px-4 py-3">DoHub service account ClusterRole for workspaces, DirectPV, ingress</td></tr>
+              <tr><td class="px-4 py-3 font-mono text-xs">helm3</td><td class="px-4 py-3">Spawn / delete workspace Helm releases</td></tr>
+              <tr><td class="px-4 py-3 font-mono text-xs">registry</td><td class="px-4 py-3">Push DoHub and sidecar images to <code>localhost:32000</code></td></tr>
+              <tr><td class="px-4 py-3 font-mono text-xs">metrics-server</td><td class="px-4 py-3">Pod CPU/RAM metrics for the monitor sidecar</td></tr>
+              <tr><td class="px-4 py-3 font-mono text-xs">ingress</td><td class="px-4 py-3">Route HTTPS traffic to DoHub and workspace subdomains</td></tr>
+              <tr><td class="px-4 py-3 font-mono text-xs">cert-manager</td><td class="px-4 py-3">Let's Encrypt certificates via <code>letsencrypt-cert-issuer.yaml</code> (see TLS section)</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div class="mt-6 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
+          <strong>Registry note:</strong> MicroK8s registry listens on <code>localhost:32000</code> on each node.
+          Configure Docker on the build host to treat it as an insecure registry if pushing from outside the node:
+          add <code>"insecure-registries": ["localhost:32000"]</code> to <code>/etc/docker/daemon.json</code> and restart Docker.
+        </div>
+      </section>
+
+      <!-- TLS -->
+      <section id="tls" class="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm sm:p-8">
+        <div class="flex items-center gap-3">
+          <span class="flex h-10 w-10 items-center justify-center rounded-xl bg-emerald-600 text-sm font-bold text-white">TLS</span>
+          <h2 class="text-2xl font-bold text-slate-900">Configure TLS with Let's Encrypt</h2>
+        </div>
+        <p class="mt-4 text-slate-600">
+          DeepOps uses <strong>cert-manager</strong> with a cluster-wide ACME issuer defined in
+          <code class="rounded bg-slate-100 px-1.5 py-0.5 text-sm">letsencrypt-cert-issuer.yaml</code> at the repository root.
+          The issuer uses the <strong>HTTP-01</strong> challenge via the ingress controller (<code>ingressClassName: nginx</code>).
+          Complete this section after enabling the <code>ingress</code> and <code>cert-manager</code> addons (step 4).
+        </p>
+
+        <h3 class="mt-8 text-lg font-semibold text-slate-900">Prerequisites</h3>
+        <ul class="mt-3 list-inside list-disc space-y-2 text-sm text-slate-600">
+          <li><code>microk8s enable ingress</code> and <code>microk8s enable cert-manager</code> are active</li>
+          <li>Your hub domain (e.g. <code>iaihub.uet.edu.vn</code>) has a public <strong>DNS A record</strong> pointing to the cluster ingress IP</li>
+          <li>Port <strong>80</strong> is reachable from the internet (required for HTTP-01 validation)</li>
+        </ul>
+
+        <h3 class="mt-8 text-lg font-semibold text-slate-900">Step 1 — Edit the ClusterIssuer</h3>
+        <p class="mt-2 text-slate-600">Open <code>letsencrypt-cert-issuer.yaml</code> and set your contact email for Let's Encrypt expiry notices:</p>
+        <pre class="mt-3 overflow-x-auto rounded-xl bg-slate-800 p-4 text-sm text-slate-100"><code>apiVersion: cert-manager.io/v1
+kind: ClusterIssuer
+metadata:
+  name: letsencrypt-prod
+spec:
+  acme:
+    server: https://acme-v02.api.letsencrypt.org/directory
+    email: admin@your-domain.com          # &lt;-- change this
+    privateKeySecretRef:
+      name: letsencrypt-prod
+    solvers:
+    - http01:
+        ingress:
+          ingressClassName: nginx          # matches dohub ingress.className</code></pre>
+
+        <h3 class="mt-8 text-lg font-semibold text-slate-900">Step 2 — Apply the ClusterIssuer</h3>
+        <pre class="mt-3 overflow-x-auto rounded-xl bg-slate-900 p-4 text-sm text-slate-100"><code>cd /path/to/DeepOps
+
+# Wait for cert-manager pods to be ready first
+microk8s kubectl wait --for=condition=Available \
+  deployment/cert-manager -n cert-manager --timeout=120s
+microk8s kubectl wait --for=condition=Available \
+  deployment/cert-manager-webhook -n cert-manager --timeout=120s
+
+# Apply the issuer
+microk8s kubectl apply -f letsencrypt-cert-issuer.yaml
+
+# Confirm the issuer is ready
+microk8s kubectl get clusterissuer letsencrypt-prod
+# STATUS should become Ready</code></pre>
+
+        <h3 class="mt-8 text-lg font-semibold text-slate-900">Step 3 — Annotate the DoHub ingress</h3>
+        <p class="mt-2 text-slate-600">
+          Before deploying DoHub, add the cert-manager annotation so the ingress shim automatically requests a certificate
+          into the TLS secret <code>tls-dohub-secret</code> (already referenced in <code>dohub/values.yaml</code>).
+        </p>
+        <pre class="mt-3 overflow-x-auto rounded-xl bg-slate-800 p-4 text-sm text-slate-100"><code># dohub/values.yaml
+ingress:
+  enabled: true
+  className: "nginx"
+  annotations:
+    cert-manager.io/cluster-issuer: letsencrypt-prod
+    nginx.ingress.kubernetes.io/proxy-body-size: "0"
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "600"
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "600"
+  hosts:
+    - host: iaihub.uet.edu.vn          # your hub domain
+      paths:
+        - path: /
+          pathType: Prefix
+  tls:
+    - secretName: tls-dohub-secret
+      hosts:
+        - iaihub.uet.edu.vn</code></pre>
+
+        <div class="mt-6 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
+          <strong>Manual TLS files:</strong> The dohub chart can also load certificates from <code>dohub/tls/*</code>
+          (<code>dohub/templates/tls_secrets.yaml</code>). When using cert-manager, <em>do not</em> place static
+          <code>tls.crt</code> / <code>tls.key</code> files there — let cert-manager populate
+          <code>tls-dohub-secret</code> automatically after the ingress is created.
+        </div>
+
+        <h3 class="mt-8 text-lg font-semibold text-slate-900">Step 4 — Verify certificate issuance</h3>
+        <p class="mt-2 text-slate-600">After running <code>build-and-deploy.sh</code> (step 10), cert-manager creates a Certificate resource and stores the issued cert in the secret:</p>
+        <pre class="mt-3 overflow-x-auto rounded-xl bg-slate-900 p-4 text-sm text-slate-100"><code># Certificate and challenge status
+microk8s kubectl get certificate,certificaterequest,order,challenge -n dohub
+
+# TLS secret populated by cert-manager
+microk8s kubectl get secret tls-dohub-secret -n dohub
+
+# Test HTTPS (should NOT use -k once cert is valid)
+curl -vI https://iaihub.uet.edu.vn/</code></pre>
+
+        <h3 class="mt-8 text-lg font-semibold text-slate-900">Workspace subdomains</h3>
+        <p class="mt-2 text-sm text-slate-600 leading-relaxed">
+          Workspace ingresses use per-user hostnames such as
+          <code>&lt;slug&gt;-&lt;username&gt;.&lt;DOMAIN_NAME&gt;</code> and reference the same
+          <code>tls-dohub-secret</code> for sidecar routes on the hub domain. The HTTP-01 issuer in
+          <code>letsencrypt-cert-issuer.yaml</code> issues one certificate per hostname listed in an ingress TLS block.
+          For many dynamic workspace subdomains you may need a <strong>wildcard certificate</strong> (DNS-01 solver) or
+          additional Certificate resources — extend the ClusterIssuer beyond the provided file if required.
+        </p>
+      </section>
+
+      <!-- 5. DirectPV -->
+      <section id="directpv" class="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm sm:p-8">
+        <div class="flex items-center gap-3">
+          <span class="flex h-10 w-10 items-center justify-center rounded-xl bg-brand-600 text-lg font-bold text-white">5</span>
+          <h2 class="text-2xl font-bold text-slate-900">Install DirectPV with Helm</h2>
+        </div>
+        <p class="mt-4 text-slate-600">
+          DirectPV provides the <code>directpv-min-io</code> StorageClass used by DoHub and all workspace PVCs.
+          The repo includes a values file tuned for MicroK8s kubelet paths.
+        </p>
+
+        <pre class="mt-6 overflow-x-auto rounded-xl bg-slate-900 p-4 text-sm text-slate-100"><code># From the DeepOps repository root
+cd /path/to/DeepOps
+
+# Add the MinIO Helm repository
+microk8s helm repo add minio https://charts.min.io/
+microk8s helm repo update
+
+# Install DirectPV (uses directpv-install.yaml from this repo)
+microk8s helm upgrade --install directpv minio/directpv \
+  -f directpv-install.yaml \
+  --namespace directpv \
+  --create-namespace
+
+# Verify pods
+microk8s kubectl get pods -n directpv
+microk8s kubectl get storageclass directpv-min-io</code></pre>
+
+        <h3 class="mt-6 text-lg font-semibold text-slate-900">Values file reference (<code>directpv-install.yaml</code>)</h3>
+        <pre class="mt-3 overflow-x-auto rounded-xl bg-slate-800 p-4 text-sm text-slate-100"><code># MicroK8s kubelet path (required)
+kubeletDirPath: "/var/snap/microk8s/common/var/lib/kubelet/"
+
+# Driver image — plugin version must match this tag
+images:
+  directpv: quay.io/minio/directpv:v5.1.1</code></pre>
+      </section>
+
+      <!-- 6. Plugin -->
+      <section id="directpv-plugin" class="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm sm:p-8">
+        <div class="flex items-center gap-3">
+          <span class="flex h-10 w-10 items-center justify-center rounded-xl bg-brand-600 text-lg font-bold text-white">6</span>
+          <h2 class="text-2xl font-bold text-slate-900">Install kubectl-directpv plugin</h2>
+        </div>
+        <p class="mt-4 text-slate-600">
+          The CLI plugin version <strong>must match</strong> the DirectPV driver installed in the cluster (<code>v5.1.1</code>).
+          Install on every machine that runs <code>kubectl directpv</code> commands (admin workstation and/or nodes where DoHub executes discover/init).
+        </p>
+
+        <h3 class="mt-6 text-lg font-semibold text-slate-900">Option A — download release binary (recommended)</h3>
+        <pre class="mt-3 overflow-x-auto rounded-xl bg-slate-900 p-4 text-sm text-slate-100"><code>DIRECTPV_VERSION="v5.1.1"
+ARCH="linux_amd64"   # or linux_arm64
+
+curl -fLo kubectl-directpv \
+  "https://dl.min.io/aistor/directpv/release/${DIRECTPV_VERSION#v}/linux-amd64/kubectl-directpv"
+
+sudo install -m 0755 kubectl-directpv /usr/local/bin/kubectl-directpv
+
+# Verify version matches the cluster driver
+kubectl-directpv --version
+# Expected: directpv version v5.1.1</code></pre>
+
+        <h3 class="mt-6 text-lg font-semibold text-slate-900">Option B — copy from repository</h3>
+        <p class="mt-2 text-sm text-slate-600">The repo ships a binary at <code>./kubectl-directpv</code> (embedded in the DoHub Docker image). Ensure it matches <code>directpv-install.yaml</code> before use.</p>
+        <pre class="mt-3 overflow-x-auto rounded-xl bg-slate-900 p-4 text-sm text-slate-100"><code>sudo install -m 0755 ./kubectl-directpv /usr/local/bin/kubectl-directpv
+kubectl directpv --version</code></pre>
+
+        <div class="mt-6 rounded-xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-900">
+          <strong>Version mismatch warning:</strong> If the plugin reports a different version than the in-cluster driver,
+          <code>kubectl directpv discover</code> and <code>init</code> may fail or behave unexpectedly. Always align plugin and
+          <code>images.directpv</code> in <code>directpv-install.yaml</code>.
+        </div>
+      </section>
+
+      <!-- 7. Discover & init -->
+      <section id="directpv-init" class="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm sm:p-8">
+        <div class="flex items-center gap-3">
+          <span class="flex h-10 w-10 items-center justify-center rounded-xl bg-brand-600 text-lg font-bold text-white">7</span>
+          <h2 class="text-2xl font-bold text-slate-900">Discover and initialize drives</h2>
+        </div>
+        <p class="mt-4 text-slate-600">
+          DirectPV must discover raw drives on each node, then initialize the selected devices.
+          Initialization <strong>formats drives and erases all data</strong>.
+        </p>
+
+        <h3 class="mt-6 text-lg font-semibold text-slate-900">Step 7.1 — Discover drives</h3>
+        <pre class="mt-3 overflow-x-auto rounded-xl bg-slate-900 p-4 text-sm text-slate-100"><code># Discover block devices and write results to a YAML file
+kubectl directpv discover --output-file /tmp/directpv-drives.yaml
+
+# Review discovered drives (node, device, size, status)
+kubectl directpv list drives</code></pre>
+
+        <h3 class="mt-6 text-lg font-semibold text-slate-900">Step 7.2 — Select drives to initialize</h3>
+        <p class="mt-2 text-slate-600">Edit <code>/tmp/directpv-drives.yaml</code> and set <code>selected: true</code> on each drive you want DirectPV to manage. Alternatively, use the DoHub admin UI (<em>Cluster → DirectPV discover</em>) to select drives and save.</p>
+
+        <h3 class="mt-6 text-lg font-semibold text-slate-900">Step 7.3 — Initialize selected drives</h3>
+        <pre class="mt-3 overflow-x-auto rounded-xl bg-slate-900 p-4 text-sm text-slate-100"><code># WARNING: irreversible — formats selected drives
+kubectl directpv init /tmp/directpv-drives.yaml --dangerous
+
+# Confirm drives are available
+kubectl directpv list drives
+kubectl get directpvdrives.directpv.min.io</code></pre>
+
+        <div class="mt-6 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
+          <strong>StorageClass behavior:</strong> <code>directpv-min-io</code> uses
+          <code>volumeBindingMode: WaitForFirstConsumer</code> — PVCs bind when a pod schedules onto the node with the drive.
+        </div>
+      </section>
+
+      <!-- 8. NVIDIA runtime -->
+      <section id="nvidia-runtime" class="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm sm:p-8">
+        <div class="flex items-center gap-3">
+          <span class="flex h-10 w-10 items-center justify-center rounded-xl bg-brand-600 text-lg font-bold text-white">8</span>
+          <h2 class="text-2xl font-bold text-slate-900">Configure NVIDIA runtime on GPU nodes</h2>
+        </div>
+        <p class="mt-4 text-slate-600">
+          HAMi requires <code>nvidia-container-runtime</code> as the <strong>default containerd runtime</strong> on GPU nodes.
+          On MicroK8s, edit the containerd <em>template</em> (not the generated <code>containerd.toml</code>, which is overwritten on restart).
+        </p>
+
+        <p class="mt-4 text-sm font-medium text-slate-700">Perform these steps on <strong>each GPU node</strong>:</p>
+
+        <h3 class="mt-6 text-lg font-semibold text-slate-900">Step 8.1 — Add the nvidia runtime to containerd template</h3>
+        <pre class="mt-3 overflow-x-auto rounded-xl bg-slate-900 p-4 text-sm text-slate-100"><code>TEMPLATE="/var/snap/microk8s/current/args/containerd-template.toml"
+
+# Append nvidia runtime definition (if not already present)
+sudo tee -a "$TEMPLATE" &lt;&lt;'EOF'
+
+    [plugins."io.containerd.grpc.v1.cri".containerd.runtimes.nvidia]
+      runtime_type = "io.containerd.runc.v2"
+      [plugins."io.containerd.grpc.v1.cri".containerd.runtimes.nvidia.options]
+        BinaryName = "/usr/bin/nvidia-container-runtime"
+EOF</code></pre>
+
+        <h3 class="mt-6 text-lg font-semibold text-slate-900">Step 8.2 — Set nvidia as the default runtime</h3>
+        <pre class="mt-3 overflow-x-auto rounded-xl bg-slate-900 p-4 text-sm text-slate-100"><code># Change default_runtime_name from "${RUNTIME}" to "nvidia"
+sudo sed -i 's/default_runtime_name = "\${RUNTIME}"/default_runtime_name = "nvidia"/' \
+  /var/snap/microk8s/current/args/containerd-template.toml
+
+# Verify the change
+grep default_runtime_name /var/snap/microk8s/current/args/containerd-template.toml</code></pre>
+
+        <h3 class="mt-6 text-lg font-semibold text-slate-900">Step 8.3 — Restart MicroK8s on GPU nodes</h3>
+        <pre class="mt-3 overflow-x-auto rounded-xl bg-slate-900 p-4 text-sm text-slate-100"><code># Full restart (recommended)
+sudo microk8s stop
+sudo microk8s start
+
+# Or restart containerd only
+sudo snap restart microk8s.daemon-containerd
+
+# Confirm node rejoins Ready
+microk8s kubectl get nodes</code></pre>
+
+        <h3 class="mt-6 text-lg font-semibold text-slate-900">Step 8.4 — Verify GPU access from a test pod</h3>
+        <pre class="mt-3 overflow-x-auto rounded-xl bg-slate-900 p-4 text-sm text-slate-100"><code>microk8s kubectl run gpu-test --rm -it --restart=Never \
+  --image=nvidia/cuda:12.4.0-base-ubuntu22.04 \
+  -- nvidia-smi</code></pre>
+
+        <div class="mt-6 rounded-xl border border-blue-200 bg-blue-50 p-4 text-sm text-blue-900">
+          <strong>MicroK8s 1.36+ note:</strong> The built-in GPU addon may not set nvidia as the default runtime automatically.
+          HAMi expects the default runtime approach documented above. Alternatively, use
+          <code>runtimeClassName: nvidia</code> in pod specs if you keep runc as default.
+        </div>
+      </section>
+
+      <!-- 9. HAMi -->
+      <section id="hami" class="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm sm:p-8">
+        <div class="flex items-center gap-3">
+          <span class="flex h-10 w-10 items-center justify-center rounded-xl bg-brand-600 text-lg font-bold text-white">9</span>
+          <h2 class="text-2xl font-bold text-slate-900">Install HAMi (GPU / vGPU scheduler)</h2>
+        </div>
+        <p class="mt-4 text-slate-600">
+          HAMi (formerly k8s-vGPU-scheduler) enables fractional GPU sharing. DeepOps workspace templates request
+          <code>nvidia.com/gpu</code> and optionally <code>nvidia.com/gpumem</code> (MiB) via the codehub chart.
+        </p>
+
+        <h3 class="mt-6 text-lg font-semibold text-slate-900">Step 9.1 — Label GPU nodes</h3>
+        <pre class="mt-3 overflow-x-auto rounded-xl bg-slate-900 p-4 text-sm text-slate-100"><code># List nodes and identify GPU workers
+microk8s kubectl get nodes -o wide
+
+# Label each GPU node (required — HAMi ignores unlabeled nodes)
+microk8s kubectl label nodes &lt;gpu-node-name&gt; gpu=on
+
+# Example
+microk8s kubectl label nodes worker-gpu-01 gpu=on</code></pre>
+
+        <h3 class="mt-6 text-lg font-semibold text-slate-900">Step 9.2 — Check Kubernetes version</h3>
+        <pre class="mt-3 overflow-x-auto rounded-xl bg-slate-900 p-4 text-sm text-slate-100"><code>microk8s kubectl version --short
+# Note the server version, e.g. v1.35.0</code></pre>
+
+        <h3 class="mt-6 text-lg font-semibold text-slate-900">Step 9.3 — Install HAMi Helm chart</h3>
+        <pre class="mt-3 overflow-x-auto rounded-xl bg-slate-900 p-4 text-sm text-slate-100"><code>microk8s helm repo add hami-charts https://project-hami.github.io/HAMi/
+microk8s helm repo update
+
+# Set scheduler image tag to match your Kubernetes server version
+K8S_VERSION=$(microk8s kubectl version -o json | jq -r '.serverVersion.gitVersion')
+
+microk8s helm upgrade --install hami hami-charts/hami \
+  --namespace kube-system \
+  --create-namespace \
+  --set scheduler.kubeScheduler.imageTag="${K8S_VERSION}"
+
+# Verify
+microk8s kubectl get pods -n kube-system | grep hami</code></pre>
+        <p class="mt-3 text-sm text-slate-600">Both <code>hami-device-plugin</code> and <code>hami-scheduler</code> pods should reach <code>Running</code> state.</p>
+
+        <h3 class="mt-6 text-lg font-semibold text-slate-900">Example GPU workspace resources (codehub chart)</h3>
+        <pre class="mt-3 overflow-x-auto rounded-xl bg-slate-800 p-4 text-sm text-slate-100"><code>resources:
+  limits:
+    nvidia.com/gpu: 1
+    nvidia.com/gpumem: 10240   # 10 GiB vGPU memory (optional)
+  requests:
+    nvidia.com/gpu: 1
+    nvidia.com/gpumem: 10240</code></pre>
+      </section>
+
+      <!-- 10. DoHub -->
+      <section id="dohub" class="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm sm:p-8">
+        <div class="flex items-center gap-3">
+          <span class="flex h-10 w-10 items-center justify-center rounded-xl bg-brand-600 text-lg font-bold text-white">10</span>
+          <h2 class="text-2xl font-bold text-slate-900">Deploy DoHub</h2>
+        </div>
+
+        <h3 class="mt-6 text-lg font-semibold text-slate-900">Step 10.1 — Configure secrets and values</h3>
+        <pre class="mt-3 overflow-x-auto rounded-xl bg-slate-900 p-4 text-sm text-slate-100"><code>cd /path/to/DeepOps
+
+# Environment secrets (GitHub OAuth, admin users, domain)
+cp dohub/secrets/.env.example dohub/secrets/.env
+nano dohub/secrets/.env
+
+# Key variables:
+#   GITHUB_CLIENT_ID / GITHUB_CLIENT_SECRET
+#   ADMIN_USERS=your-github-username
+#   DOMAIN_NAME=iaihub.uet.edu.vn
+#   NAMESPACE=dohub
+#   DJANGO_SECRET_KEY=…</code></pre>
+
+        <p class="mt-4 text-slate-600">Edit hub configuration and ingress host:</p>
+        <ul class="mt-2 list-inside list-disc space-y-1 text-sm text-slate-600">
+          <li><code>dohub/configmap/config.yaml</code> — storage class, server templates, ingress controller mode</li>
+          <li><code>dohub/values.yaml</code> — ingress host, TLS secret, image repository</li>
+        </ul>
+
+        <h3 class="mt-8 text-lg font-semibold text-slate-900">Step 10.2 — Build images and deploy</h3>
+        <p class="mt-2 text-slate-600">From the repository root on a machine with Docker access to the MicroK8s registry:</p>
+        <pre class="mt-3 overflow-x-auto rounded-xl bg-slate-900 p-4 text-sm text-slate-100"><code>chmod +x build-and-deploy.sh
+
+# Build all images, push to local registry, deploy Helm chart
+./build-and-deploy.sh -t 1.0.0 -r localhost:32000/dohub -p all</code></pre>
+
+        <p class="mt-4 text-sm text-slate-600">This script builds and optionally pushes:</p>
+        <ul class="mt-2 list-inside list-disc space-y-1 text-sm text-slate-600">
+          <li><code>localhost:32000/dohub:1.0.0</code> — Django hub (includes kubectl, helm, kubectl-directpv, codehub chart)</li>
+          <li><code>localhost:32000/ssh-bridge:1.0.0</code> — SSH-over-HTTPS sidecar</li>
+          <li><code>localhost:32000/port-tunnel:1.0.0</code> — TCP port tunnel sidecar</li>
+          <li><code>localhost:32000/monitor-sidecar:1.0.0</code> — Resource monitor sidecar</li>
+        </ul>
+
+        <h3 class="mt-8 text-lg font-semibold text-slate-900">Step 10.3 — GitHub OAuth callback</h3>
+        <p class="mt-2 text-slate-600">Register a GitHub OAuth App with callback URL:</p>
+        <pre class="mt-2 overflow-x-auto rounded-xl bg-slate-800 p-4 text-sm text-slate-100"><code>https://&lt;your-ingress-host&gt;/github-callback</code></pre>
+
+        <h3 class="mt-8 text-lg font-semibold text-slate-900">Step 10.4 — TLS</h3>
+        <p class="mt-2 text-slate-600">
+          TLS is configured with Let's Encrypt via cert-manager — see the
+          <a href="#tls" class="font-medium text-brand-600 hover:text-brand-700">Configure TLS with Let's Encrypt</a>
+          section. In short:
+        </p>
+        <ol class="mt-3 list-inside list-decimal space-y-2 text-sm text-slate-600">
+          <li>Edit the email in <code>letsencrypt-cert-issuer.yaml</code> and apply it to the cluster</li>
+          <li>Add <code>cert-manager.io/cluster-issuer: letsencrypt-prod</code> to <code>dohub/values.yaml</code> ingress annotations</li>
+          <li>Ensure DNS for your hub domain points at the ingress controller before deploying</li>
+        </ol>
+        <p class="mt-3 text-sm text-slate-600">cert-manager will populate <code>tls-dohub-secret</code> automatically when the DoHub ingress is created.</p>
+      </section>
+
+      <!-- 11. Verify -->
+      <section id="verify" class="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm sm:p-8">
+        <div class="flex items-center gap-3">
+          <span class="flex h-10 w-10 items-center justify-center rounded-xl bg-brand-600 text-lg font-bold text-white">11</span>
+          <h2 class="text-2xl font-bold text-slate-900">Verification checklist</h2>
+        </div>
+
+        <pre class="mt-6 overflow-x-auto rounded-xl bg-slate-900 p-4 text-sm text-slate-100"><code># Cluster health
+microk8s kubectl get nodes
+microk8s kubectl get pods -A | grep -Ev 'Running|Completed'
+
+# DirectPV
+microk8s kubectl get storageclass directpv-min-io
+kubectl directpv list drives
+
+# HAMi
+microk8s kubectl get pods -n kube-system -l app.kubernetes.io/name=hami
+microk8s kubectl describe node &lt;gpu-node&gt; | grep -A5 'Capacity'
+
+# DoHub
+microk8s kubectl get pods,ingress,pvc -n dohub
+
+# TLS (cert-manager)
+microk8s kubectl get clusterissuer letsencrypt-prod
+microk8s kubectl get certificate -n dohub
+curl -I https://&lt;your-domain&gt;/</code></pre>
+
+        <p class="mt-6 text-slate-600">Log in via GitHub, create a server from a template, and start it. A workspace pod should schedule, bind a DirectPV PVC, and become reachable at:</p>
+        <pre class="mt-3 overflow-x-auto rounded-xl bg-slate-800 p-4 text-sm text-slate-100"><code>https://&lt;workspace-slug&gt;-&lt;username&gt;.&lt;DOMAIN_NAME&gt;/</code></pre>
+      </section>
+
+      <!-- Troubleshooting -->
+      <section id="troubleshooting" class="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm sm:p-8">
+        <h2 class="text-2xl font-bold text-slate-900">Troubleshooting</h2>
+        <div class="mt-6 space-y-4">
+          <details class="rounded-xl border border-slate-200 p-4">
+            <summary class="cursor-pointer font-semibold text-slate-900">DirectPV: plugin version mismatch</summary>
+            <p class="mt-3 text-sm text-slate-600">Ensure <code>kubectl directpv --version</code> matches <code>images.directpv</code> in <code>directpv-install.yaml</code>. Re-download the plugin or upgrade the Helm release together.</p>
+          </details>
+          <details class="rounded-xl border border-slate-200 p-4">
+            <summary class="cursor-pointer font-semibold text-slate-900">PVC stays Pending</summary>
+            <p class="mt-3 text-sm text-slate-600">Check drives are initialized on the target node, StorageClass is <code>directpv-min-io</code>, and the pod can schedule (node has capacity / GPU labels if needed).</p>
+          </details>
+          <details class="rounded-xl border border-slate-200 p-4">
+            <summary class="cursor-pointer font-semibold text-slate-900">GPU pods not scheduling</summary>
+            <p class="mt-3 text-sm text-slate-600">Verify <code>gpu=on</code> label, HAMi pods running, <code>nvidia-smi</code> works on the node, and nvidia is the default containerd runtime (section 8).</p>
+          </details>
+          <details class="rounded-xl border border-slate-200 p-4">
+            <summary class="cursor-pointer font-semibold text-slate-900">Image pull errors from localhost:32000</summary>
+            <p class="mt-3 text-sm text-slate-600">Confirm registry addon is enabled, images were pushed with <code>-p</code>, and MicroK8s nodes can reach the registry. Re-run <code>./build-and-deploy.sh … -p all</code>.</p>
+          </details>
+          <details class="rounded-xl border border-slate-200 p-4">
+            <summary class="cursor-pointer font-semibold text-slate-900">DoHub DirectPV admin errors (forbidden)</summary>
+            <p class="mt-3 text-sm text-slate-600">Upgrade the dohub chart so ClusterRole includes <code>directpv.min.io</code> resources and <code>daemonsets</code> — see <code>dohub/templates/clusterroles.yaml</code>.</p>
+          </details>
+          <details class="rounded-xl border border-slate-200 p-4">
+            <summary class="cursor-pointer font-semibold text-slate-900">Let's Encrypt certificate stuck / not Ready</summary>
+            <p class="mt-3 text-sm text-slate-600">Check <code>kubectl describe challenge -n dohub</code> and <code>kubectl describe certificate -n dohub</code>. Common causes: DNS not pointing to the cluster, port 80 blocked, ingress class mismatch (issuer expects <code>nginx</code>), or cert-manager pods not running. Ensure the ingress annotation <code>cert-manager.io/cluster-issuer: letsencrypt-prod</code> is set before the first deploy.</p>
+          </details>
+        </div>
+      </section>
+
+      <!-- Footer -->
+      <footer class="border-t border-slate-200 pt-8 text-center text-sm text-slate-500">
+        <p>DeepOps / DoHub — see also <code>DEPLOY.md</code> and <code>README.md</code> in the repository.</p>
+        <p class="mt-1">Generated from repository configuration: DirectPV v5.1.1 · Helm 3.14.4 · Kubernetes 1.30+</p>
+      </footer>
+    </main>
+  </div>
+</body>
+</html>
