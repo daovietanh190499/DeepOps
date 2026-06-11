@@ -784,7 +784,7 @@
                             <span v-else v-text="modalWorkspace.has_key ? 'Regenerate key pair' : 'Generate key pair'"></span>
                         </button>
                     </div>
-                    <p class="text-xs text-slate-600">Tunnel SSH through <code class="rounded bg-white px-1">wss://…/ssh-tunnel</code> (port 443). See <code class="text-[10px]">docs/SSH-OVER-HTTPS.md</code>.</p>
+                    <p class="text-xs text-slate-600">Tunnel SSH through <code class="rounded bg-white px-1">wss://&lt;domain&gt;/&lt;user&gt;/&lt;slug&gt;/ssh-tunnel</code> on the hub domain (port 443). The workspace subdomain is only for the main app.</p>
                     <div class="rounded-lg border border-slate-200 bg-white p-3 text-xs text-slate-600 space-y-1">
                         <p class="font-semibold text-slate-700">Install wstunnel (client)</p>
                         <p>SSH uses <code class="rounded bg-slate-100 px-1">wstunnel</code> as <code class="rounded bg-slate-100 px-1">ProxyCommand</code>. Download the binary for your OS from
@@ -835,7 +835,7 @@
                             <span v-else>Expose</span>
                         </button>
                     </div>
-                    <p class="text-xs text-slate-600">Forward TCP ports from the main container through <code class="rounded bg-white px-1">wss://…/port-tunnel</code> (HTTPS port 443). Use this for apps listening inside the server that are not on the public ingress path.</p>
+                    <p class="text-xs text-slate-600">Forward TCP ports through <code class="rounded bg-white px-1">wss://&lt;domain&gt;/&lt;user&gt;/&lt;slug&gt;/port-tunnel</code> on the hub domain (HTTPS port 443).</p>
                     <div class="flex flex-wrap items-end gap-2">
                         <label class="flex-1 min-w-[12rem] text-xs">
                             <span class="font-medium text-slate-600">Container ports</span>
@@ -855,7 +855,7 @@
                             <li>Run the client command below — it listens on your machine and forwards through the WebSocket tunnel to the container port.</li>
                             <li>Open <code class="rounded bg-slate-100 px-1">http://localhost:&lt;port&gt;</code> (or your DB/client tool) on the local port shown.</li>
                         </ol>
-                        <p class="text-slate-500">Path prefix <code class="rounded bg-slate-100 px-1">port-tunnel</code> must match the server sidecar (<code class="rounded bg-slate-100 px-1">-P port-tunnel</code> on the client, <code class="rounded bg-slate-100 px-1">-r port-tunnel</code> on the server).</p>
+                        <p class="text-slate-500">Path prefix <code class="rounded bg-slate-100 px-1" v-text="tunnelInfo.path_prefix || '…'"></code> must match the server sidecar (<code class="rounded bg-slate-100 px-1">-P</code> on the client, <code class="rounded bg-slate-100 px-1">-r</code> on the server).</p>
                     </div>
                     <p v-if="tunnelSyncMessage && !tunnelSyncError" class="text-xs text-emerald-700" v-text="tunnelSyncMessage"></p>
                     <p v-if="tunnelSyncError" class="text-xs text-rose-600 whitespace-pre-wrap" v-text="tunnelSyncError"></p>

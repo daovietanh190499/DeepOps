@@ -1,0 +1,107 @@
+{{- if and .Values.sidecarIngress.enabled .Values.sidecarIngress.host -}}
+{{- $fullName := include "codehub.fullname" . -}}
+{{- $ns := .Release.Namespace -}}
+{{- if .Values.sshBridge.enabled }}
+{{- $sshPublicPath := .Values.sshBridge.ingressPath | default "/ssh-tunnel" -}}
+{{- $sshPrefix := .Values.sshBridge.pathPrefix | default "ssh-tunnel" -}}
+{{- $sshStripPrefix := trimSuffix (printf "/%s" $sshPrefix) $sshPublicPath -}}
+{{- if $sshStripPrefix }}
+apiVersion: traefik.io/v1alpha1
+kind: Middleware
+metadata:
+  name: {{ $fullName }}-ssh-strip
+  labels:
+    {{- include "codehub.labels" . | nindent 4 }}
+spec:
+  stripPrefix:
+    prefixes:
+      - {{ $sshStripPrefix }}
+---
+{{- end }}
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: {{ $fullName }}-ssh-tunnel
+  labels:
+    {{- include "codehub.labels" . | nindent 4 }}
+  annotations:
+    {{- if $sshStripPrefix }}
+    traefik.ingress.kubernetes.io/router.middlewares: {{ $ns }}-{{ $fullName }}-ssh-strip@kubernetescrd
+    {{- end }}
+    traefik.ingress.kubernetes.io/router.priority: "1000"
+spec:
+  {{- if .Values.ingress.className }}
+  ingressClassName: {{ .Values.ingress.className }}
+  {{- end }}
+  {{- if .Values.sidecarIngress.tlsSecretName }}
+  tls:
+    - hosts:
+        - {{ .Values.sidecarIngress.host | quote }}
+      secretName: {{ .Values.sidecarIngress.tlsSecretName }}
+  {{- end }}
+  rules:
+    - host: {{ .Values.sidecarIngress.host | quote }}
+      http:
+        paths:
+          - path: {{ $sshPublicPath }}
+            pathType: Prefix
+            backend:
+              service:
+                name: {{ $fullName }}
+                port:
+                  number: {{ .Values.sshBridge.wsPort }}
+{{- end }}
+{{- if and .Values.sshBridge.enabled .Values.portTunnel.enabled }}
+---
+{{- end }}
+{{- if .Values.portTunnel.enabled }}
+{{- $portPublicPath := .Values.portTunnel.ingressPath | default "/port-tunnel" -}}
+{{- $portPrefix := .Values.portTunnel.pathPrefix | default "port-tunnel" -}}
+{{- $portStripPrefix := trimSuffix (printf "/%s" $portPrefix) $portPublicPath -}}
+{{- if $portStripPrefix }}
+apiVersion: traefik.io/v1alpha1
+kind: Middleware
+metadata:
+  name: {{ $fullName }}-port-strip
+  labels:
+    {{- include "codehub.labels" . | nindent 4 }}
+spec:
+  stripPrefix:
+    prefixes:
+      - {{ $portStripPrefix }}
+---
+{{- end }}
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: {{ $fullName }}-port-tunnel
+  labels:
+    {{- include "codehub.labels" . | nindent 4 }}
+  annotations:
+    {{- if $portStripPrefix }}
+    traefik.ingress.kubernetes.io/router.middlewares: {{ $ns }}-{{ $fullName }}-port-strip@kubernetescrd
+    {{- end }}
+    traefik.ingress.kubernetes.io/router.priority: "1000"
+spec:
+  {{- if .Values.ingress.className }}
+  ingressClassName: {{ .Values.ingress.className }}
+  {{- end }}
+  {{- if .Values.sidecarIngress.tlsSecretName }}
+  tls:
+    - hosts:
+        - {{ .Values.sidecarIngress.host | quote }}
+      secretName: {{ .Values.sidecarIngress.tlsSecretName }}
+  {{- end }}
+  rules:
+    - host: {{ .Values.sidecarIngress.host | quote }}
+      http:
+        paths:
+          - path: {{ $portPublicPath }}
+            pathType: Prefix
+            backend:
+              service:
+                name: {{ $fullName }}
+                port:
+                  number: {{ .Values.portTunnel.wsPort }}
+{{- end }}
+{{- end }}

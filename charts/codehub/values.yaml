@@ -38,6 +38,7 @@ sshBridge:
   sshPort: 2222
   sshUser: coder
   ingressPath: /ssh-tunnel
+  pathPrefix: ssh-tunnel
   secretName: ""
   authorizedKeys: ""
   # Main workspace container kubectl exec target
@@ -47,6 +48,12 @@ sshBridge:
     name: ""
   rbac:
     create: true
+
+# SSH / port-tunnel paths on the hub domain (not the workspace subdomain)
+sidecarIngress:
+  enabled: false
+  host: ""
+  tlsSecretName: tls-dohub-secret
 
 # Expose main-container TCP ports through wstunnel over HTTPS (separate from SSH tunnel)
 portTunnel:

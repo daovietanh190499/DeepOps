@@ -133,7 +133,7 @@ spec:
             - name: WS_PORT
               value: {{ .Values.sshBridge.wsPort | quote }}
             - name: WS_PATH_PREFIX
-              value: {{ trimPrefix "/" (.Values.sshBridge.ingressPath | default "/ssh-tunnel") | quote }}
+              value: {{ .Values.sshBridge.pathPrefix | default "ssh-tunnel" | quote }}
             - name: AUTHORIZED_KEYS
               value: /ssh/authorized_keys
             - name: POD_NAME
@@ -178,7 +178,7 @@ spec:
             - name: WS_PORT
               value: {{ .Values.portTunnel.wsPort | quote }}
             - name: WS_PATH_PREFIX
-              value: {{ trimPrefix "/" (.Values.portTunnel.ingressPath | default "/port-tunnel") | quote }}
+              value: {{ .Values.portTunnel.pathPrefix | default "port-tunnel" | quote }}
             - name: TARGET_HOST
               value: {{ .Values.portTunnel.targetHost | default "127.0.0.1" | quote }}
             - name: TUNNEL_PORTS

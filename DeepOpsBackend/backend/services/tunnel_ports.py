@@ -1,6 +1,7 @@
 """WebSocket tunnel port exposure (wstunnel) for workspace main container."""
 
-PORT_TUNNEL_PATH_PREFIX = 'port-tunnel'
+from .workspace_routes import hub_wss_base_url, port_tunnel_path_prefix, port_tunnel_wss_url
+
 MAX_TUNNEL_PORTS = 32
 
 
@@ -48,10 +49,6 @@ def parse_tunnel_ports(raw) -> list[int]:
     return sorted(ports)
 
 
-def port_tunnel_wss_url(workspace) -> str:
-    return f'wss://{workspace.hostname}/{PORT_TUNNEL_PATH_PREFIX}'
-
-
 def wstunnel_client_local_flag(local_port: int, remote_port: int, target_host: str = '127.0.0.1') -> str:
     return f'tcp://{local_port}:{target_host}:{remote_port}'
 
@@ -71,9 +68,10 @@ def wstunnel_client_command(
         for p in ports
     ]
     local_part = ' '.join(f'-L {flag}' for flag in flags)
+    prefix = port_tunnel_path_prefix(workspace)
     return (
-        f'wstunnel client --log-lvl=warn -P {PORT_TUNNEL_PATH_PREFIX} '
-        f'{local_part} {port_tunnel_wss_url(workspace)}'
+        f'wstunnel client --log-lvl=warn -P {prefix} '
+        f'{local_part} {hub_wss_base_url()}'
     )
 
 
@@ -86,8 +84,8 @@ def tunnel_port_entries(workspace, ports: list[int]) -> list[dict]:
             'local_port': local,
             'remote_host': '127.0.0.1',
             'command': (
-                f'wstunnel client --log-lvl=warn -P {PORT_TUNNEL_PATH_PREFIX} '
-                f'-L tcp://{local}:127.0.0.1:{port} {port_tunnel_wss_url(workspace)}'
+                f'wstunnel client --log-lvl=warn -P {port_tunnel_path_prefix(workspace)} '
+                f'-L tcp://{local}:127.0.0.1:{port} {hub_wss_base_url()}'
             ),
         })
     return entries
@@ -101,7 +99,7 @@ def tunnel_info_payload(workspace) -> dict:
         'ports': ports,
         'ports_text': ', '.join(str(p) for p in ports),
         'wss_url': port_tunnel_wss_url(workspace),
-        'path_prefix': PORT_TUNNEL_PATH_PREFIX,
+        'path_prefix': port_tunnel_path_prefix(workspace),
         'client_command': combined,
         'port_commands': tunnel_port_entries(workspace, ports),
         'curl_example': (

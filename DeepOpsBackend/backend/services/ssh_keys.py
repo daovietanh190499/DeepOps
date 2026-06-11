@@ -10,7 +10,13 @@ from django.conf import settings
 
 from backend.models import Workspace, WorkspaceSSHKey
 
-WSTUNNEL_PATH_PREFIX = 'ssh-tunnel'
+from .k8s_env import DOMAIN_NAME
+from .workspace_routes import (
+    hub_wss_base_url,
+    ssh_tunnel_ingress_path,
+    ssh_tunnel_path_prefix,
+    ssh_tunnel_wss_url,
+)
 
 
 def _fernet() -> Fernet:
@@ -68,13 +74,14 @@ def ssh_user() -> str:
 
 
 def wss_tunnel_url(workspace: Workspace) -> str:
-    return f'wss://{workspace.hostname}/ssh-tunnel'
+    return ssh_tunnel_wss_url(workspace)
 
 
-def wstunnel_proxy_command() -> str:
+def wstunnel_proxy_command(workspace: Workspace) -> str:
+    prefix = ssh_tunnel_path_prefix(workspace)
     return (
-        f'wstunnel client --log-lvl=warn -P {WSTUNNEL_PATH_PREFIX} '
-        '-L stdio://127.0.0.1:2222 wss://%h/ssh-tunnel'
+        f'wstunnel client --log-lvl=warn -P {prefix} '
+        f'-L stdio://127.0.0.1:2222 {hub_wss_base_url()}'
     )
 
 
@@ -83,10 +90,10 @@ def ssh_config_snippet(workspace: Workspace, *, identity_path: str | None = None
     key_path = identity_path or f'~/.ssh/dohub-{workspace.slug}'
     return '\n'.join([
         f'Host {host_alias}',
-        f'    HostName {workspace.hostname}',
+        f'    HostName {DOMAIN_NAME}',
         f'    User {ssh_user()}',
         f'    IdentityFile {key_path}',
-        f'    ProxyCommand {wstunnel_proxy_command()}',
+        f'    ProxyCommand {wstunnel_proxy_command(workspace)}',
         '    StrictHostKeyChecking accept-new',
     ])
 
@@ -140,12 +147,13 @@ def ssh_info_payload(workspace: Workspace) -> dict:
         'public_key': record.public_key if record else '',
         'ssh_user': ssh_user(),
         'wss_url': wss_tunnel_url(workspace),
+        'path_prefix': ssh_tunnel_path_prefix(workspace),
         'ssh_host_alias': f'dohub-{workspace.slug}',
         'ssh_command': ssh_connect_command(workspace) if record else '',
         'ssh_config': ssh_config_snippet(workspace) if record else '',
-        'proxy_command': wstunnel_proxy_command() if record else '',
+        'proxy_command': wstunnel_proxy_command(workspace) if record else '',
         'proxy_hint': (
             'Install wstunnel: https://github.com/erebe/wstunnel/releases '
-            '(client uses -P ssh-tunnel -L stdio://127.0.0.1:2222 wss://HOST/ssh-tunnel)'
+            f'(path {ssh_tunnel_ingress_path(workspace)} on {DOMAIN_NAME})'
         ),
     }

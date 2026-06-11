@@ -12,6 +12,43 @@ def _storage_class() -> str:
     return get_hub_config().get('storage', {}).get('storageClassName', 'directpv-min-io')
 
 
+def _helm_release_status(release_name: str) -> str | None:
+    """Return helm release status, or None if the release name is not reserved."""
+    result = subprocess.run(
+        ['helm', 'list', '-n', NAMESPACE, '-a', '-o', 'json'],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    if result.returncode != 0 or not (result.stdout or '').strip():
+        return None
+    try:
+        releases = json.loads(result.stdout)
+    except json.JSONDecodeError:
+        return None
+    for item in releases:
+        if (item.get('name') or '').strip() == release_name:
+            return (item.get('status') or '').strip().lower() or None
+    return None
+
+
+def _clear_stuck_helm_release(release_name: str) -> tuple[str, int]:
+    """Remove failed/stuck helm metadata so upgrade --install can proceed."""
+    status = _helm_release_status(release_name)
+    if status is None or status == 'deployed':
+        return '', 0
+    result = subprocess.run(
+        ['helm', 'uninstall', release_name, '-n', NAMESPACE],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    logs = ((result.stdout or '') + (result.stderr or '')).strip()
+    if result.returncode != 0 and 'not found' not in logs.lower():
+        return logs or 'helm uninstall failed', result.returncode
+    return logs or f'cleared helm release in {status!r} state', 0
+
+
 def build_spawn_config(workspace) -> dict:
     from .workspace_mounts import build_pvc_volume_specs, spawn_drive_mounts
 
@@ -73,6 +110,27 @@ def _security_context_helm_flags(privileged: bool) -> list[str]:
         '--set-json',
         'securityContext={"runAsUser":1000,"allowPrivilegeEscalation":false,"privileged":false}',
     ]
+
+
+def _sidecar_ingress_flags(config: dict) -> list[str]:
+    """Path-based SSH / port-tunnel routes on the hub domain."""
+    ssh_on = config.get('ssh_enabled') and config.get('ssh_secret_name')
+    tunnel_on = bool(config.get('ws_tunnel_ports'))
+    if not ssh_on and not tunnel_on:
+        return []
+
+    username = config['username']
+    slug = config['slug']
+    flags = [
+        '--set', 'sidecarIngress.enabled=true',
+        '--set-string', f'sidecarIngress.host={DOMAIN_NAME}',
+        '--set-string', f'sidecarIngress.tlsSecretName=tls-{NAMESPACE}-secret',
+    ]
+    if ssh_on:
+        flags.extend(['--set-string', f'sshBridge.ingressPath=/{username}/{slug}/ssh-tunnel'])
+    if tunnel_on:
+        flags.extend(['--set-string', f'portTunnel.ingressPath=/{username}/{slug}/port-tunnel'])
+    return flags
 
 
 def _parse_memory_bytes(ram_str: str) -> int:
@@ -226,6 +284,7 @@ def _helm_base_cmd(config: dict) -> list[str]:
         ])
 
     cmd.extend([
+        *_sidecar_ingress_flags(config),
         *gpu_flags,
         config['release_name'],
         CODEHUB_CHART_PATH,
@@ -242,6 +301,9 @@ def create_codehub(config: dict) -> tuple[str, str, int]:
         logs, code = sync_ssh_secret_for_workspace(workspace)
         if code != 0:
             return '', f'ssh secret apply failed: {logs}', code
+    prep_logs, prep_code = _clear_stuck_helm_release(config['release_name'])
+    if prep_code != 0:
+        return '', f'helm release cleanup failed: {prep_logs}', prep_code
     cmd = _helm_base_cmd(config)
     result = subprocess.run(cmd, capture_output=True, text=True, check=False)
     logs = result.stdout + result.stderr
@@ -305,9 +367,7 @@ def stop_codehub(release_name: str) -> tuple[str, int]:
 
 def remove_codehub(release_name: str) -> int:
     """Remove a workspace Helm release. No-op if the release does not exist."""
-    from .k8s_status import helm_release_exists
-
-    if not helm_release_exists(release_name):
+    if _helm_release_status(release_name) is None:
         return 0
     return subprocess.call([
         'helm', 'uninstall', '-n', NAMESPACE, release_name,
