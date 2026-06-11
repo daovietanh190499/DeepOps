@@ -43,7 +43,7 @@
                 </nav>
                 <button v-if="!is_login" @click="loginWithGithub()"
                         class="inline-flex items-center gap-2 rounded-lg bg-slate-900 px-3 py-2 text-sm font-semibold text-white hover:bg-slate-800">
-                    <img src="/static/img/github.png" class="h-4 w-4 invert" alt="">
+                    <img src="/static/img/github.png" class="h-4 w-4" alt="">
                     <span class="hidden sm:inline">Login with GitHub</span>
                 </button>
                 <button v-if="is_login" @click="logout()"
