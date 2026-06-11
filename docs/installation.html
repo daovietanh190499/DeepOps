@@ -3,7 +3,8 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>DeepOps / DoHub — Cluster Installation Guide</title>
+  <title>DoHub — Cluster Installation Guide</title>
+  <link rel="icon" href="assets/logo.png" type="image/png" />
   <script src="https://cdn.tailwindcss.com"></script>
   <script>
     tailwind.config = {
@@ -25,19 +26,19 @@
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
   <style>
     pre code { font-family: 'JetBrains Mono', ui-monospace, monospace; }
-    .step-badge { counter-increment: step; }
-    .step-badge::before { content: counter(step); }
-    ol.steps { counter-reset: step; }
   </style>
 </head>
 <body class="bg-slate-50 text-slate-800 antialiased">
 
   <!-- Header -->
   <header class="sticky top-0 z-40 border-b border-slate-200 bg-white/90 backdrop-blur">
-    <div class="mx-auto flex max-w-7xl items-center justify-between px-4 py-4 sm:px-6 lg:px-8">
-      <div>
-        <p class="text-xs font-semibold uppercase tracking-wider text-brand-600">DeepOps / DoHub</p>
-        <h1 class="text-lg font-bold text-slate-900">Cluster Installation Guide</h1>
+    <div class="mx-auto flex max-w-7xl items-center justify-between px-4 py-3 sm:px-6 lg:px-8">
+      <div class="flex items-center gap-3">
+        <img src="assets/logo.png" alt="DoHub" class="h-10 w-10 rounded-xl object-contain shadow-sm ring-1 ring-slate-200/80" />
+        <div>
+          <p class="text-xs font-semibold uppercase tracking-wider text-brand-600">DoHub</p>
+          <h1 class="text-lg font-bold text-slate-900">Cluster Installation Guide</h1>
+        </div>
       </div>
       <a href="#prerequisites" class="hidden rounded-lg bg-brand-600 px-4 py-2 text-sm font-medium text-white hover:bg-brand-700 sm:inline-block">Get started</a>
     </div>
@@ -47,7 +48,15 @@
 
     <!-- Sidebar TOC -->
     <aside class="hidden w-64 shrink-0 lg:block">
-      <nav class="sticky top-24 space-y-1 text-sm">
+      <div class="sticky top-24">
+        <div class="mb-5 flex items-center gap-2.5 rounded-xl border border-slate-200 bg-white px-3 py-3 shadow-sm">
+          <img src="assets/logo.png" alt="DoHub" class="h-9 w-9 rounded-lg object-contain" />
+          <div>
+            <p class="text-sm font-semibold text-slate-900">DoHub</p>
+            <p class="text-xs text-slate-500">Install guide</p>
+          </div>
+        </div>
+      <nav class="space-y-1 text-sm">
         <p class="mb-3 text-xs font-semibold uppercase tracking-wider text-slate-400">Contents</p>
         <a href="#overview" class="block rounded-md px-3 py-2 text-slate-600 hover:bg-slate-100">Overview</a>
         <a href="#prerequisites" class="block rounded-md px-3 py-2 text-slate-600 hover:bg-slate-100">1. Prerequisites</a>
@@ -64,6 +73,7 @@
         <a href="#verify" class="block rounded-md px-3 py-2 text-slate-600 hover:bg-slate-100">11. Verification</a>
         <a href="#troubleshooting" class="block rounded-md px-3 py-2 text-slate-600 hover:bg-slate-100">Troubleshooting</a>
       </nav>
+      </div>
     </aside>
 
     <!-- Main content -->
@@ -71,28 +81,66 @@
 
       <!-- Overview -->
       <section id="overview" class="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm sm:p-8">
-        <h2 class="text-2xl font-bold text-slate-900">Overview</h2>
-        <p class="mt-3 text-slate-600 leading-relaxed">
-          This guide walks through bringing up a production DeepOps (DoHub) cluster on Ubuntu nodes using
-          <strong>MicroK8s</strong>, <strong>DirectPV</strong> for local storage, and <strong>HAMi</strong> for GPU / vGPU scheduling.
-          Workspaces are spawned via the <code class="rounded bg-slate-100 px-1.5 py-0.5 text-sm">charts/codehub</code> Helm chart; the hub itself is deployed from <code class="rounded bg-slate-100 px-1.5 py-0.5 text-sm">dohub/</code>.
-        </p>
+        <div class="flex flex-col gap-4 sm:flex-row sm:items-start sm:gap-6">
+          <img src="assets/logo.png" alt="DoHub" class="mx-auto h-20 w-20 shrink-0 rounded-2xl object-contain shadow-md ring-1 ring-slate-200 sm:mx-0 sm:h-24 sm:w-24" />
+          <div class="min-w-0 flex-1">
+            <h2 class="text-2xl font-bold text-slate-900">Overview</h2>
+            <p class="mt-3 text-slate-600 leading-relaxed">
+              This guide walks through bringing up a production <strong>DoHub</strong> cluster on Ubuntu nodes using
+              <strong>MicroK8s</strong>, <strong>DirectPV</strong> for local storage, and <strong>HAMi</strong> for GPU / vGPU scheduling.
+              Workspaces are spawned via the <code class="rounded bg-slate-100 px-1.5 py-0.5 text-sm">charts/codehub</code> Helm chart; the hub itself is deployed from <code class="rounded bg-slate-100 px-1.5 py-0.5 text-sm">dohub/</code>.
+            </p>
+          </div>
+        </div>
 
         <div class="mt-6 grid gap-4 sm:grid-cols-2">
           <div class="rounded-xl border border-brand-100 bg-brand-50 p-4">
             <h3 class="font-semibold text-brand-900">Pipeline summary</h3>
-            <ol class="steps mt-3 space-y-2 text-sm text-brand-900">
-              <li class="step-badge flex gap-3"><span class="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-brand-600 text-xs font-bold text-white"></span><span>Install prerequisites on every node</span></li>
-              <li class="step-badge flex gap-3"><span class="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-brand-600 text-xs font-bold text-white"></span><span>Install MicroK8s on each node</span></li>
-              <li class="step-badge flex gap-3"><span class="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-brand-600 text-xs font-bold text-white"></span><span>Join worker / HA nodes to the master</span></li>
-              <li class="step-badge flex gap-3"><span class="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-brand-600 text-xs font-bold text-white"></span><span>Enable core MicroK8s addons</span></li>
-              <li class="step-badge flex gap-3"><span class="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-brand-600 text-xs font-bold text-white"></span><span>Configure Let's Encrypt TLS (<code>letsencrypt-cert-issuer.yaml</code>)</span></li>
-              <li class="step-badge flex gap-3"><span class="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-brand-600 text-xs font-bold text-white"></span><span>Install DirectPV via Helm</span></li>
-              <li class="step-badge flex gap-3"><span class="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-brand-600 text-xs font-bold text-white"></span><span>Install matching <code>kubectl-directpv</code> plugin</span></li>
-              <li class="step-badge flex gap-3"><span class="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-brand-600 text-xs font-bold text-white"></span><span>Discover and initialize drives</span></li>
-              <li class="step-badge flex gap-3"><span class="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-brand-600 text-xs font-bold text-white"></span><span>Configure NVIDIA runtime on GPU nodes</span></li>
-              <li class="step-badge flex gap-3"><span class="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-brand-600 text-xs font-bold text-white"></span><span>Label GPU nodes and install HAMi</span></li>
-              <li class="step-badge flex gap-3"><span class="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-brand-600 text-xs font-bold text-white"></span><span>Build and deploy DoHub</span></li>
+            <ol class="mt-3 list-none space-y-2.5 pl-0">
+              <li class="flex items-start gap-3 text-sm text-brand-900">
+                <span class="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-brand-600 text-xs font-bold leading-none text-white">1</span>
+                <span class="pt-0.5">Install prerequisites on every node</span>
+              </li>
+              <li class="flex items-start gap-3 text-sm text-brand-900">
+                <span class="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-brand-600 text-xs font-bold leading-none text-white">2</span>
+                <span class="pt-0.5">Install MicroK8s on each node</span>
+              </li>
+              <li class="flex items-start gap-3 text-sm text-brand-900">
+                <span class="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-brand-600 text-xs font-bold leading-none text-white">3</span>
+                <span class="pt-0.5">Join worker / HA nodes to the master</span>
+              </li>
+              <li class="flex items-start gap-3 text-sm text-brand-900">
+                <span class="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-brand-600 text-xs font-bold leading-none text-white">4</span>
+                <span class="pt-0.5">Enable core MicroK8s addons</span>
+              </li>
+              <li class="flex items-start gap-3 text-sm text-brand-900">
+                <span class="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-brand-600 text-xs font-bold leading-none text-white">5</span>
+                <span class="pt-0.5">Configure Let's Encrypt TLS (<code class="rounded bg-brand-100/80 px-1 text-xs">letsencrypt-cert-issuer.yaml</code>)</span>
+              </li>
+              <li class="flex items-start gap-3 text-sm text-brand-900">
+                <span class="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-brand-600 text-xs font-bold leading-none text-white">6</span>
+                <span class="pt-0.5">Install DirectPV via Helm</span>
+              </li>
+              <li class="flex items-start gap-3 text-sm text-brand-900">
+                <span class="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-brand-600 text-xs font-bold leading-none text-white">7</span>
+                <span class="pt-0.5">Install matching <code class="rounded bg-brand-100/80 px-1 text-xs">kubectl-directpv</code> plugin</span>
+              </li>
+              <li class="flex items-start gap-3 text-sm text-brand-900">
+                <span class="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-brand-600 text-xs font-bold leading-none text-white">8</span>
+                <span class="pt-0.5">Discover and initialize drives</span>
+              </li>
+              <li class="flex items-start gap-3 text-sm text-brand-900">
+                <span class="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-brand-600 text-xs font-bold leading-none text-white">9</span>
+                <span class="pt-0.5">Configure NVIDIA runtime on GPU nodes</span>
+              </li>
+              <li class="flex items-start gap-3 text-sm text-brand-900">
+                <span class="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-brand-600 text-xs font-bold leading-none text-white">10</span>
+                <span class="pt-0.5">Label GPU nodes and install HAMi</span>
+              </li>
+              <li class="flex items-start gap-3 text-sm text-brand-900">
+                <span class="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-brand-600 text-xs font-bold leading-none text-white">11</span>
+                <span class="pt-0.5">Build and deploy DoHub</span>
+              </li>
             </ol>
           </div>
           <div class="rounded-xl border border-slate-200 bg-slate-50 p-4">
@@ -728,8 +776,9 @@ curl -I https://&lt;your-domain&gt;/</code></pre>
 
       <!-- Footer -->
       <footer class="border-t border-slate-200 pt-8 text-center text-sm text-slate-500">
-        <p>DeepOps / DoHub — see also <code>DEPLOY.md</code> and <code>README.md</code> in the repository.</p>
-        <p class="mt-1">Generated from repository configuration: DirectPV v5.1.1 · Helm 3.14.4 · Kubernetes 1.30+</p>
+        <img src="assets/logo.png" alt="DoHub" class="mx-auto mb-3 h-10 w-10 rounded-lg object-contain opacity-80" />
+        <p>DoHub — see also <code>DEPLOY.md</code> and <code>README.md</code> in the repository.</p>
+        <p class="mt-1">DirectPV v5.1.1 · Helm 3.14.4 · Kubernetes 1.30+</p>
       </footer>
     </main>
   </div>
