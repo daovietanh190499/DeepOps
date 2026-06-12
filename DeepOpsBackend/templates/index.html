@@ -946,14 +946,24 @@
                             class="rounded-lg border px-2 py-1 text-xs min-w-[6rem]">
                         <option v-for="opt in monitorWindowOptions" :key="opt.minutes" :value="opt.minutes" v-text="opt.label"></option>
                     </select>
+                    <div class="ml-auto flex flex-wrap items-center gap-2">
                     <button type="button" @click="fetchWorkspaceMonitor()" :disabled="workspaceMonitor.loading"
-                            class="ml-auto rounded-lg border px-3 py-1 text-xs font-semibold hover:bg-slate-50 disabled:opacity-50">
+                            class="rounded-lg border px-3 py-1 text-xs font-semibold hover:bg-slate-50 disabled:opacity-50">
                         <i class="fa fa-refresh" :class="workspaceMonitor.loading ? 'fa-spin' : ''"></i> Refresh
                     </button>
+                    <button type="button" @click="downloadMonitorFile(modalWorkspace)"
+                            :disabled="!workspaceMonitor.pods.length || workspaceMonitor.loading"
+                            class="rounded-lg border px-3 py-1 text-xs font-semibold hover:bg-slate-50 disabled:opacity-50"
+                            title="Download daily metrics JSONL files (tar.gz)">
+                        <i class="fa fa-download"></i> Download
+                    </button>
+                    </div>
                 </div>
                 <p class="text-[10px] text-slate-400">
                     Auto-refreshes every 2s · Last {{ workspaceMonitor.windowLabel }} ·
-                    <code class="rounded bg-slate-100 px-1">monitor-sidecar</code>
+                    <code class="rounded bg-slate-100 px-1">monitor-sidecar</code> ·
+                    Daily files <code class="rounded bg-slate-100 px-1">metrics-YYYY-MM-DD.jsonl</code>
+                    (30-day retention) · Download is a <code class="rounded bg-slate-100 px-1">.tar.gz</code> archive
                 </p>
                 <p v-if="workspaceMonitor.error" class="text-xs text-amber-700 whitespace-pre-wrap" v-text="workspaceMonitor.error"></p>
                 <p v-if="!workspaceMonitor.error && !workspaceMonitor.points.length && !workspaceMonitor.loading"

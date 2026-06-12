@@ -320,6 +320,27 @@ def _helm_base_cmd(config: dict) -> list[str]:
     return cmd
 
 
+def _delete_workspace_deployments(release_name: str) -> tuple[str, int]:
+    """Remove existing workspace deployment(s) so a fresh pod can be created."""
+    result = subprocess.run(
+        [
+            'kubectl', 'delete', 'deployment',
+            '-n', NAMESPACE,
+            f'-l=app.kubernetes.io/instance={release_name}',
+            '--ignore-not-found=true',
+            '--wait=true',
+            '--timeout=120s',
+        ],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    logs = ((result.stdout or '') + (result.stderr or '')).strip()
+    if result.returncode != 0:
+        return logs or 'deployment delete failed', result.returncode
+    return logs or 'deployment removed', 0
+
+
 def create_codehub(config: dict) -> tuple[str, str, int]:
     if config.get('ssh_enabled'):
         from backend.models import Workspace
@@ -329,6 +350,9 @@ def create_codehub(config: dict) -> tuple[str, str, int]:
         logs, code = sync_ssh_secret_for_workspace(workspace)
         if code != 0:
             return '', f'ssh secret apply failed: {logs}', code
+        del_logs, del_code = _delete_workspace_deployments(config['release_name'])
+        if del_code != 0:
+            return '', f'deployment cleanup failed: {del_logs}', del_code
     prep_logs, prep_code = _clear_stuck_helm_release(config['release_name'])
     if prep_code != 0:
         return '', f'helm release cleanup failed: {prep_logs}', prep_code

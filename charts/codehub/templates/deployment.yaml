@@ -214,12 +214,10 @@ spec:
               value: {{ .Values.monitor.memoryLimitBytes | default 4294967296 | quote }}
             - name: INTERVAL_SEC
               value: {{ .Values.monitor.intervalSec | default 2 | quote }}
-            - name: MAX_LINES
-              value: {{ .Values.monitor.maxLines | default 9000 | quote }}
+            - name: RETENTION_DAYS
+              value: {{ .Values.monitor.retentionDays | default 30 | quote }}
             - name: LOG_DIR
               value: {{ .Values.monitor.logDir | default "/tmp/monitor" | quote }}
-            - name: LOG_FILE
-              value: {{ printf "%s/metrics.jsonl" (.Values.monitor.logDir | default "/tmp/monitor") | quote }}
           resources:
             requests:
               cpu: 25m

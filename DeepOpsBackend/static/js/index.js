@@ -1442,6 +1442,13 @@ const appVue = new Vue({
         downloadSshKey(ws) {
             window.location = 'workspaces/' + ws.id + '/ssh/download'
         },
+        downloadMonitorFile(ws) {
+            if (!ws) return
+            const params = new URLSearchParams()
+            if (this.workspaceMonitor.selectedPod) params.set('pod', this.workspaceMonitor.selectedPod)
+            const qs = params.toString()
+            window.location = 'workspaces/' + ws.id + '/monitor/download' + (qs ? '?' + qs : '')
+        },
         async copyText(text, msg) {
             if (!text) return
             try {

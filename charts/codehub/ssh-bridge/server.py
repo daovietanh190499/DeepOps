@@ -19,7 +19,7 @@ from pathlib import Path
 import asyncssh
 
 LOG = logging.getLogger('ssh_bridge')
-BUILD_ID = 'ssh-bridge-2026-06-09-pty-resize'
+BUILD_ID = 'ssh-bridge-2026-06-11-pty-close'
 
 SSH_BIND_HOST = os.environ.get('SSH_BIND_HOST', '127.0.0.1')
 SSH_PORT = int(os.environ.get('SSH_PORT', '2222'))
@@ -113,6 +113,14 @@ def _set_nonblocking(fd: int) -> None:
     fcntl.fcntl(fd, fcntl.F_SETFL, flags | os.O_NONBLOCK)
 
 
+def _close_pty_master(fd: int) -> None:
+    """Close a PTY master fd. PTYs do not support os.shutdown() (Linux EINVAL)."""
+    if fd < 0:
+        return
+    with contextlib.suppress(OSError):
+        os.close(fd)
+
+
 def _stop_shell(shell: subprocess.Popen[bytes]) -> int:
     if shell.poll() is not None:
         return shell.returncode or 0
@@ -169,9 +177,6 @@ async def _forward_ssh_to_pty(
             await asyncio.get_running_loop().run_in_executor(None, os.write, master_fd, data)
     except (asyncssh.DisconnectError, BrokenPipeError, OSError):
         stop_event.set()
-    finally:
-        with contextlib.suppress(OSError):
-            os.shutdown(master_fd, os.SHUT_WR)
 
 
 async def _forward_pty_to_ssh(
@@ -271,9 +276,8 @@ async def _run_interactive_shell(process: asyncssh.SSHServerProcess) -> int:
             shell_task.cancel()
             with contextlib.suppress(asyncio.CancelledError):
                 await shell_task
-        with contextlib.suppress(OSError):
-            os.shutdown(master_fd, os.SHUT_RDWR)
-            os.close(master_fd)
+        _close_pty_master(master_fd)
+        master_fd = -1
         if shell.poll() is None:
             with contextlib.suppress(subprocess.TimeoutExpired):
                 shell.kill()

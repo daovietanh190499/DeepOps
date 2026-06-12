@@ -2,13 +2,14 @@
 set -euo pipefail
 
 LOG_DIR="${LOG_DIR:-/tmp/monitor}"
-LOG_FILE="${LOG_FILE:-$LOG_DIR/metrics.jsonl}"
 INTERVAL_SEC="${INTERVAL_SEC:-2}"
-MAX_LINES="${MAX_LINES:-9000}"
+RETENTION_DAYS="${RETENTION_DAYS:-30}"
 TARGET_CONTAINER="${TARGET_CONTAINER:-codehub}"
 GPU_ENABLED="${GPU_ENABLED:-false}"
 CPU_LIMIT_MILLICORES="${CPU_LIMIT_MILLICORES:-2000}"
 MEMORY_LIMIT_BYTES="${MEMORY_LIMIT_BYTES:-4294967296}"
+
+CURRENT_DAY=""
 
 mkdir -p "$LOG_DIR"
 
@@ -44,20 +45,40 @@ parse_mem_to_bytes() {
   fi
 }
 
-trim_log_file() {
-  if [[ ! -f "$LOG_FILE" ]]; then
-    return
-  fi
-  local lines
-  lines=$(wc -l < "$LOG_FILE" | tr -d ' ')
-  if [[ "$lines" -gt "$MAX_LINES" ]]; then
-    tail -n "$MAX_LINES" "$LOG_FILE" > "${LOG_FILE}.tmp"
-    mv "${LOG_FILE}.tmp" "$LOG_FILE"
-  fi
+daily_log_file() {
+  echo "${LOG_DIR}/metrics-$(date -u +%Y-%m-%d).jsonl"
+}
+
+purge_old_logs() {
+  local retention_days="${RETENTION_DAYS:-30}"
+  local cutoff_day
+  cutoff_day=$(date -u -d "${retention_days} days ago" +%Y-%m-%d)
+
+  local f base day
+  for f in "$LOG_DIR"/metrics-*.jsonl; do
+    [[ -e "$f" ]] || continue
+    base="${f##*/}"
+    day="${base#metrics-}"
+    day="${day%.jsonl}"
+    if [[ "$day" < "$cutoff_day" ]]; then
+      rm -f "$f"
+    fi
+  done
+
+  # Drop legacy single-file format if present (rm -f avoids set -e exit when missing).
+  rm -f "$LOG_DIR/metrics.jsonl"
 }
 
 collect_once() {
-  local ts cpu_raw mem_raw cpu_m mem_b gpu_util gpu_mem_used gpu_mem_total
+  local today log_file ts cpu_raw mem_raw cpu_m mem_b gpu_util gpu_mem_used gpu_mem_total
+
+  today=$(date -u +%Y-%m-%d)
+  if [[ "$today" != "$CURRENT_DAY" ]]; then
+    CURRENT_DAY="$today"
+    purge_old_logs
+  fi
+
+  log_file=$(daily_log_file)
   ts=$(date -u +%Y-%m-%dT%H:%M:%SZ)
 
   cpu_raw=""
@@ -105,10 +126,10 @@ collect_once() {
     "${MEMORY_LIMIT_BYTES:-4294967296}" \
     "${gpu_util:-null}" \
     "${gpu_mem_used:-null}" \
-    "${gpu_mem_total:-null}" >> "$LOG_FILE"
-
-  trim_log_file
+    "${gpu_mem_total:-null}" >> "$log_file"
 }
+
+purge_old_logs
 
 while true; do
   collect_once || true

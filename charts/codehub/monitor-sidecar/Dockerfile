@@ -23,9 +23,8 @@ COPY collect.sh entrypoint.sh ./
 RUN chmod +x /app/collect.sh /app/entrypoint.sh
 
 ENV LOG_DIR=/tmp/monitor
-ENV LOG_FILE=/tmp/monitor/metrics.jsonl
 ENV INTERVAL_SEC=2
-ENV MAX_LINES=9000
+ENV RETENTION_DAYS=30
 ENV TARGET_CONTAINER=codehub
 ENV GPU_ENABLED=false
 ENV CPU_LIMIT_MILLICORES=2000

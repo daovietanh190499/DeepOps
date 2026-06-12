@@ -77,7 +77,7 @@ monitor:
     tag: latest
     pullPolicy: Always
   intervalSec: 2
-  maxLines: 9000
+  retentionDays: 30
   logDir: /tmp/monitor
   targetContainer: codehub
   cpuLimitMillicores: 2000

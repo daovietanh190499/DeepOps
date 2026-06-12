@@ -26,6 +26,7 @@ from backend.services.workspace_kubectl import (
     MONITOR_DEFAULT_WINDOW_MINUTES,
     workspace_describe,
     workspace_logs,
+    workspace_monitor_file,
     workspace_monitor_metrics,
 )
 from backend.services.workspace_mounts import (
@@ -467,6 +468,26 @@ def workspace_monitor_view(request, user, workspace_id):
     return JsonResponse({
         'result': workspace_monitor_metrics(ws, pod_name=pod, window_minutes=raw_window),
     })
+
+
+@auth.verify
+@require_http_methods(['GET'])
+def workspace_monitor_download_view(request, user, workspace_id):
+    denied = _require_accepted(user)
+    if denied:
+        return denied
+    ws, err = _get_workspace_for_user(user, workspace_id)
+    if err:
+        return err
+    pod = (request.GET.get('pod') or '').strip() or None
+    result = workspace_monitor_file(ws, pod_name=pod)
+    if result.get('error'):
+        return JsonResponse({'message': result['error']}, status=404)
+    filename = result.get('filename') or 'metrics.tar.gz'
+    content_type = result.get('content_type') or 'application/gzip'
+    response = HttpResponse(result.get('content') or b'', content_type=content_type)
+    response['Content-Disposition'] = f'attachment; filename="{filename}"'
+    return response
 
 
 @auth.verify
