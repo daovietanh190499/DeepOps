@@ -77,7 +77,7 @@ if [[ -f "${STATUS_FILE}" ]] && jq -e '.running == true' "${STATUS_FILE}" >/dev/
   write_status false null "Recovered from interrupted backup" "${TS}"
 fi
 
-write_status true null "Backup started" "${TS}"
+write_status true null "Running…" "${TS}"
 
 LOG_FILE="${LOG_DIR}/backup-${TS//:/-}.log"
 : > "${LOG_FILE}"

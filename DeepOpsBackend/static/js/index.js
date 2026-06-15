@@ -1673,7 +1673,7 @@ const appVue = new Vue({
                 if (this.modalTab === 'backup' && this.modalWorkspace) {
                     this.fetchWorkspaceBackup(true)
                 }
-            }, 3000)
+            }, 1000)
         },
         stopWorkspaceBackupPoll() {
             if (this.workspaceBackupTimer) {
@@ -1765,6 +1765,10 @@ const appVue = new Vue({
                     this.showToast(data.message || 'Backup failed to start')
                     return
                 }
+                this.workspaceBackup.status.running = true
+                this.workspaceBackup.status.last_success = null
+                this.workspaceBackup.status.last_message = 'Backup started'
+                this.workspaceBackup.status.trigger = 'manual'
                 this.showToast(data.message || 'Backup started')
                 await this.fetchWorkspaceBackup(true)
             } catch (e) {

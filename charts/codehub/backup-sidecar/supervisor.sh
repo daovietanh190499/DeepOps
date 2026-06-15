@@ -65,6 +65,10 @@ start_cron() {
 }
 
 apply_config() {
+  if [[ -f "${STATUS_FILE}" ]] && jq -e '.running == true' "${STATUS_FILE}" >/dev/null 2>&1; then
+    return
+  fi
+
   if [[ ! -f "${CONFIG_FILE}" ]]; then
     stop_cron
     LAST_CONFIG_HASH=""
@@ -88,8 +92,6 @@ apply_config() {
   if [[ "${enabled}" != "true" ]] || [[ -z "${schedule}" ]] || [[ -z "${remote}" ]]; then
     stop_cron
     LAST_CONFIG_HASH="${config_hash}"
-    jq '.last_message = "Backup idle"' "${STATUS_FILE}" > "${STATUS_FILE}.tmp" 2>/dev/null \
-      && mv "${STATUS_FILE}.tmp" "${STATUS_FILE}" || true
     echo "backup-sidecar: idle"
     return
   fi
