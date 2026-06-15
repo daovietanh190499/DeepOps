@@ -1021,6 +1021,24 @@
                 <p v-if="workspaceMonitor.error" class="text-xs text-amber-700 whitespace-pre-wrap" v-text="workspaceMonitor.error"></p>
                 <p v-if="!workspaceMonitor.error && !workspaceMonitor.points.length && !workspaceMonitor.loading"
                    class="text-xs text-slate-500">Waiting for metrics… Start the server or redeploy to include the monitor sidecar.</p>
+                <div v-if="workspaceMonitor.points.length" class="grid grid-cols-2 gap-2 lg:grid-cols-4">
+                    <div class="rounded-lg border border-slate-200 bg-white px-3 py-2">
+                        <p class="text-[10px] font-semibold uppercase tracking-wide text-slate-500">CPU</p>
+                        <p class="mt-0.5 font-mono text-xs text-slate-800" v-text="formatMonitorCpuSummary(monitorLatestPoint())"></p>
+                    </div>
+                    <div class="rounded-lg border border-slate-200 bg-white px-3 py-2">
+                        <p class="text-[10px] font-semibold uppercase tracking-wide text-slate-500">RAM</p>
+                        <p class="mt-0.5 font-mono text-xs text-slate-800" v-text="formatMonitorMemorySummary(monitorLatestPoint())"></p>
+                    </div>
+                    <div v-if="workspaceMonitor.hasGpu" class="rounded-lg border border-slate-200 bg-white px-3 py-2">
+                        <p class="text-[10px] font-semibold uppercase tracking-wide text-slate-500">GPU</p>
+                        <p class="mt-0.5 font-mono text-xs text-slate-800" v-text="formatMonitorGpuUtilSummary(monitorLatestPoint())"></p>
+                    </div>
+                    <div v-if="workspaceMonitor.hasGpu" class="rounded-lg border border-slate-200 bg-white px-3 py-2">
+                        <p class="text-[10px] font-semibold uppercase tracking-wide text-slate-500">GPU memory</p>
+                        <p class="mt-0.5 font-mono text-xs text-slate-800" v-text="formatMonitorGpuMemSummary(monitorLatestPoint())"></p>
+                    </div>
+                </div>
                 <div class="dohub-monitor-grid">
                     <div class="dohub-monitor-chart-wrap">
                         <canvas ref="monitorChartCpu"></canvas>

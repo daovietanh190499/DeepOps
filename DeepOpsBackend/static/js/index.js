@@ -1290,6 +1290,35 @@ const appVue = new Vue({
             }
             return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
         },
+        monitorLatestPoint() {
+            const pts = this.workspaceMonitor.points || []
+            return pts.length ? pts[pts.length - 1] : null
+        },
+        formatMonitorCpuSummary(point) {
+            if (!point) return '—'
+            const used = Number(point.cpu_cores ?? 0)
+            const limit = Number(point.cpu_limit_cores ?? 0)
+            const pct = point.cpu_pct ?? 0
+            return `${used.toFixed(2)} / ${limit.toFixed(2)} cores (${pct}%)`
+        },
+        formatMonitorMemorySummary(point) {
+            if (!point) return '—'
+            const used = Number(point.memory_gb ?? 0)
+            const limit = Number(point.memory_limit_gb ?? 0)
+            const pct = point.memory_pct ?? 0
+            return `${used.toFixed(2)} / ${limit.toFixed(2)} GB (${pct}%)`
+        },
+        formatMonitorGpuUtilSummary(point) {
+            if (!point || point.gpu_util_pct == null) return '—'
+            return `${Number(point.gpu_util_pct).toFixed(0)}% SM`
+        },
+        formatMonitorGpuMemSummary(point) {
+            if (!point || point.gpu_mem_total_gib == null) return '—'
+            const used = Number(point.gpu_mem_used_gib ?? 0)
+            const limit = Number(point.gpu_mem_total_gib ?? 0)
+            const pct = point.gpu_mem_pct ?? 0
+            return `${used.toFixed(2)} / ${limit.toFixed(2)} GiB (${pct}%)`
+        },
         destroyMonitorCharts() {
             const keys = ['cpu', 'memory', 'gpuUtil', 'gpuMem']
             keys.forEach((key) => {
@@ -1299,7 +1328,7 @@ const appVue = new Vue({
                 }
             })
         },
-        monitorChartOptions(title, color) {
+        monitorChartOptions(title, color, tooltipLabel) {
             return {
                 responsive: true,
                 maintainAspectRatio: false,
@@ -1313,6 +1342,17 @@ const appVue = new Vue({
                         color: '#334155',
                         font: { size: 12, weight: '600' },
                         padding: { bottom: 8 },
+                    },
+                    tooltip: {
+                        callbacks: {
+                            label: (ctx) => {
+                                if (typeof tooltipLabel === 'function') {
+                                    return tooltipLabel(ctx)
+                                }
+                                const v = ctx.parsed.y
+                                return v == null ? '' : `${ctx.dataset.label}: ${v}%`
+                            },
+                        },
                     },
                 },
                 scales: {
@@ -1343,7 +1383,7 @@ const appVue = new Vue({
                 },
             }
         },
-        upsertMonitorChart(key, canvasRef, title, borderColor, fillColor, labels, values) {
+        upsertMonitorChart(key, canvasRef, title, borderColor, fillColor, labels, values, tooltipLabel) {
             if (typeof Chart === 'undefined') return
             const canvas = canvasRef
             if (!canvas) return
@@ -1356,57 +1396,83 @@ const appVue = new Vue({
             }
             if (this.monitorChartInstances[key]) {
                 const chart = this.monitorChartInstances[key]
+                chart.options.plugins.title.text = title
+                if (tooltipLabel) {
+                    chart.options.plugins.tooltip.callbacks.label = (ctx) => tooltipLabel(ctx)
+                }
                 chart.data.labels = labels
                 chart.data.datasets[0].data = values
+                chart.data.datasets[0].label = title
                 chart.update('none')
                 return
             }
             this.monitorChartInstances[key] = new Chart(canvas, {
                 type: 'line',
                 data: { labels, datasets: [dataset] },
-                options: this.monitorChartOptions(title, borderColor),
+                options: this.monitorChartOptions(title, borderColor, tooltipLabel),
             })
         },
         renderMonitorCharts() {
             const pts = this.workspaceMonitor.points || []
             const labels = pts.map((p) => this.formatMonitorTime(p.ts))
+            const latest = pts.length ? pts[pts.length - 1] : null
             this.$nextTick(() => {
                 this.upsertMonitorChart(
                     'cpu',
                     this.$refs.monitorChartCpu,
-                    'CPU utilization',
+                    latest ? `CPU · ${this.formatMonitorCpuSummary(latest)}` : 'CPU utilization',
                     'rgb(59, 130, 246)',
                     'rgba(59, 130, 246, 0.28)',
                     labels,
                     pts.map((p) => p.cpu_pct),
+                    (ctx) => {
+                        const p = pts[ctx.dataIndex]
+                        if (!p) return ''
+                        return this.formatMonitorCpuSummary(p)
+                    },
                 )
                 this.upsertMonitorChart(
                     'memory',
                     this.$refs.monitorChartMemory,
-                    'RAM utilization',
+                    latest ? `RAM · ${this.formatMonitorMemorySummary(latest)}` : 'RAM utilization',
                     'rgb(16, 185, 129)',
                     'rgba(16, 185, 129, 0.28)',
                     labels,
                     pts.map((p) => p.memory_pct),
+                    (ctx) => {
+                        const p = pts[ctx.dataIndex]
+                        if (!p) return ''
+                        return this.formatMonitorMemorySummary(p)
+                    },
                 )
                 if (this.workspaceMonitor.hasGpu) {
                     this.upsertMonitorChart(
                         'gpuUtil',
                         this.$refs.monitorChartGpuUtil,
-                        'GPU utilization',
+                        latest ? `GPU · ${this.formatMonitorGpuUtilSummary(latest)}` : 'GPU utilization',
                         'rgb(168, 85, 247)',
                         'rgba(168, 85, 247, 0.28)',
                         labels,
                         pts.map((p) => (p.gpu_util_pct == null ? null : p.gpu_util_pct)),
+                        (ctx) => {
+                            const p = pts[ctx.dataIndex]
+                            if (!p || p.gpu_util_pct == null) return ''
+                            return this.formatMonitorGpuUtilSummary(p)
+                        },
                     )
                     this.upsertMonitorChart(
                         'gpuMem',
                         this.$refs.monitorChartGpuMem,
-                        'GPU memory',
+                        latest ? `GPU memory · ${this.formatMonitorGpuMemSummary(latest)}` : 'GPU memory',
                         'rgb(245, 158, 11)',
                         'rgba(245, 158, 11, 0.28)',
                         labels,
                         pts.map((p) => (p.gpu_mem_pct == null ? null : p.gpu_mem_pct)),
+                        (ctx) => {
+                            const p = pts[ctx.dataIndex]
+                            if (!p || p.gpu_mem_total_gib == null) return ''
+                            return this.formatMonitorGpuMemSummary(p)
+                        },
                     )
                 }
             })

@@ -378,6 +378,8 @@ def workspace_monitor_metrics(
 
         gpu_util_pct = None
         gpu_mem_pct = None
+        used_mib = 0.0
+        total_mib = 0.0
         if gpu_util is not None and gpu_util != 'null':
             try:
                 gpu_util_pct = float(gpu_util)
@@ -393,6 +395,9 @@ def workspace_monitor_metrics(
                     saw_gpu = True
             except (TypeError, ValueError):
                 gpu_mem_pct = None
+                used_mib = total_mib = 0.0
+        else:
+            used_mib = total_mib = 0.0
 
         points.append({
             'ts': ts.isoformat().replace('+00:00', 'Z'),
@@ -400,6 +405,12 @@ def workspace_monitor_metrics(
             'memory_pct': _pct(mem_used, mem_limit),
             'gpu_util_pct': gpu_util_pct,
             'gpu_mem_pct': gpu_mem_pct,
+            'cpu_cores': round(cpu_used / 1000.0, 3),
+            'cpu_limit_cores': round(cpu_limit / 1000.0, 3),
+            'memory_gb': round(mem_used / (1024 ** 3), 3),
+            'memory_limit_gb': round(mem_limit / (1024 ** 3), 3),
+            'gpu_mem_used_gib': round(used_mib / 1024.0, 2) if total_mib > 0 else None,
+            'gpu_mem_total_gib': round(total_mib / 1024.0, 2) if total_mib > 0 else None,
         })
 
     return {
