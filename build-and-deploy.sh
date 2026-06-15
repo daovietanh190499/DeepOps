@@ -17,6 +17,9 @@ PORT_TUNNEL_CONTEXT="${PORT_TUNNEL_CONTEXT:-./charts/codehub/port-tunnel}"
 MONITOR_SIDECAR_REPO="${MONITOR_SIDECAR_REPO:-localhost:32000/monitor-sidecar}"
 MONITOR_SIDECAR_TAG="${MONITOR_SIDECAR_TAG:-${IMAGE_TAG}}"
 MONITOR_SIDECAR_CONTEXT="${MONITOR_SIDECAR_CONTEXT:-./charts/codehub/monitor-sidecar}"
+BACKUP_SIDECAR_REPO="${BACKUP_SIDECAR_REPO:-localhost:32000/backup-sidecar}"
+BACKUP_SIDECAR_TAG="${BACKUP_SIDECAR_TAG:-${IMAGE_TAG}}"
+BACKUP_SIDECAR_CONTEXT="${BACKUP_SIDECAR_CONTEXT:-./charts/codehub/backup-sidecar}"
 KUBE_VERSION="${KUBE_VERSION:-1.30.0}"
 HELM_VERSION="${HELM_VERSION:-3.14.4}"
 TARGETOS="${TARGETOS:-linux}"
@@ -34,7 +37,7 @@ usage() {
 Usage: ./build-and-deploy.sh [OPTIONS] [COMMAND]
 
 Commands:
-  build     Build Docker images (dohub + ssh-bridge + port-tunnel + monitor-sidecar)
+  build     Build Docker images (dohub + ssh-bridge + port-tunnel + monitor-sidecar + backup-sidecar)
   deploy    Helm upgrade/install chart
   all       Build then deploy (default)
 
@@ -47,6 +50,8 @@ Options:
       --port-tunnel-tag TAG   port-tunnel image tag         (default: same as --tag)
       --monitor-sidecar-repo REPO monitor-sidecar image repository (default: localhost:32000/monitor-sidecar)
       --monitor-sidecar-tag TAG   monitor-sidecar image tag         (default: same as --tag)
+      --backup-sidecar-repo REPO backup-sidecar image repository (default: localhost:32000/backup-sidecar)
+      --backup-sidecar-tag TAG   backup-sidecar image tag         (default: same as --tag)
   -n, --namespace NS       Kubernetes namespace        (default: dohub)
       --release NAME       Helm release name           (default: dohub)
       --chart PATH         Helm chart directory        (default: ./dohub)
@@ -116,6 +121,14 @@ parse_args() {
         ;;
       --monitor-sidecar-tag)
         MONITOR_SIDECAR_TAG="$2"
+        shift 2
+        ;;
+      --backup-sidecar-repo)
+        BACKUP_SIDECAR_REPO="$2"
+        shift 2
+        ;;
+      --backup-sidecar-tag)
+        BACKUP_SIDECAR_TAG="$2"
         shift 2
         ;;
       -n|--namespace)
@@ -248,11 +261,29 @@ build_monitor_sidecar_image() {
   fi
 }
 
+build_backup_sidecar_image() {
+  if [[ ! -f "${BACKUP_SIDECAR_CONTEXT}/Dockerfile" ]]; then
+    echo "backup-sidecar Dockerfile not found: ${BACKUP_SIDECAR_CONTEXT}/Dockerfile" >&2
+    exit 1
+  fi
+  echo "==> Building backup-sidecar ${BACKUP_SIDECAR_REPO}:${BACKUP_SIDECAR_TAG} (${TARGETOS}/${TARGETARCH})"
+  docker build \
+    --build-arg TARGETARCH="${TARGETARCH}" \
+    -t "${BACKUP_SIDECAR_REPO}:${BACKUP_SIDECAR_TAG}" \
+    -f "${BACKUP_SIDECAR_CONTEXT}/Dockerfile" \
+    "${BACKUP_SIDECAR_CONTEXT}"
+  if [[ "${PUSH_IMAGE}" == "true" ]]; then
+    echo "==> Pushing ${BACKUP_SIDECAR_REPO}:${BACKUP_SIDECAR_TAG}"
+    docker push "${BACKUP_SIDECAR_REPO}:${BACKUP_SIDECAR_TAG}"
+  fi
+}
+
 build_images() {
   build_dohub_image
   build_ssh_bridge_image
   build_port_tunnel_image
   build_monitor_sidecar_image
+  build_backup_sidecar_image
 }
 
 deploy_chart() {
@@ -286,6 +317,7 @@ deploy_chart() {
   echo "    ssh-bridge (workspace sidecar): ${SSH_BRIDGE_REPO}:${SSH_BRIDGE_TAG}"
   echo "    port-tunnel (workspace sidecar): ${PORT_TUNNEL_REPO}:${PORT_TUNNEL_TAG}"
   echo "    monitor-sidecar (workspace sidecar): ${MONITOR_SIDECAR_REPO}:${MONITOR_SIDECAR_TAG}"
+  echo "    backup-sidecar (workspace sidecar): ${BACKUP_SIDECAR_REPO}:${BACKUP_SIDECAR_TAG}"
   echo "    Chart: ${CHART_PATH}"
   microk8s helm "${helm_args[@]}"
 

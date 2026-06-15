@@ -1,6 +1,7 @@
 from django.urls import path
 
 from backend import views
+from backend.views import backup as backup_views
 from backend.views import catalog as catalog_views
 from backend.views import cluster as cluster_views
 from backend.views import drives as drive_views
@@ -61,6 +62,12 @@ urlpatterns = [
     path('workspaces/<uuid:workspace_id>/describe', ws_views.workspace_describe_view, name='workspace-describe'),
     path('workspaces/<uuid:workspace_id>/monitor/download', ws_views.workspace_monitor_download_view, name='workspace-monitor-download'),
     path('workspaces/<uuid:workspace_id>/monitor', ws_views.workspace_monitor_view, name='workspace-monitor'),
+    path('workspaces/<uuid:workspace_id>/backup/run', backup_views.workspace_backup_run, name='workspace-backup-run'),
+    path('workspaces/<uuid:workspace_id>/backup/stop', backup_views.workspace_backup_stop_view, name='workspace-backup-stop'),
+    path('workspaces/<uuid:workspace_id>/backup/rclone/save', backup_views.workspace_backup_save_config, name='workspace-backup-rclone-save'),
+    path('workspaces/<uuid:workspace_id>/backup/rclone/download', backup_views.workspace_backup_download_config, name='workspace-backup-rclone-download'),
+    path('workspaces/<uuid:workspace_id>/backup/schedule', backup_views.workspace_backup_schedule, name='workspace-backup-schedule'),
+    path('workspaces/<uuid:workspace_id>/backup', backup_views.workspace_backup_info, name='workspace-backup-info'),
     path('workspaces/<uuid:workspace_id>/export', ws_views.workspace_export, name='workspace-export'),
     path('workspaces/<uuid:workspace_id>/start', ws_views.workspace_start, name='workspace-start'),
     path('workspaces/<uuid:workspace_id>/stop', ws_views.workspace_stop, name='workspace-stop'),

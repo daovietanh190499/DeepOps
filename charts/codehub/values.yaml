@@ -85,6 +85,20 @@ monitor:
   rbac:
     create: true
 
+# rclone backup sidecar (cron + manual sync to cloud storage)
+backup:
+  enabled: false
+  image:
+    repository: localhost:32000/backup-sidecar
+    tag: latest
+    pullPolicy: Always
+  secretName: ""
+  schedule: ""
+  remote: ""
+  folders: []
+  logDir: /tmp/backup
+  volumeMounts: []
+
 ingress:
   enabled: true
   # Ingress implementation: auto | nginx | traefik | both

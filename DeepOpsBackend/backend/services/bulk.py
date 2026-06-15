@@ -88,6 +88,7 @@ def spawn_workspace(ws: Workspace) -> dict | None:
         return {'error': drive_err}
     try:
         config = build_spawn_config(ws)
+        config['replica_count'] = 1
     except ValueError as exc:
         return {'error': str(exc)}
     command, logs, exit_code = create_codehub(config)

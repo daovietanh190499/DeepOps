@@ -232,6 +232,43 @@ spec:
             - name: monitor-data
               mountPath: {{ .Values.monitor.logDir | default "/tmp/monitor" }}
         {{- end }}
+        {{- if .Values.backup.enabled }}
+        - name: backup-sidecar
+          image: "{{ .Values.backup.image.repository }}:{{ .Values.backup.image.tag }}"
+          imagePullPolicy: {{ .Values.backup.image.pullPolicy }}
+          env:
+            - name: BACKUP_SCHEDULE
+              value: {{ .Values.backup.schedule | default "" | quote }}
+            - name: BACKUP_REMOTE
+              value: {{ .Values.backup.remote | default "" | quote }}
+            - name: BACKUP_FOLDERS
+              value: {{ .Values.backup.folders | default list | toJson | quote }}
+            - name: LOG_DIR
+              value: {{ .Values.backup.logDir | default "/tmp/backup" | quote }}
+            - name: RCLONE_CONFIG
+              value: /config/rclone.conf
+          resources:
+            requests:
+              cpu: 25m
+              memory: 64Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi
+          volumeMounts:
+            - name: rclone-config
+              mountPath: /config
+              readOnly: true
+            - name: backup-data
+              mountPath: {{ .Values.backup.logDir | default "/tmp/backup" }}
+            {{- range .Values.backup.volumeMounts }}
+            - name: {{ .name }}
+              mountPath: {{ .mountPath }}
+              {{- if .subPath }}
+              subPath: {{ .subPath }}
+              {{- end }}
+              readOnly: true
+            {{- end }}
+        {{- end }}
       volumes:
         {{- if .Values.persistence.enabled }}
         {{- $claimName := .Values.persistence.claimName | default .Values.mainVolume.claimName }}
@@ -267,6 +304,17 @@ spec:
         {{- end }}
         {{- if .Values.monitor.enabled }}
         - name: monitor-data
+          emptyDir: {}
+        {{- end }}
+        {{- if .Values.backup.enabled }}
+        - name: rclone-config
+          secret:
+            secretName: {{ required "backup.secretName required when backup.enabled" .Values.backup.secretName }}
+            optional: false
+            items:
+              - key: rclone.conf
+                path: rclone.conf
+        - name: backup-data
           emptyDir: {}
         {{- end }}
         {{- with .Values.volumes }}

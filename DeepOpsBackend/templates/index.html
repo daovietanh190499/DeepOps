@@ -729,6 +729,9 @@
                 <button type="button" @click="switchModalTab('monitor')"
                         :class="modalTab==='monitor' ? 'border-blue-600 text-blue-700 bg-white' : 'border-transparent text-slate-500 hover:text-slate-700'"
                         class="rounded-t-lg border-b-2 px-4 py-2 text-xs font-semibold">Monitor</button>
+                <button type="button" @click="switchModalTab('backup')"
+                        :class="modalTab==='backup' ? 'border-blue-600 text-blue-700 bg-white' : 'border-transparent text-slate-500 hover:text-slate-700'"
+                        class="rounded-t-lg border-b-2 px-4 py-2 text-xs font-semibold">Backup</button>
             </div>
             <div class="flex-1 overflow-y-auto px-4 py-4 text-sm min-h-0 sm:px-5">
 
@@ -1031,6 +1034,130 @@
                     <div v-if="workspaceMonitor.hasGpu" class="dohub-monitor-chart-wrap">
                         <canvas ref="monitorChartGpuMem"></canvas>
                     </div>
+                </div>
+            </div>
+
+            <!-- Backup tab -->
+            <div v-show="modalTab==='backup'" class="space-y-4 flex flex-col min-h-[50vh]">
+                <div class="rounded-xl border border-violet-100 bg-violet-50/50 p-4 space-y-3">
+                    <div class="flex flex-wrap items-center justify-between gap-2">
+                        <p class="font-semibold text-slate-800">rclone backup</p>
+                        <div class="flex flex-wrap gap-2">
+                            <button type="button" @click="scheduleWorkspaceBackup(modalWorkspace)"
+                                    :disabled="workspaceBackup.enabled || workspaceBackup.status.sidecar_active || workspaceBackup.scheduleLoading || workspaceBackup.status.running || !workspaceBackup.folders.length || !backupVolumeOptionsList().length"
+                                    class="rounded-lg bg-violet-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-violet-700 disabled:opacity-50">
+                                <span v-if="workspaceBackup.scheduleLoading">Scheduling…</span>
+                                <span v-else>Schedule</span>
+                            </button>
+                            <button type="button" @click="runWorkspaceBackup(modalWorkspace)"
+                                    :disabled="!workspaceBackup.enabled || !workspaceBackup.remote.trim() || workspaceBackup.runLoading || workspaceBackup.status.running"
+                                    class="rounded-lg border border-violet-600 bg-white px-3 py-1.5 text-xs font-semibold text-violet-700 hover:bg-violet-50 disabled:opacity-50">
+                                <span v-if="workspaceBackup.runLoading">Starting…</span>
+                                <span v-else>Backup now</span>
+                            </button>
+                            <button type="button" @click="stopWorkspaceBackup(modalWorkspace)"
+                                    :disabled="!(workspaceBackup.enabled || workspaceBackup.status.sidecar_active) || workspaceBackup.stopLoading"
+                                    class="rounded-lg border border-rose-600 bg-white px-3 py-1.5 text-xs font-semibold text-rose-700 hover:bg-rose-50 disabled:opacity-50">
+                                <span v-if="workspaceBackup.stopLoading">Removing…</span>
+                                <span v-else>Stop backup</span>
+                            </button>
+                            <button type="button" @click="fetchWorkspaceBackup()" :disabled="workspaceBackup.loading"
+                                    class="rounded-lg border px-3 py-1.5 text-xs font-semibold hover:bg-slate-50 disabled:opacity-50">
+                                <i class="fa fa-refresh" :class="workspaceBackup.loading ? 'fa-spin' : ''"></i>
+                            </button>
+                        </div>
+                    </div>
+                    <p class="text-xs text-slate-600">Sync workspace folders to cloud storage with <a href="https://rclone.org/" target="_blank" rel="noopener noreferrer" class="font-semibold text-violet-700 hover:underline">rclone</a>. <strong>Schedule</strong> adds the backup sidecar to the pod (cron + rclone). <strong>Stop backup</strong> removes the sidecar. <strong>Backup now</strong> runs rclone immediately in the existing sidecar without restarting the pod.</p>
+                    <div class="rounded-lg border border-slate-200 bg-white p-3 space-y-3">
+                        <div class="flex flex-wrap items-end gap-3">
+                            <label class="flex-1 min-w-[14rem] text-xs">
+                                <span class="font-medium text-slate-600">Cron schedule</span>
+                                <input v-model="workspaceBackup.schedule" type="text" placeholder="0 2 * * *"
+                                       @input="markBackupFormDirty"
+                                       class="mt-1 w-full rounded-lg border bg-white px-3 py-2 text-sm font-mono">
+                            </label>
+                            <label class="flex-1 min-w-[14rem] text-xs">
+                                <span class="font-medium text-slate-600">Remote destination</span>
+                                <input v-model="workspaceBackup.remote" type="text" placeholder="gdrive:backups/my-server"
+                                       @input="markBackupFormDirty"
+                                       class="mt-1 w-full rounded-lg border bg-white px-3 py-2 text-sm font-mono">
+                            </label>
+                        </div>
+                        <p class="text-[10px] text-slate-500">Five-field cron (minute hour day month weekday). Remote is <code class="rounded bg-slate-100 px-1">remote:path</code> from your config — each selected volume syncs to a subfolder under that path (named from the mount path).</p>
+                        <label class="block text-xs">
+                            <div class="flex flex-wrap items-center justify-between gap-2 mb-1">
+                                <span class="font-medium text-slate-600">rclone.conf (saved in database)</span>
+                                <div class="flex flex-wrap gap-2">
+                                    <button type="button" @click="saveRcloneConfig(modalWorkspace)"
+                                            :disabled="workspaceBackup.rcloneSaveLoading || !(workspaceBackup.rcloneConfig.trim() || workspaceBackup.remote.trim() || workspaceBackup.schedule.trim() || workspaceBackup.folders.length)"
+                                            class="rounded-lg border bg-white px-3 py-1 text-xs font-semibold hover:bg-slate-50 disabled:opacity-50">
+                                        <span v-if="workspaceBackup.rcloneSaveLoading">Saving…</span>
+                                        <span v-else>Save settings</span>
+                                    </button>
+                                    <button type="button" @click="downloadRcloneConfig(modalWorkspace)"
+                                            :disabled="!workspaceBackup.hasConfig && !workspaceBackup.rcloneConfig.trim()"
+                                            class="rounded-lg border bg-white px-3 py-1 text-xs font-semibold hover:bg-slate-50 disabled:opacity-50">
+                                        <i class="fa fa-download"></i> Download
+                                    </button>
+                                </div>
+                            </div>
+                            <textarea v-model="workspaceBackup.rcloneConfig" rows="8" placeholder="[gdrive]&#10;type = drive&#10;scope = drive&#10;token = {...}"
+                                      @input="markBackupFormDirty"
+                                      class="w-full rounded-lg border bg-white px-3 py-2 text-xs font-mono leading-relaxed"></textarea>
+                        </label>
+                        <div class="space-y-2">
+                            <p class="text-xs font-medium text-slate-600">Volumes to backup</p>
+                            <p class="text-[10px] text-slate-500">Choose workspace PVCs by their mount path in the main container. The backup sidecar mounts only the selected volume(s) at the same path.</p>
+                            <ul v-if="backupVolumeOptionsList().length" class="space-y-2">
+                                <li v-for="(vol, idx) in backupVolumeOptionsList()" :key="'backup-vol-' + vol.drive_id + '-' + vol.mount_path + '-' + idx"
+                                    class="rounded-lg border bg-white px-3 py-2">
+                                    <label class="flex items-start gap-3 cursor-pointer">
+                                        <input type="checkbox"
+                                               class="mt-0.5 rounded border-slate-300 text-violet-600 focus:ring-violet-500"
+                                               :checked="isBackupMountSelected(vol.mount_path)"
+                                               @change="toggleBackupMount(vol)">
+                                        <span class="min-w-0 flex-1">
+                                            <span class="block text-xs font-semibold text-slate-800" v-text="vol.drive_name || 'Drive'"></span>
+                                            <span class="block font-mono text-[11px] text-slate-700" v-text="vol.mount_path"></span>
+                                            <span class="block font-mono text-[10px] text-slate-500">
+                                                PVC <span v-text="vol.claim_name"></span>
+                                                <span v-if="vol.sub_path"> · subPath <span v-text="vol.sub_path"></span></span>
+                                            </span>
+                                        </span>
+                                    </label>
+                                </li>
+                            </ul>
+                            <p v-else class="text-xs text-amber-700">No drives mounted on this server — add drives in the <strong>General</strong> tab first.</p>
+                            <p v-if="backupVolumeOptionsList().length && !workspaceBackup.folders.length" class="text-xs text-slate-500">Select at least one volume before scheduling.</p>
+                        </div>
+                    </div>
+                    <p v-if="workspaceBackup.syncMessage && !workspaceBackup.syncError" class="text-xs text-emerald-700" v-text="workspaceBackup.syncMessage"></p>
+                    <p v-if="workspaceBackup.syncError" class="text-xs text-rose-600 whitespace-pre-wrap" v-text="workspaceBackup.syncError"></p>
+                </div>
+                <div class="rounded-xl border border-slate-200 bg-white p-4 space-y-2">
+                    <p class="font-semibold text-slate-800 text-sm">Latest backup</p>
+                    <p v-if="workspaceBackup.error" class="text-xs text-amber-700 whitespace-pre-wrap" v-text="workspaceBackup.error"></p>
+                    <div class="flex flex-wrap items-center gap-3 text-sm">
+                        <span v-if="workspaceBackup.status.running" class="inline-flex items-center gap-1.5 text-amber-700">
+                            <i class="fa fa-spinner fa-spin"></i> Running…
+                        </span>
+                        <span v-else-if="workspaceBackup.status.last_success === true" class="inline-flex items-center gap-1.5 text-emerald-700">
+                            <i class="fa fa-check-circle text-lg"></i> Success
+                        </span>
+                        <span v-else-if="workspaceBackup.status.last_success === false" class="inline-flex items-center gap-1.5 text-rose-600">
+                            <i class="fa fa-times-circle text-lg"></i> Failed
+                        </span>
+                        <span v-else class="inline-flex items-center gap-1.5 text-slate-500">
+                            <i class="fa fa-minus-circle text-lg"></i> No run yet
+                        </span>
+                        <span class="text-slate-600 text-xs">
+                            <span class="font-medium">Last run:</span>
+                            <span class="font-mono" v-text="formatBackupTime(workspaceBackup.status.last_run_at)"></span>
+                            <span v-if="workspaceBackup.status.trigger" class="text-slate-400" v-text="' · ' + workspaceBackup.status.trigger"></span>
+                        </span>
+                    </div>
+                    <p v-if="workspaceBackup.status.last_message" class="text-xs text-slate-600 font-mono whitespace-pre-wrap" v-text="workspaceBackup.status.last_message"></p>
+                    <p class="text-[10px] text-slate-400">Auto-refreshes every 3s · Uses <code class="rounded bg-slate-100 px-1">rclone sync</code> with <code class="rounded bg-slate-100 px-1">--log-file</code> and <code class="rounded bg-slate-100 px-1">--stats 30s</code></p>
                 </div>
             </div>
 

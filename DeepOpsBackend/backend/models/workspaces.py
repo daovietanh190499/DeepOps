@@ -121,6 +121,11 @@ class Workspace(models.Model):
         blank=True,
         help_text='Main-container TCP ports exposed via wstunnel sidecar',
     )
+    backup_enabled = models.BooleanField(default=False)
+    backup_schedule = models.CharField(max_length=128, blank=True, default='')
+    backup_remote = models.CharField(max_length=512, blank=True, default='')
+    backup_folders = models.JSONField(default=list, blank=True)
+    backup_rclone_config = models.TextField(blank=True, default='')
     container_command = models.JSONField(default=_default_command, blank=True)
     privileged = models.BooleanField(
         default=False,

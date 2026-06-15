@@ -14,6 +14,9 @@ from .k8s_status import workspace_pods_for_id
 
 MONITOR_CONTAINER = 'monitor-sidecar'
 MONITOR_LOG_DIR = '/tmp/monitor'
+BACKUP_CONTAINER = 'backup-sidecar'
+BACKUP_LOG_DIR = '/tmp/backup'
+BACKUP_STATUS_FILE = f'{BACKUP_LOG_DIR}/status.json'
 MONITOR_LEGACY_LOG_FILE = f'{MONITOR_LOG_DIR}/metrics.jsonl'
 MONITOR_DAILY_NAME_RE = re.compile(r'^metrics-(\d{4}-\d{2}-\d{2})\.jsonl$')
 MONITOR_INTERVAL_SEC = 2
@@ -477,3 +480,130 @@ def workspace_monitor_file(
         'content_type': 'application/gzip',
         'error': '',
     }
+
+
+def _resolve_backup_pod(
+    workspace: Workspace,
+    *,
+    pod_name: str | None = None,
+) -> tuple[str, list[dict], str]:
+    pods = workspace_pods_for_id(str(workspace.id))
+    if not pods:
+        return '', pods, 'No pods found. The server may be stopped or not deployed yet.'
+    selected = pod_name or pods[0]['name']
+    if not any(item['name'] == selected for item in pods):
+        selected = pods[0]['name']
+    return selected, pods, ''
+
+
+def _backup_sidecar_present(pod_name: str) -> bool:
+    stdout, _, code = _kubectl([
+        'get', 'pod', pod_name,
+        '-n', NAMESPACE,
+        '-o', 'jsonpath={.spec.containers[?(@.name=="backup-sidecar")].name}',
+    ], timeout=15)
+    return code == 0 and bool(stdout.strip())
+
+
+def _backup_sidecar_ready(pod_name: str) -> bool:
+    stdout, _, code = _kubectl([
+        'get', 'pod', pod_name,
+        '-n', NAMESPACE,
+        '-o', 'jsonpath={.status.containerStatuses[?(@.name=="backup-sidecar")].ready}',
+    ], timeout=15)
+    return code == 0 and stdout.strip() == 'true'
+
+
+def workspace_backup_status(
+    workspace: Workspace,
+    *,
+    pod_name: str | None = None,
+) -> dict:
+    empty = {
+        'last_run_at': '',
+        'last_success': None,
+        'last_message': '',
+        'running': False,
+        'trigger': '',
+        'sidecar_active': False,
+        'sidecar_ready': False,
+    }
+
+    selected, _, pod_error = _resolve_backup_pod(workspace, pod_name=pod_name)
+    if pod_error:
+        if workspace.backup_enabled:
+            empty['last_message'] = pod_error
+        else:
+            empty['last_message'] = 'Backup not scheduled'
+        return empty
+
+    sidecar_active = _backup_sidecar_present(selected)
+    empty['sidecar_active'] = sidecar_active
+
+    if not workspace.backup_enabled and not sidecar_active:
+        empty['last_message'] = 'Backup not scheduled'
+        return empty
+
+    if not sidecar_active:
+        empty['last_message'] = 'Backup sidecar not deployed — click Schedule or restart the server.'
+        return empty
+
+    if not _backup_sidecar_ready(selected):
+        empty['last_message'] = 'Backup sidecar not ready — restart the server after scheduling.'
+        return empty
+
+    stdout, stderr, code = _kubectl([
+        'exec', selected,
+        '-n', NAMESPACE,
+        '-c', BACKUP_CONTAINER,
+        '--', 'cat', BACKUP_STATUS_FILE,
+    ], timeout=20)
+    if code != 0:
+        empty['sidecar_active'] = True
+        empty['sidecar_ready'] = True
+        empty['last_message'] = (stderr or stdout or '').strip() or 'Waiting for first backup status…'
+        return empty
+
+    try:
+        data = json.loads(stdout)
+    except json.JSONDecodeError:
+        empty['sidecar_active'] = True
+        empty['sidecar_ready'] = True
+        empty['last_message'] = 'Invalid status from backup sidecar'
+        return empty
+
+    return {
+        'last_run_at': str(data.get('last_run_at') or ''),
+        'last_success': data.get('last_success'),
+        'last_message': str(data.get('last_message') or ''),
+        'running': bool(data.get('running')),
+        'trigger': str(data.get('trigger') or ''),
+        'sidecar_active': True,
+        'sidecar_ready': True,
+    }
+
+
+def workspace_backup_trigger(
+    workspace: Workspace,
+    *,
+    pod_name: str | None = None,
+) -> dict:
+    selected, _, pod_error = _resolve_backup_pod(workspace, pod_name=pod_name)
+    if pod_error:
+        return {'ok': False, 'error': pod_error}
+
+    if not _backup_sidecar_ready(selected):
+        return {'ok': False, 'error': 'Backup sidecar is not ready'}
+
+    stdout, stderr, code = _kubectl([
+        'exec', selected,
+        '-n', NAMESPACE,
+        '-c', BACKUP_CONTAINER,
+        '--', 'sh', '-c',
+        'nohup /app/run-backup.sh manual >> "${LOG_DIR:-/tmp/backup}/trigger.log" 2>&1 &',
+    ], timeout=15)
+    if code != 0:
+        err = (stderr or stdout or '').strip() or 'Failed to trigger backup'
+        return {'ok': False, 'error': err}
+    return {'ok': True, 'message': (stdout or stderr or '').strip() or 'Backup started'}
+

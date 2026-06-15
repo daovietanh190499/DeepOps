@@ -562,6 +562,34 @@ const appVue = new Vue({
         },
         workspaceLogsTimer: null,
         workspaceMonitorTimer: null,
+        workspaceBackupTimer: null,
+        workspaceBackup: {
+            loading: false,
+            scheduleLoading: false,
+            runLoading: false,
+            stopLoading: false,
+            rcloneSaveLoading: false,
+            error: '',
+            syncMessage: '',
+            syncError: '',
+            schedule: '',
+            remote: '',
+            rcloneConfig: '',
+            hasConfig: false,
+            folders: [],
+            volumeOptions: [],
+            enabled: false,
+            formDirty: false,
+            status: {
+                last_run_at: '',
+                last_success: null,
+                last_message: '',
+                running: false,
+                trigger: '',
+                sidecar_active: false,
+                sidecar_ready: false,
+            },
+        },
         monitorChartInstances: {},
         workspaceLogsAutoScroll: true,
         userList: [],
@@ -1075,10 +1103,38 @@ const appVue = new Vue({
             }
             this.loadWorkspaceSsh(ws)
             this.loadWorkspaceTunnel(ws)
+            this.workspaceBackup = {
+                loading: false,
+                scheduleLoading: false,
+                runLoading: false,
+                stopLoading: false,
+                rcloneSaveLoading: false,
+                error: '',
+                syncMessage: '',
+                syncError: '',
+                schedule: '',
+                remote: '',
+                rcloneConfig: '',
+                hasConfig: false,
+                folders: [],
+                volumeOptions: [],
+                enabled: false,
+                formDirty: false,
+                status: {
+                    last_run_at: '',
+                    last_success: null,
+                    last_message: '',
+                    running: false,
+                    trigger: '',
+                    sidecar_active: false,
+                    sidecar_ready: false,
+                },
+            }
         },
         closeWorkspaceModal() {
             this.stopWorkspaceLogsPoll()
             this.stopWorkspaceMonitorPoll()
+            this.stopWorkspaceBackupPoll()
             this.destroyMonitorCharts()
             this.modalTab = 'general'
             this.modalWorkspace = null
@@ -1092,6 +1148,7 @@ const appVue = new Vue({
             this.modalTab = tab
             this.stopWorkspaceLogsPoll()
             this.stopWorkspaceMonitorPoll()
+            this.stopWorkspaceBackupPoll()
             if (tab === 'logs') {
                 this.destroyMonitorCharts()
                 this.fetchWorkspaceLogs()
@@ -1101,6 +1158,13 @@ const appVue = new Vue({
             if (tab === 'monitor') {
                 this.fetchWorkspaceMonitor()
                 this.startWorkspaceMonitorPoll()
+                return
+            }
+            if (tab === 'backup') {
+                this.destroyMonitorCharts()
+                this.workspaceBackup.formDirty = false
+                this.fetchWorkspaceBackup()
+                this.startWorkspaceBackupPoll()
                 return
             }
             this.destroyMonitorCharts()
@@ -1495,6 +1559,244 @@ const appVue = new Vue({
             if (this.workspaceMonitor.selectedPod) params.set('pod', this.workspaceMonitor.selectedPod)
             const qs = params.toString()
             window.location = 'workspaces/' + ws.id + '/monitor/download' + (qs ? '?' + qs : '')
+        },
+        markBackupFormDirty() {
+            this.workspaceBackup.formDirty = true
+        },
+        applyBackupStatus(result) {
+            if (!result) return
+            this.workspaceBackup.enabled = !!result.enabled
+            this.workspaceBackup.hasConfig = !!result.has_config
+            if (result.status) {
+                this.workspaceBackup.status = { ...this.workspaceBackup.status, ...result.status }
+            }
+        },
+        applyBackupForm(result) {
+            if (!result) return
+            this.workspaceBackup.schedule = result.schedule || ''
+            this.workspaceBackup.remote = result.remote || ''
+            this.workspaceBackup.folders = Array.isArray(result.folders) ? [...result.folders] : []
+            this.workspaceBackup.volumeOptions = Array.isArray(result.volume_options)
+                ? result.volume_options.map((v) => ({ ...v }))
+                : []
+            if (result.rclone_config !== undefined) {
+                this.workspaceBackup.rcloneConfig = result.rclone_config || ''
+            }
+        },
+        applyBackupInfo(result, { updateForm = true, forceForm = false } = {}) {
+            if (!result) return
+            if (updateForm && (forceForm || !this.workspaceBackup.formDirty)) {
+                this.applyBackupForm(result)
+            }
+            this.applyBackupStatus(result)
+        },
+        async saveRcloneConfig(ws) {
+            if (!ws) return
+            this.workspaceBackup.rcloneSaveLoading = true
+            try {
+                const res = await fetch('workspaces/' + ws.id + '/backup/rclone/save', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        rclone_config: this.workspaceBackup.rcloneConfig,
+                        remote: this.workspaceBackup.remote,
+                        schedule: this.workspaceBackup.schedule,
+                        folders: this.workspaceBackup.folders,
+                    }),
+                })
+                const data = await res.json().catch(() => ({}))
+                if (res.status !== 200) {
+                    this.showToast(data.message || 'Failed to save config')
+                    return
+                }
+                this.applyBackupInfo(data.result || {}, { updateForm: true, forceForm: true })
+                this.workspaceBackup.formDirty = false
+                this.showToast(data.message || 'Backup settings saved')
+            } catch (e) {
+                this.showToast(e.message || 'Failed to save config')
+            } finally {
+                this.workspaceBackup.rcloneSaveLoading = false
+            }
+        },
+        downloadRcloneConfig(ws) {
+            if (!ws) return
+            window.location = 'workspaces/' + ws.id + '/backup/rclone/download'
+        },
+        async loadWorkspaceBackup(ws) {
+            const target = ws || this.modalWorkspace
+            if (!target) return
+            const res = await fetch('workspaces/' + target.id + '/backup')
+            if (res.status !== 200 || !this.modalWorkspace || this.modalWorkspace.id !== target.id) return
+            const data = await res.json()
+            this.applyBackupInfo(data.result || {})
+        },
+        normalizeBackupMountPath(path) {
+            const text = (path || '').trim()
+            if (!text) return '/'
+            return text.replace(/\/+$/, '') || '/'
+        },
+        backupVolumeOptionsList() {
+            if (this.workspaceBackup.volumeOptions.length) {
+                return this.workspaceBackup.volumeOptions
+            }
+            const mounts = this.modalWorkspace?.drive_mounts || []
+            return mounts.map((m) => ({
+                drive_id: m.drive_id,
+                drive_name: m.drive_name,
+                claim_name: m.claim_name,
+                mount_path: m.mount_path,
+                sub_path: m.sub_path || '',
+            }))
+        },
+        isBackupMountSelected(mountPath) {
+            const norm = this.normalizeBackupMountPath(mountPath)
+            return this.workspaceBackup.folders.some(
+                (f) => this.normalizeBackupMountPath(f) === norm,
+            )
+        },
+        toggleBackupMount(vol) {
+            if (!vol || !vol.mount_path) return
+            const norm = this.normalizeBackupMountPath(vol.mount_path)
+            const idx = this.workspaceBackup.folders.findIndex(
+                (f) => this.normalizeBackupMountPath(f) === norm,
+            )
+            if (idx >= 0) {
+                this.workspaceBackup.folders.splice(idx, 1)
+            } else {
+                this.workspaceBackup.folders.push(vol.mount_path)
+            }
+            this.markBackupFormDirty()
+        },
+        startWorkspaceBackupPoll() {
+            this.stopWorkspaceBackupPoll()
+            this.workspaceBackupTimer = setInterval(() => {
+                if (this.modalTab === 'backup' && this.modalWorkspace) {
+                    this.fetchWorkspaceBackup(true)
+                }
+            }, 3000)
+        },
+        stopWorkspaceBackupPoll() {
+            if (this.workspaceBackupTimer) {
+                clearInterval(this.workspaceBackupTimer)
+                this.workspaceBackupTimer = null
+            }
+        },
+        async fetchWorkspaceBackup(silent) {
+            if (!this.modalWorkspace) return
+            if (!silent) this.workspaceBackup.loading = true
+            const ws = this.modalWorkspace
+            try {
+                const res = await fetch('workspaces/' + ws.id + '/backup')
+                if (!this.modalWorkspace || this.modalWorkspace.id !== ws.id) return
+                const data = await res.json().catch(() => ({}))
+                if (res.status !== 200) {
+                    this.workspaceBackup.error = data.message || 'Failed to load backup status'
+                    return
+                }
+                const result = data.result || {}
+                if (silent) {
+                    this.applyBackupStatus(result)
+                } else {
+                    this.applyBackupInfo(result, { updateForm: true })
+                }
+                this.workspaceBackup.error = ''
+            } catch (e) {
+                if (this.modalWorkspace && this.modalWorkspace.id === ws.id) {
+                    this.workspaceBackup.error = e.message || 'Failed to load backup status'
+                }
+            } finally {
+                if (this.modalWorkspace && this.modalWorkspace.id === ws.id) {
+                    this.workspaceBackup.loading = false
+                }
+            }
+        },
+        async scheduleWorkspaceBackup(ws) {
+            this.workspaceBackup.scheduleLoading = true
+            this.workspaceBackup.syncMessage = ''
+            this.workspaceBackup.syncError = ''
+            try {
+                const res = await fetch('workspaces/' + ws.id + '/backup/schedule', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        schedule: this.workspaceBackup.schedule,
+                        remote: this.workspaceBackup.remote,
+                        folders: this.workspaceBackup.folders,
+                        rclone_config: this.workspaceBackup.rcloneConfig,
+                    }),
+                })
+                const data = await res.json().catch(() => ({}))
+                const result = data.result || {}
+                this.applyBackupInfo(result, { updateForm: true, forceForm: true })
+                this.workspaceBackup.formDirty = false
+                const sync = result.sync || {}
+                if (sync.message) this.workspaceBackup.syncMessage = sync.message
+                const syncErr = (sync.error || '').trim()
+                    || (sync.ok === false ? (sync.helm_logs || '').trim() : '')
+                if (syncErr) this.workspaceBackup.syncError = syncErr
+                if (res.status !== 200) {
+                    this.showToast(data.message || syncErr || 'Schedule failed')
+                    return
+                }
+                this.showToast(data.message || 'Backup sidecar scheduled')
+                await this.refreshLists()
+            } catch (e) {
+                this.showToast(e.message || 'Schedule failed')
+            } finally {
+                this.workspaceBackup.scheduleLoading = false
+            }
+        },
+        async runWorkspaceBackup(ws) {
+            this.workspaceBackup.runLoading = true
+            try {
+                const res = await fetch('workspaces/' + ws.id + '/backup/run', { method: 'POST' })
+                const data = await res.json().catch(() => ({}))
+                const result = data.result || {}
+                this.applyBackupStatus(result)
+                if (res.status !== 200) {
+                    this.showToast(data.message || 'Backup failed to start')
+                    return
+                }
+                this.showToast(data.message || 'Backup started')
+                await this.fetchWorkspaceBackup(true)
+            } catch (e) {
+                this.showToast(e.message || 'Backup failed to start')
+            } finally {
+                this.workspaceBackup.runLoading = false
+            }
+        },
+        async stopWorkspaceBackup(ws) {
+            this.workspaceBackup.stopLoading = true
+            this.workspaceBackup.syncMessage = ''
+            this.workspaceBackup.syncError = ''
+            try {
+                const res = await fetch('workspaces/' + ws.id + '/backup/stop', { method: 'POST' })
+                const data = await res.json().catch(() => ({}))
+                const result = data.result || {}
+                this.applyBackupInfo(result, { updateForm: true, forceForm: true })
+                this.workspaceBackup.formDirty = false
+                const sync = result.sync || {}
+                if (sync.message) this.workspaceBackup.syncMessage = sync.message
+                const syncErr = (sync.error || '').trim()
+                    || (sync.ok === false ? (sync.helm_logs || '').trim() : '')
+                if (syncErr) this.workspaceBackup.syncError = syncErr
+                if (res.status !== 200) {
+                    this.showToast(data.message || syncErr || 'Failed to remove backup sidecar')
+                    return
+                }
+                this.showToast(data.message || 'Backup sidecar removed')
+                await this.refreshLists()
+            } catch (e) {
+                this.showToast(e.message || 'Failed to remove backup sidecar')
+            } finally {
+                this.workspaceBackup.stopLoading = false
+            }
+        },
+        formatBackupTime(iso) {
+            if (!iso) return '—'
+            const d = new Date(iso)
+            if (Number.isNaN(d.getTime())) return iso
+            return d.toLocaleString()
         },
         async copyText(text, msg) {
             if (!text) return
