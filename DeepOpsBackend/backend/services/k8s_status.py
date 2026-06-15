@@ -92,6 +92,31 @@ def get_deployments_status_map(release_names: set[str]) -> dict[str, dict]:
     return result
 
 
+def get_services_map(release_names: set[str]) -> dict[str, dict]:
+    if not release_names:
+        return {}
+
+    from .drives_k8s import kubectl_json
+
+    data = kubectl_json(['get', 'service', '-n', NAMESPACE])
+    if not data:
+        return {}
+
+    result: dict[str, dict] = {}
+    for svc in data.get('items') or []:
+        meta = svc.get('metadata') or {}
+        labels = meta.get('labels') or {}
+        instance = labels.get('app.kubernetes.io/instance', '')
+        if instance not in release_names:
+            continue
+        name = meta.get('name', '')
+        result[instance] = {
+            'name': name,
+            'cluster_dns': _service_cluster_dns(name),
+        }
+    return result
+
+
 def get_deployment_status(release_name: str) -> dict | None:
     return get_deployments_status_map({release_name}).get(release_name)
 
@@ -101,6 +126,22 @@ def deployment_replicas(release_name: str) -> int | None:
     if dep is None:
         return None
     return dep['desired']
+
+
+def _pod_cluster_dns(pod_ip: str, namespace: str = NAMESPACE) -> str:
+    """CoreDNS pod record: <ip-with-dashes>.<namespace>.pod.cluster.local"""
+    ip = (pod_ip or '').strip()
+    if not ip:
+        return ''
+    return f'{ip.replace(".", "-")}.{namespace}.pod.cluster.local'
+
+
+def _service_cluster_dns(service_name: str, namespace: str = NAMESPACE) -> str:
+    """ClusterIP service DNS: <name>.<namespace>.svc.cluster.local"""
+    name = (service_name or '').strip()
+    if not name:
+        return ''
+    return f'{name}.{namespace}.svc.cluster.local'
 
 
 def _pod_ready_string(pod: dict) -> str:
@@ -188,12 +229,15 @@ def _workspace_pods_by_id(workspace_ids: set[str]) -> dict[str, list[dict]]:
         ws_id = (meta.get('labels') or {}).get(label_key, '')
         if ws_id not in workspace_ids:
             continue
+        pod_ip = (pod.get('status') or {}).get('podIP', '') or ''
         pods_by_id[ws_id].append({
             'name': meta.get('name', ''),
             'phase': (pod.get('status') or {}).get('phase', 'Unknown'),
             'display': _pod_k8s_display_status(pod),
             'ready': _pod_ready_string(pod),
             'deleting': bool(meta.get('deletionTimestamp')),
+            'pod_ip': pod_ip,
+            'pod_domain': _pod_cluster_dns(pod_ip),
         })
     return pods_by_id
 
@@ -208,6 +252,7 @@ def _empty_workspace_k8s_status() -> dict:
         'display': 'Not deployed',
         'deployment': None,
         'pods': [],
+        'service': None,
         'release_exists': False,
     }
 
@@ -216,12 +261,14 @@ def _build_workspace_k8s_status(
     pod_rows: list[dict],
     deployment: dict | None,
     release_exists: bool,
+    service: dict | None = None,
 ) -> dict:
     display = _workspace_k8s_display(deployment, pod_rows, release_exists)
     return {
         'display': display,
         'deployment': deployment,
         'pods': pod_rows,
+        'service': service,
         'release_exists': release_exists,
     }
 
@@ -237,6 +284,7 @@ def live_workspace_k8s_status_batch(workspaces: list[Workspace]) -> dict[str, di
 
     pods_by_id = _workspace_pods_by_id(ws_ids)
     deployments = get_deployments_status_map(release_names)
+    services = get_services_map(release_names)
     helm_releases = helm_release_names_set()
 
     result: dict[str, dict] = {}
@@ -247,6 +295,7 @@ def live_workspace_k8s_status_batch(workspaces: list[Workspace]) -> dict[str, di
             pods_by_id.get(ws_id, []),
             deployments.get(release),
             release in helm_releases,
+            services.get(release),
         )
     return result
 

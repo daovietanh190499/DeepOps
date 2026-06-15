@@ -105,13 +105,7 @@ Vue.component('workspace-card', {
       <div class="flex justify-between items-start gap-2 min-w-0">
         <div class="min-w-0 flex-1 overflow-hidden">
           <h3 class="font-bold text-slate-900 truncate" v-text="ws.name"></h3>
-          <p v-if="showOwner" class="text-xs text-slate-500 truncate" v-text="'@' + ws.owner"></p>
-          <div class="flex items-start gap-1 mt-0.5 min-w-0">
-            <p class="dohub-break-long text-xs font-mono text-slate-400 flex-1 min-w-0" v-text="ws.hostname"></p>
-            <button type="button" @click.stop="$emit('copy', ws)" class="shrink-0 rounded p-1 text-slate-400 hover:bg-slate-100 hover:text-blue-600" title="Copy URL">
-              <i class="fa fa-copy text-xs"></i>
-            </button>
-          </div>
+          <p v-if="showOwner" class="text-xs text-slate-500 truncate mt-0.5" v-text="'@' + ws.owner"></p>
         </div>
         <span class="shrink-0 rounded-full px-2 py-0.5 text-xs font-bold max-w-[40%] text-right leading-tight" :class="stateClass" v-text="k8sDisplay"></span>
       </div>
@@ -698,6 +692,23 @@ const appVue = new Vue({
                 && this.modalWorkspace.k8s_status.pods
             return pods || []
         },
+        modalPrimaryPod() {
+            return this.modalPods.length ? this.modalPods[0] : null
+        },
+        modalPodDomain() {
+            return (this.modalPrimaryPod && this.modalPrimaryPod.pod_domain) || '—'
+        },
+        modalPodIp() {
+            return (this.modalPrimaryPod && this.modalPrimaryPod.pod_ip) || '—'
+        },
+        modalPodName() {
+            return (this.modalPrimaryPod && this.modalPrimaryPod.name) || '—'
+        },
+        modalServiceDns() {
+            const svc = this.modalWorkspace && this.modalWorkspace.k8s_status
+                && this.modalWorkspace.k8s_status.service
+            return (svc && svc.cluster_dns) || '—'
+        },
         filteredPlanTemplates() {
             if (!this.resourceLimits.limited) return this.planTemplates
             const eq = this.resourceLimits.equipment || {}
@@ -971,7 +982,7 @@ const appVue = new Vue({
             const url = this.workspaceUrl(ws)
             try {
                 await navigator.clipboard.writeText(url)
-                this.showToast('URL copied')
+                this.showToast('Service URL copied')
             } catch {
                 const ta = document.createElement('textarea')
                 ta.value = url
@@ -979,8 +990,44 @@ const appVue = new Vue({
                 ta.select()
                 document.execCommand('copy')
                 document.body.removeChild(ta)
-                this.showToast('URL copied')
+                this.showToast('Service URL copied')
             }
+        },
+        async copyWorkspaceDomain(ws) {
+            const domain = (ws && ws.hostname) || ''
+            if (!domain) return
+            try {
+                await navigator.clipboard.writeText(domain)
+                this.showToast('Service domain copied')
+            } catch {
+                const ta = document.createElement('textarea')
+                ta.value = domain
+                document.body.appendChild(ta)
+                ta.select()
+                document.execCommand('copy')
+                document.body.removeChild(ta)
+                this.showToast('Service domain copied')
+            }
+        },
+        primaryWorkspacePod(ws) {
+            const pods = ws && ws.k8s_status && ws.k8s_status.pods
+            return pods && pods.length ? pods[0] : null
+        },
+        copyPodDomain(ws) {
+            const pod = this.primaryWorkspacePod(ws)
+            if (pod && pod.pod_domain) this.copyText(pod.pod_domain, 'Pod domain copied')
+        },
+        copyPodIp(ws) {
+            const pod = this.primaryWorkspacePod(ws)
+            if (pod && pod.pod_ip) this.copyText(pod.pod_ip, 'Pod IP copied')
+        },
+        copyPodName(ws) {
+            const pod = this.primaryWorkspacePod(ws)
+            if (pod && pod.name) this.copyText(pod.name, 'Pod name copied')
+        },
+        copyServiceDns(ws) {
+            const svc = ws && ws.k8s_status && ws.k8s_status.service
+            if (svc && svc.cluster_dns) this.copyText(svc.cluster_dns, 'Service DNS copied')
         },
         openWorkspaceModal(ws) {
             this.mobileNavOpen = false

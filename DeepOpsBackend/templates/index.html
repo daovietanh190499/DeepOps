@@ -475,7 +475,7 @@
             <div class="dohub-card-grid grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
                 <workspace-card v-for="ws in myWorkspaces" :key="ws.id" :ws="ws"
                                 :disabled="statusPending.myWorkspaces"
-                                @detail="openWorkspaceModal" @copy="copyWorkspaceUrl"
+                                @detail="openWorkspaceModal"
                                 @start="startWorkspace" @stop="stopWorkspace" @open="openWorkspace"
                                 @export="exportWorkspace" @delete="ws => openDeleteModal(ws, false)"></workspace-card>
             </div>
@@ -585,7 +585,7 @@
                 <div class="dohub-card-grid grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
                     <workspace-card v-for="ws in adminWorkspaces" :key="ws.id" :ws="ws" :show-owner="true"
                                     :disabled="statusPending.adminWorkspaces"
-                                    @detail="openWorkspaceModal" @copy="copyWorkspaceUrl"
+                                    @detail="openWorkspaceModal"
                                     @start="startWorkspace" @stop="stopWorkspace" @open="openWorkspace"
                                     @export="exportWorkspace" @delete="ws => openDeleteModal(ws, true)"></workspace-card>
                 </div>
@@ -713,12 +713,6 @@
             <div class="shrink-0 flex items-center justify-between border-b border-slate-100 bg-white px-4 py-3 sm:px-5 sm:py-4">
                 <div class="min-w-0 flex-1 pr-3">
                     <h3 class="text-lg font-bold text-slate-900 truncate" v-text="modalWorkspace.name"></h3>
-                    <div class="mt-1 flex items-center gap-2">
-                        <span class="font-mono text-[10px] text-slate-500 truncate" v-text="workspaceUrl(modalWorkspace)"></span>
-                        <button type="button" @click="copyWorkspaceUrl(modalWorkspace)" class="shrink-0 rounded p-1 text-slate-400 hover:bg-slate-100 hover:text-blue-600" title="Copy URL">
-                            <i class="fa fa-copy text-xs"></i>
-                        </button>
-                    </div>
                 </div>
                 <button type="button" @click="closeWorkspaceModal" class="text-slate-400 hover:text-slate-700"><i class="fa fa-times text-xl"></i></button>
             </div>
@@ -743,6 +737,62 @@
                 <span class="inline-block rounded-full px-2 py-0.5 text-xs font-bold"
                       :class="modalK8sDisplay.toLowerCase()==='running' ? 'bg-emerald-100 text-emerald-700' : modalK8sDisplay.toLowerCase()==='terminating' ? 'bg-rose-100 text-rose-700' : modalWorkspace.state==='offline' ? 'bg-slate-100 text-slate-600' : 'bg-amber-100 text-amber-700'"
                       v-text="modalK8sDisplay"></span>
+                <div class="rounded-xl border border-slate-200 bg-slate-50 p-4 space-y-2">
+                    <p class="font-semibold text-slate-800">Networking</p>
+                    <p class="text-xs text-slate-600">Public ingress and in-cluster addresses (when the server is deployed).</p>
+                    <div class="flex items-center gap-2">
+                        <span class="font-medium text-slate-500 shrink-0 text-xs w-28">Service domain</span>
+                        <span class="font-mono text-slate-800 truncate flex-1 text-xs" v-text="modalWorkspace.hostname"></span>
+                        <button type="button" @click="copyWorkspaceDomain(modalWorkspace)"
+                                class="shrink-0 rounded border bg-white px-2 py-0.5 hover:bg-slate-50" title="Copy service domain">
+                            <i class="fa fa-copy"></i>
+                        </button>
+                    </div>
+                    <div class="flex items-center gap-2">
+                        <span class="font-medium text-slate-500 shrink-0 text-xs w-28">Service URL</span>
+                        <span class="font-mono text-slate-800 truncate flex-1 text-xs" v-text="workspaceUrl(modalWorkspace)"></span>
+                        <button type="button" @click="copyWorkspaceUrl(modalWorkspace)"
+                                class="shrink-0 rounded border bg-white px-2 py-0.5 hover:bg-slate-50" title="Copy service URL">
+                            <i class="fa fa-copy"></i>
+                        </button>
+                    </div>
+                    <div class="flex items-center gap-2">
+                        <span class="font-medium text-slate-500 shrink-0 text-xs w-28">Service DNS</span>
+                        <span class="font-mono text-slate-800 truncate flex-1 text-xs" v-text="modalServiceDns"></span>
+                        <button type="button" @click="copyServiceDns(modalWorkspace)"
+                                :disabled="modalServiceDns === '—'"
+                                class="shrink-0 rounded border bg-white px-2 py-0.5 hover:bg-slate-50 disabled:opacity-40" title="Copy service internal DNS">
+                            <i class="fa fa-copy"></i>
+                        </button>
+                    </div>
+                    <div class="flex items-center gap-2">
+                        <span class="font-medium text-slate-500 shrink-0 text-xs w-28">Pod name</span>
+                        <span class="font-mono text-slate-800 truncate flex-1 text-xs" v-text="modalPodName"></span>
+                        <button type="button" @click="copyPodName(modalWorkspace)"
+                                :disabled="modalPodName === '—'"
+                                class="shrink-0 rounded border bg-white px-2 py-0.5 hover:bg-slate-50 disabled:opacity-40" title="Copy pod name">
+                            <i class="fa fa-copy"></i>
+                        </button>
+                    </div>
+                    <div class="flex items-center gap-2">
+                        <span class="font-medium text-slate-500 shrink-0 text-xs w-28">Pod domain</span>
+                        <span class="font-mono text-slate-800 truncate flex-1 text-xs" v-text="modalPodDomain"></span>
+                        <button type="button" @click="copyPodDomain(modalWorkspace)"
+                                :disabled="modalPodDomain === '—'"
+                                class="shrink-0 rounded border bg-white px-2 py-0.5 hover:bg-slate-50 disabled:opacity-40" title="Copy pod domain">
+                            <i class="fa fa-copy"></i>
+                        </button>
+                    </div>
+                    <div class="flex items-center gap-2">
+                        <span class="font-medium text-slate-500 shrink-0 text-xs w-28">Pod IP</span>
+                        <span class="font-mono text-slate-800 truncate flex-1 text-xs" v-text="modalPodIp"></span>
+                        <button type="button" @click="copyPodIp(modalWorkspace)"
+                                :disabled="modalPodIp === '—'"
+                                class="shrink-0 rounded border bg-white px-2 py-0.5 hover:bg-slate-50 disabled:opacity-40" title="Copy pod IP">
+                            <i class="fa fa-copy"></i>
+                        </button>
+                    </div>
+                </div>
                 <div class="rounded-xl bg-slate-50 px-4 py-2">
                     <spec-row label="Owner" :value="modalWorkspace.owner || modalWorkspace.username"></spec-row>
                     <spec-row v-if="modalWorkspace.k8s_status && modalWorkspace.k8s_status.deployment"
