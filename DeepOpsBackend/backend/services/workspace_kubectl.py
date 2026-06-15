@@ -16,8 +16,12 @@ MONITOR_CONTAINER = 'monitor-sidecar'
 MONITOR_LOG_DIR = '/tmp/monitor'
 MONITOR_LEGACY_LOG_FILE = f'{MONITOR_LOG_DIR}/metrics.jsonl'
 MONITOR_DAILY_NAME_RE = re.compile(r'^metrics-(\d{4}-\d{2}-\d{2})\.jsonl$')
+MONITOR_INTERVAL_SEC = 2
 MONITOR_DEFAULT_WINDOW_MINUTES = 300
 MONITOR_WINDOW_OPTIONS_MINUTES = (5, 15, 30, 60, 300)
+MONITOR_MAX_TAIL_LINES = (
+    MONITOR_DEFAULT_WINDOW_MINUTES * 60 // MONITOR_INTERVAL_SEC
+)
 
 
 def _parse_monitor_window_minutes(raw: str | int | None) -> int:
@@ -35,6 +39,15 @@ def _monitor_window_label(minutes: int) -> str:
         return f'{minutes} min'
     hours = minutes // 60
     return '1 hour' if hours == 1 else f'{hours} hours'
+
+
+def _monitor_tail_lines(
+    window_minutes: int,
+    interval_sec: int = MONITOR_INTERVAL_SEC,
+) -> int:
+    """Sample every ``interval_sec`` (sidecar default 2s) → 30 lines/minute."""
+    lines = (window_minutes * 60) // interval_sec
+    return max(1, min(lines, MONITOR_MAX_TAIL_LINES))
 
 
 def _kubectl(args: list[str], timeout: int = 60) -> tuple[str, str, int]:
@@ -92,23 +105,37 @@ def _list_monitor_daily_files(pod_name: str) -> tuple[list[str], str]:
 
 def _monitor_files_for_cutoff(all_files: list[str], cutoff: datetime) -> list[str]:
     cutoff_day = cutoff.date()
-    selected = [
+    selected = sorted(
         path for path in all_files
         if (_monitor_daily_date(path) or date.min) >= cutoff_day
-    ]
-    return sorted(selected)
+    )
+    # Max chart window is 5 h — at most two daily files (midnight crossover).
+    if len(selected) > 2:
+        selected = selected[-2:]
+    return selected
 
 
-def _read_monitor_file_contents(pod_name: str, file_paths: list[str]) -> tuple[str, str, int]:
-    if not file_paths:
+def _read_monitor_tail(
+    pod_name: str,
+    file_paths: list[str],
+    tail_lines: int,
+) -> tuple[str, str, int]:
+    if not file_paths or tail_lines <= 0:
         return '', '', 0
-    cat_cmd = 'cat ' + ' '.join(shlex.quote(path) for path in file_paths)
+    if len(file_paths) == 1:
+        cmd = f'tail -n {tail_lines} {shlex.quote(file_paths[0])}'
+    else:
+        inner = '; '.join(
+            f'tail -n {tail_lines} {shlex.quote(path)}'
+            for path in file_paths
+        )
+        cmd = f'{{ {inner}; }} | tail -n {tail_lines}'
     return _kubectl([
         'exec', pod_name,
         '-n', NAMESPACE,
         '-c', MONITOR_CONTAINER,
-        '--', 'sh', '-c', cat_cmd,
-    ], timeout=90)
+        '--', 'sh', '-c', cmd,
+    ], timeout=45)
 
 
 def _resolve_monitor_pod(
@@ -291,15 +318,18 @@ def workspace_monitor_metrics(
     daily_files, list_error = _list_monitor_daily_files(selected)
     cutoff = datetime.now(timezone.utc) - timedelta(minutes=window_minutes)
     file_paths = _monitor_files_for_cutoff(daily_files, cutoff)
+    tail_lines = _monitor_tail_lines(window_minutes)
 
     stdout = ''
     error = list_error
     if file_paths:
-        stdout, read_err, code = _read_monitor_file_contents(selected, file_paths)
+        stdout, read_err, code = _read_monitor_tail(selected, file_paths, tail_lines)
         if code != 0:
             error = read_err or 'Failed to read monitor metrics from sidecar.'
     elif not error:
-        stdout, read_err, code = _read_monitor_file_contents(selected, [MONITOR_LEGACY_LOG_FILE])
+        stdout, read_err, code = _read_monitor_tail(
+            selected, [MONITOR_LEGACY_LOG_FILE], tail_lines,
+        )
         if code != 0:
             error = read_err or 'Failed to read monitor metrics from sidecar.'
         elif not stdout.strip():
