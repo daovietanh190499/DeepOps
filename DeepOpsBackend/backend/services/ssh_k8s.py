@@ -5,12 +5,14 @@ import subprocess
 import tempfile
 
 from backend.models import Workspace
-from backend.services.k8s import build_spawn_config
 from backend.services.k8s_env import NAMESPACE
 from backend.services.k8s_status import live_workspace_state, workspace_is_active
+from backend.services.sidecar_k8s import sync_workspace_sidecars
 from backend.services.ssh_keys import (
     ensure_host_key_material,
     get_or_none,
+    is_valid_openssh_private_key,
+    is_valid_openssh_public_key,
     ssh_secret_name,
 )
 
@@ -21,6 +23,12 @@ def apply_ssh_bridge_secret(
     host_key_openssh: str,
 ) -> tuple[str, int]:
     """Create or replace the ssh-bridge secret (authorized_keys + host_key)."""
+    if not secret_name:
+        return 'missing ssh secret name', 1
+    if not is_valid_openssh_public_key(public_key_openssh):
+        return 'invalid authorized_keys public key', 1
+    if not is_valid_openssh_private_key(host_key_openssh):
+        return 'invalid ssh host private key', 1
     auth_content = public_key_openssh.strip() + '\n'
     host_content = host_key_openssh.strip() + '\n'
     auth_tmp = host_tmp = None
@@ -80,22 +88,8 @@ def sync_ssh_secret_for_workspace(workspace: Workspace) -> tuple[str, int]:
     )
 
 
-def restart_workspace_pod(release_name: str) -> tuple[str, int]:
-    result = subprocess.run(
-        [
-            'kubectl', 'rollout', 'restart', 'deployment',
-            '-n', NAMESPACE,
-            f'-l=app.kubernetes.io/instance={release_name}',
-        ],
-        capture_output=True,
-        text=True,
-        check=False,
-    )
-    return (result.stdout or '') + (result.stderr or ''), result.returncode
-
-
 def sync_workspace_ssh_to_cluster(workspace, *, public_key: str, respawn: bool = True) -> dict:
-    """Apply secret and optionally re-helm when the server is running."""
+    """Apply secret and update ssh-bridge sidecar via ConfigMap (no Helm redeploy)."""
     record = get_or_none(workspace)
     secret_name = ssh_secret_name(workspace)
     host_key = ensure_host_key_material(record) if record else ''
@@ -108,24 +102,15 @@ def sync_workspace_ssh_to_cluster(workspace, *, public_key: str, respawn: bool =
     if not respawn or not workspace_is_active(live_workspace_state(workspace)):
         out['ok'] = True
         out['restarted'] = False
+        out['message'] = 'SSH keys saved — start the server to enable SSH.'
         return out
 
-    try:
-        config = build_spawn_config(workspace)
-        config['ssh_public_key'] = public_key
-        if host_key:
-            config['ssh_host_key'] = host_key
-    except ValueError as exc:
-        out['ok'] = False
-        out['error'] = str(exc)
-        return out
-
-    from backend.services.k8s import create_codehub
-
-    command, helm_logs, exit_code = create_codehub(config)
-    out['helm_command'] = command
-    out['helm_logs'] = helm_logs
-    out['helm_code'] = exit_code
-    out['restarted'] = exit_code == 0
-    out['ok'] = exit_code == 0
+    sync = sync_workspace_sidecars(workspace, reload=True)
+    out.update(sync)
+    out['ok'] = sync.get('ok', False)
+    out['restarted'] = sync.get('restarted', False)
+    if sync.get('ok'):
+        out['message'] = 'SSH enabled — sidecar updated without restarting the workspace.'
+    else:
+        out['error'] = sync.get('error') or 'failed to update ssh sidecar'
     return out

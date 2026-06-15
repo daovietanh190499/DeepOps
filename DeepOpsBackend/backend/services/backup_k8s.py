@@ -6,9 +6,9 @@ import tempfile
 
 from backend.models import Workspace
 from backend.services.backup_config import backup_secret_name
-from backend.services.k8s import build_spawn_config, create_codehub
 from backend.services.k8s_env import NAMESPACE
 from backend.services.k8s_status import live_workspace_state, workspace_is_active
+from backend.services.sidecar_k8s import sync_workspace_sidecars
 
 
 def apply_backup_secret(secret_name: str, rclone_config: str) -> tuple[str, int]:
@@ -48,46 +48,47 @@ def apply_backup_secret(secret_name: str, rclone_config: str) -> tuple[str, int]
             os.unlink(conf_tmp)
 
 
+def sync_backup_secret_for_workspace(workspace: Workspace) -> tuple[str, int]:
+    """Push rclone.conf from DB into the cluster secret."""
+    config = (workspace.backup_rclone_config or '').strip()
+    if not config:
+        return '', 0
+    return apply_backup_secret(backup_secret_name(workspace), config)
+
+
 def sync_workspace_backup_to_cluster(workspace: Workspace, *, respawn: bool = True) -> dict:
-    """Re-helm workspace release so backup sidecar matches DB config."""
+    """Update backup secret + sidecar ConfigMap (no Helm redeploy)."""
     out: dict = {'ok': True, 'restarted': False}
 
-    if not workspace.backup_enabled:
-        out['message'] = 'Backup disabled — start or restart the server to remove the sidecar.'
-        if not respawn or not workspace_is_active(live_workspace_state(workspace)):
-            return out
-    elif not respawn or not workspace_is_active(live_workspace_state(workspace)):
-        out['message'] = 'Saved — start or restart the server to apply backup settings.'
+    secret_logs, secret_code = sync_backup_secret_for_workspace(workspace)
+    if secret_code != 0:
+        return {
+            'ok': False,
+            'error': (secret_logs or '').strip() or 'failed to apply backup secret',
+        }
+    if secret_logs:
+        out['secret_logs'] = secret_logs
+
+    if not respawn:
+        out['message'] = 'Backup settings saved.'
         return out
 
-    if workspace.backup_enabled:
-        secret_logs, secret_code = apply_backup_secret(
-            backup_secret_name(workspace),
-            workspace.backup_rclone_config or '',
+    if not workspace_is_active(live_workspace_state(workspace)):
+        out['message'] = (
+            'Backup settings saved — start the server to apply.'
+            if workspace.backup_enabled
+            else 'Backup settings saved.'
         )
-        out['secret_logs'] = secret_logs
-        if secret_code != 0:
-            return {
-                'ok': False,
-                'error': (secret_logs or '').strip() or 'failed to apply backup secret',
-            }
+        return out
 
-    try:
-        config = build_spawn_config(workspace)
-    except ValueError as exc:
-        return {'ok': False, 'error': str(exc)}
-
-    command, helm_logs, exit_code = create_codehub(config)
-    out['helm_command'] = command
-    out['helm_logs'] = helm_logs
-    out['helm_code'] = exit_code
-    out['restarted'] = exit_code == 0
-    out['ok'] = exit_code == 0
-    if exit_code == 0:
-        if workspace.backup_enabled:
-            out['message'] = 'Backup sidecar scheduled — pod is updating.'
-        else:
-            out['message'] = 'Backup sidecar removed — pod is updating.'
+    sync = sync_workspace_sidecars(workspace, reload=True)
+    out.update(sync)
+    if sync.get('ok'):
+        out['message'] = (
+            'Backup scheduled — cron started in sidecar.'
+            if workspace.backup_enabled
+            else 'Backup stopped — cron idle in sidecar.'
+        )
     else:
-        out['error'] = (helm_logs or '').strip() or 'helm upgrade failed'
+        out['error'] = sync.get('error') or 'failed to update backup sidecar'
     return out

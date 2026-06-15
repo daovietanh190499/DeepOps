@@ -1,5 +1,10 @@
 replicaCount: 1
 
+# When true, all sidecar containers are always present in the pod.
+# Runtime on/off and config are controlled via the sidecar-config ConfigMap (hub API).
+sidecars:
+  always: true
+
 image:
   repository: codercom/code-server
   tag: "4.89.0-ubuntu"

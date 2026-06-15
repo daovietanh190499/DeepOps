@@ -4,12 +4,13 @@ from django.views.decorators.http import require_http_methods
 
 from backend.services.backup_config import (
     backup_info_payload,
+    backup_secret_name,
     parse_backup_mount_selection,
     validate_backup_remote,
     validate_cron_schedule,
     validate_rclone_config,
 )
-from backend.services.backup_k8s import sync_workspace_backup_to_cluster
+from backend.services.backup_k8s import apply_backup_secret, sync_backup_secret_for_workspace, sync_workspace_backup_to_cluster
 from backend.services.github_auth import auth
 from backend.services.workspace_kubectl import workspace_backup_status, workspace_backup_trigger
 from backend.views.workspaces import _get_workspace_for_user, _parse_body, _require_accepted
@@ -61,11 +62,6 @@ def workspace_backup_schedule(request, user, workspace_id):
     if current_status.get('running'):
         return JsonResponse({'message': 'cannot schedule while a backup is running'}, status=400)
 
-    if ws.backup_enabled or current_status.get('sidecar_active'):
-        return JsonResponse({
-            'message': 'backup sidecar is already active — click Stop backup to remove it first',
-        }, status=400)
-
     ws.backup_schedule = schedule
     ws.backup_remote = remote
     ws.backup_folders = folders
@@ -88,7 +84,7 @@ def workspace_backup_schedule(request, user, workspace_id):
         }, status=200)
 
     return JsonResponse({
-        'message': sync.get('message') or 'Backup sidecar scheduled',
+        'message': sync.get('message') or 'Backup scheduled',
         'result': payload,
     })
 
@@ -104,19 +100,49 @@ def workspace_backup_run(request, user, workspace_id):
     if err:
         return err
 
-    if not ws.backup_enabled:
-        return JsonResponse({'message': 'backup is not scheduled yet — click Schedule first'}, status=400)
+    try:
+        data = _parse_body(request)
+    except Exception:
+        data = {}
 
-    if not (ws.backup_remote or '').strip():
-        return JsonResponse({
-            'message': 'remote destination is required — set Remote destination and click Schedule',
-        }, status=400)
+    try:
+        remote = validate_backup_remote(data.get('remote', ws.backup_remote))
+        folders = parse_backup_mount_selection(ws, data.get('folders', ws.backup_folders))
+        rclone_config = validate_rclone_config(
+            data.get('rclone_config', ws.backup_rclone_config)
+        )
+    except ValueError as exc:
+        return JsonResponse({'message': str(exc)}, status=400)
+
+    if not folders:
+        return JsonResponse({'message': 'select at least one volume to back up'}, status=400)
+
+    ws.backup_remote = remote
+    ws.backup_folders = folders
+    ws.backup_rclone_config = rclone_config
+    ws.save(update_fields=[
+        'backup_remote', 'backup_folders', 'backup_rclone_config', 'updated_at',
+    ])
 
     current_status = workspace_backup_status(ws)
     if current_status.get('running'):
         return JsonResponse({'message': 'a backup is already running'}, status=400)
 
-    trigger = workspace_backup_trigger(ws)
+    if not current_status.get('sidecar_ready'):
+        return JsonResponse({
+            'message': 'backup sidecar is not ready — start the server first',
+        }, status=400)
+
+    secret_logs, secret_code = apply_backup_secret(
+        backup_secret_name(ws),
+        rclone_config,
+    )
+    if secret_code != 0:
+        return JsonResponse({
+            'message': (secret_logs or '').strip() or 'failed to apply rclone config to sidecar',
+        }, status=400)
+
+    trigger = workspace_backup_trigger(ws, remote=remote, folders=folders)
     status = workspace_backup_status(ws)
     payload = backup_info_payload(ws, status=status)
     payload['trigger'] = trigger
@@ -137,7 +163,7 @@ def workspace_backup_run(request, user, workspace_id):
 @csrf_exempt
 @require_http_methods(['POST'])
 def workspace_backup_stop_view(request, user, workspace_id):
-    """Remove the backup sidecar from the workspace pod."""
+    """Stop scheduled backup in the sidecar (container keeps running)."""
     denied = _require_accepted(user)
     if denied:
         return denied
@@ -145,13 +171,8 @@ def workspace_backup_stop_view(request, user, workspace_id):
     if err:
         return err
 
-    current_status = workspace_backup_status(ws)
-    sidecar_active = bool(
-        current_status.get('sidecar_active') or current_status.get('sidecar_ready')
-    )
-
-    if not ws.backup_enabled and not sidecar_active:
-        return JsonResponse({'message': 'backup sidecar is not active'}, status=400)
+    if not ws.backup_enabled:
+        return JsonResponse({'message': 'backup is not scheduled'}, status=400)
 
     ws.backup_enabled = False
     ws.save(update_fields=['backup_enabled', 'updated_at'])
@@ -165,12 +186,12 @@ def workspace_backup_stop_view(request, user, workspace_id):
         ws.backup_enabled = True
         ws.save(update_fields=['backup_enabled', 'updated_at'])
         return JsonResponse({
-            'message': sync.get('error') or 'failed to remove backup sidecar',
+            'message': sync.get('error') or 'failed to stop backup',
             'result': payload,
         }, status=400)
 
     return JsonResponse({
-        'message': sync.get('message') or 'Backup sidecar removed',
+        'message': sync.get('message') or 'Backup stopped',
         'result': payload,
     })
 
@@ -179,7 +200,7 @@ def workspace_backup_stop_view(request, user, workspace_id):
 @csrf_exempt
 @require_http_methods(['POST'])
 def workspace_backup_save_config(request, user, workspace_id):
-    """Persist backup form fields to DB without enabling the backup sidecar."""
+    """Persist backup form fields to DB and push rclone config to the sidecar."""
     denied = _require_accepted(user)
     if denied:
         return denied
@@ -217,6 +238,13 @@ def workspace_backup_save_config(request, user, workspace_id):
         return JsonResponse({'message': 'nothing to save'}, status=400)
 
     ws.save(update_fields=update_fields)
+
+    if 'rclone_config' in update_fields and (ws.backup_rclone_config or '').strip():
+        secret_logs, secret_code = sync_backup_secret_for_workspace(ws)
+        if secret_code != 0:
+            return JsonResponse({
+                'message': (secret_logs or '').strip() or 'settings saved but rclone sync failed',
+            }, status=400)
 
     status = workspace_backup_status(ws)
     return JsonResponse({

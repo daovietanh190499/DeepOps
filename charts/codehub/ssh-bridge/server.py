@@ -306,8 +306,13 @@ async def handle_client(process: asyncssh.SSHServerProcess) -> None:
 
 async def ensure_host_key() -> None:
     if HOST_KEY.is_file():
-        LOG.info('using SSH host key from %s', HOST_KEY)
-        return
+        try:
+            asyncssh.import_private_key(HOST_KEY.read_text())
+            LOG.info('using SSH host key from %s', HOST_KEY)
+            return
+        except (asyncssh.KeyImportError, ValueError, OSError) as exc:
+            LOG.warning('invalid host key at %s (%s), regenerating', HOST_KEY, exc)
+            HOST_KEY.unlink(missing_ok=True)
     HOST_KEY.parent.mkdir(parents=True, exist_ok=True)
     key = asyncssh.generate_private_key('ssh-ed25519')
     key.write_private_key(str(HOST_KEY))

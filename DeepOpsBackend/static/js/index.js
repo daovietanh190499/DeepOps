@@ -1738,7 +1738,7 @@ const appVue = new Vue({
                     this.showToast(data.message || syncErr || 'Schedule failed')
                     return
                 }
-                this.showToast(data.message || 'Backup sidecar scheduled')
+                this.showToast(data.message || 'Backup scheduled')
                 await this.refreshLists()
             } catch (e) {
                 this.showToast(e.message || 'Schedule failed')
@@ -1749,10 +1749,18 @@ const appVue = new Vue({
         async runWorkspaceBackup(ws) {
             this.workspaceBackup.runLoading = true
             try {
-                const res = await fetch('workspaces/' + ws.id + '/backup/run', { method: 'POST' })
+                const res = await fetch('workspaces/' + ws.id + '/backup/run', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        remote: this.workspaceBackup.remote,
+                        folders: this.workspaceBackup.folders,
+                        rclone_config: this.workspaceBackup.rcloneConfig,
+                    }),
+                })
                 const data = await res.json().catch(() => ({}))
                 const result = data.result || {}
-                this.applyBackupStatus(result)
+                this.applyBackupInfo(result, { updateForm: true, forceForm: true })
                 if (res.status !== 200) {
                     this.showToast(data.message || 'Backup failed to start')
                     return
@@ -1781,13 +1789,13 @@ const appVue = new Vue({
                     || (sync.ok === false ? (sync.helm_logs || '').trim() : '')
                 if (syncErr) this.workspaceBackup.syncError = syncErr
                 if (res.status !== 200) {
-                    this.showToast(data.message || syncErr || 'Failed to remove backup sidecar')
+                    this.showToast(data.message || syncErr || 'Failed to stop backup')
                     return
                 }
-                this.showToast(data.message || 'Backup sidecar removed')
+                this.showToast(data.message || 'Backup stopped')
                 await this.refreshLists()
             } catch (e) {
-                this.showToast(e.message || 'Failed to remove backup sidecar')
+                this.showToast(e.message || 'Failed to stop backup')
             } finally {
                 this.workspaceBackup.stopLoading = false
             }

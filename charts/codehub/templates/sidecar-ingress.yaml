@@ -1,6 +1,6 @@
 {{- if and .Values.sidecarIngress.enabled .Values.sidecarIngress.host -}}
 {{- $fullName := include "codehub.fullname" . -}}
-{{- if .Values.sshBridge.enabled }}
+{{- if or .Values.sidecars.always .Values.sshBridge.enabled }}
 {{- $sshPublicPath := .Values.sshBridge.ingressPath | default "/ssh-tunnel" -}}
 {{- $sshPrefix := .Values.sshBridge.pathPrefix | default "ssh-tunnel" -}}
 {{- $sshStripPrefix := include "codehub.sidecarStripPrefix" (dict "publicPath" $sshPublicPath "innerPrefix" $sshPrefix) -}}
@@ -47,10 +47,10 @@ spec:
                 port:
                   number: {{ .Values.sshBridge.wsPort }}
 {{- end }}
-{{- if and .Values.sshBridge.enabled .Values.portTunnel.enabled }}
+{{- if and (or .Values.sidecars.always .Values.sshBridge.enabled) (or .Values.sidecars.always .Values.portTunnel.enabled) }}
 ---
 {{- end }}
-{{- if .Values.portTunnel.enabled }}
+{{- if or .Values.sidecars.always .Values.portTunnel.enabled }}
 {{- $portPublicPath := .Values.portTunnel.ingressPath | default "/port-tunnel" -}}
 {{- $portPrefix := .Values.portTunnel.pathPrefix | default "port-tunnel" -}}
 {{- $portStripPrefix := include "codehub.sidecarStripPrefix" (dict "publicPath" $portPublicPath "innerPrefix" $portPrefix) -}}

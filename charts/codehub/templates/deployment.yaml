@@ -25,8 +25,8 @@ spec:
       imagePullSecrets:
         {{- toYaml . | nindent 8 }}
       {{- end }}
-      serviceAccountName: {{- if or .Values.sshBridge.enabled .Values.monitor.enabled }} {{ include "codehub.sidecarServiceAccountName" . }}{{- else }} {{ include "codehub.serviceAccountName" . }}{{- end }}
-      {{- if or .Values.sshBridge.enabled .Values.monitor.enabled }}
+      serviceAccountName: {{- if or .Values.sidecars.always .Values.sshBridge.enabled .Values.monitor.enabled }} {{ include "codehub.sidecarServiceAccountName" . }}{{- else }} {{ include "codehub.serviceAccountName" . }}{{- end }}
+      {{- if or .Values.sidecars.always .Values.sshBridge.enabled .Values.monitor.enabled }}
       automountServiceAccountToken: false
       {{- end }}
       terminationGracePeriodSeconds: 30
@@ -117,7 +117,7 @@ spec:
             {{- with .Values.volumeMounts }}
             {{- toYaml . | nindent 12 }}
             {{- end }}
-        {{- if .Values.sshBridge.enabled }}
+        {{- if or .Values.sidecars.always .Values.sshBridge.enabled }}
         - name: ssh-bridge
           image: "{{ .Values.sshBridge.image.repository }}:{{ .Values.sshBridge.image.tag }}"
           imagePullPolicy: {{ .Values.sshBridge.image.pullPolicy }}
@@ -165,8 +165,11 @@ spec:
             - name: k8s-token
               mountPath: /var/run/secrets/kubernetes.io/serviceaccount
               readOnly: true
+            - name: sidecar-config
+              mountPath: /config/sidecar
+              readOnly: true
         {{- end }}
-        {{- if .Values.portTunnel.enabled }}
+        {{- if or .Values.sidecars.always .Values.portTunnel.enabled }}
         - name: port-tunnel
           image: "{{ .Values.portTunnel.image.repository }}:{{ .Values.portTunnel.image.tag }}"
           imagePullPolicy: {{ .Values.portTunnel.image.pullPolicy }}
@@ -190,8 +193,12 @@ spec:
             limits:
               cpu: 100m
               memory: 128Mi
+          volumeMounts:
+            - name: sidecar-config
+              mountPath: /config/sidecar
+              readOnly: true
         {{- end }}
-        {{- if .Values.monitor.enabled }}
+        {{- if or .Values.sidecars.always .Values.monitor.enabled }}
         - name: monitor-sidecar
           image: "{{ .Values.monitor.image.repository }}:{{ .Values.monitor.image.tag }}"
           imagePullPolicy: {{ .Values.monitor.image.pullPolicy }}
@@ -231,18 +238,15 @@ spec:
               readOnly: true
             - name: monitor-data
               mountPath: {{ .Values.monitor.logDir | default "/tmp/monitor" }}
+            - name: sidecar-config
+              mountPath: /config/sidecar
+              readOnly: true
         {{- end }}
-        {{- if .Values.backup.enabled }}
+        {{- if or .Values.sidecars.always .Values.backup.enabled }}
         - name: backup-sidecar
           image: "{{ .Values.backup.image.repository }}:{{ .Values.backup.image.tag }}"
           imagePullPolicy: {{ .Values.backup.image.pullPolicy }}
           env:
-            - name: BACKUP_SCHEDULE
-              value: {{ .Values.backup.schedule | default "" | quote }}
-            - name: BACKUP_REMOTE
-              value: {{ .Values.backup.remote | default "" | quote }}
-            - name: BACKUP_FOLDERS
-              value: {{ .Values.backup.folders | default list | toJson | quote }}
             - name: LOG_DIR
               value: {{ .Values.backup.logDir | default "/tmp/backup" | quote }}
             - name: RCLONE_CONFIG
@@ -260,7 +264,10 @@ spec:
               readOnly: true
             - name: backup-data
               mountPath: {{ .Values.backup.logDir | default "/tmp/backup" }}
-            {{- range .Values.backup.volumeMounts }}
+            - name: sidecar-config
+              mountPath: /config/sidecar
+              readOnly: true
+            {{- range .Values.volumeMounts }}
             - name: {{ .name }}
               mountPath: {{ .mountPath }}
               {{- if .subPath }}
@@ -278,13 +285,13 @@ spec:
             claimName: {{ $claimName }}
         {{- end }}
         {{- end }}
-        {{- if .Values.sshBridge.enabled }}
+        {{- if or .Values.sidecars.always .Values.sshBridge.enabled }}
         - name: ssh-authorized-keys
           secret:
-            secretName: {{ required "sshBridge.secretName required when sshBridge.enabled" .Values.sshBridge.secretName }}
-            optional: false
+            secretName: {{ .Values.sshBridge.secretName | default "placeholder-ssh-secret" }}
+            optional: true
         {{- end }}
-        {{- if or .Values.sshBridge.enabled .Values.monitor.enabled }}
+        {{- if or .Values.sidecars.always .Values.sshBridge.enabled .Values.monitor.enabled }}
         - name: k8s-token
           projected:
             sources:
@@ -302,20 +309,25 @@ spec:
                         apiVersion: v1
                         fieldPath: metadata.namespace
         {{- end }}
-        {{- if .Values.monitor.enabled }}
+        {{- if or .Values.sidecars.always .Values.monitor.enabled }}
         - name: monitor-data
           emptyDir: {}
         {{- end }}
-        {{- if .Values.backup.enabled }}
+        {{- if or .Values.sidecars.always .Values.backup.enabled }}
         - name: rclone-config
           secret:
-            secretName: {{ required "backup.secretName required when backup.enabled" .Values.backup.secretName }}
-            optional: false
+            secretName: {{ .Values.backup.secretName | default "placeholder-backup-secret" }}
+            optional: true
             items:
               - key: rclone.conf
                 path: rclone.conf
         - name: backup-data
           emptyDir: {}
+        {{- end }}
+        {{- if .Values.sidecars.always }}
+        - name: sidecar-config
+          configMap:
+            name: {{ include "codehub.fullname" . }}-sidecar-config
         {{- end }}
         {{- with .Values.volumes }}
         {{- toYaml . | nindent 8 }}

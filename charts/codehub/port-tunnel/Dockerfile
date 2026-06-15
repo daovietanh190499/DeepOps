@@ -4,7 +4,7 @@ ARG WSTUNNEL_VERSION=10.4.4
 ARG TARGETARCH=amd64
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    bash ca-certificates curl tar && \
+    bash ca-certificates curl tar jq procps && \
     rm -rf /var/lib/apt/lists/*
 
 RUN case "${TARGETARCH}" in \
@@ -21,8 +21,8 @@ RUN case "${TARGETARCH}" in \
     wstunnel --version
 
 WORKDIR /app
-COPY entrypoint.sh ./
-RUN chmod +x /app/entrypoint.sh
+COPY entrypoint.sh supervisor.sh ./
+RUN chmod +x /app/entrypoint.sh /app/supervisor.sh
 
 ENV WS_PORT=8033
 ENV WS_PATH_PREFIX=port-tunnel

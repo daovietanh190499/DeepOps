@@ -106,6 +106,29 @@ def get_or_none(workspace: Workspace) -> WorkspaceSSHKey | None:
     return WorkspaceSSHKey.objects.filter(workspace=workspace).first()
 
 
+def is_valid_openssh_public_key(text: str) -> bool:
+    line = (text or '').strip().splitlines()[0] if (text or '').strip() else ''
+    if not line or line.startswith('#'):
+        return False
+    parts = line.split()
+    return bool(parts) and parts[0].startswith(('ssh-ed25519', 'ssh-rsa', 'ecdsa-sha2-', 'ssh-dss'))
+
+
+def is_valid_openssh_private_key(text: str) -> bool:
+    body = (text or '').strip()
+    if not body or body.startswith('#'):
+        return False
+    return 'BEGIN OPENSSH PRIVATE KEY' in body or 'BEGIN EC PRIVATE KEY' in body
+
+
+def ssh_keys_ready(record: WorkspaceSSHKey | None) -> bool:
+    if not record:
+        return False
+    public_ok = is_valid_openssh_public_key(record.public_key or '')
+    host_ok = is_valid_openssh_private_key(host_key_plaintext(record))
+    return public_ok and host_ok
+
+
 def host_key_plaintext(record: WorkspaceSSHKey) -> str:
     if not record.host_key_encrypted:
         return ''
@@ -115,7 +138,7 @@ def host_key_plaintext(record: WorkspaceSSHKey) -> str:
 def ensure_host_key_material(record: WorkspaceSSHKey) -> str:
     """Return ssh-bridge host private key, generating and persisting if needed."""
     existing = host_key_plaintext(record)
-    if existing:
+    if existing and is_valid_openssh_private_key(existing):
         return existing
     host_key = generate_host_key_openssh()
     record.host_key_encrypted = encrypt_private_key(host_key)
@@ -141,17 +164,18 @@ def create_or_rotate_keys(workspace: Workspace) -> tuple[WorkspaceSSHKey, str]:
 
 def ssh_info_payload(workspace: Workspace) -> dict:
     record = get_or_none(workspace)
+    ready = ssh_keys_ready(record)
     return {
-        'has_key': record is not None,
+        'has_key': ready,
         'fingerprint': record.fingerprint if record else '',
         'public_key': record.public_key if record else '',
         'ssh_user': ssh_user(),
         'wss_url': wss_tunnel_url(workspace),
         'path_prefix': ssh_tunnel_path_prefix(workspace),
         'ssh_host_alias': f'dohub-{workspace.slug}',
-        'ssh_command': ssh_connect_command(workspace) if record else '',
-        'ssh_config': ssh_config_snippet(workspace) if record else '',
-        'proxy_command': wstunnel_proxy_command(workspace) if record else '',
+        'ssh_command': ssh_connect_command(workspace) if ready else '',
+        'ssh_config': ssh_config_snippet(workspace) if ready else '',
+        'proxy_command': wstunnel_proxy_command(workspace) if ready else '',
         'proxy_hint': (
             'Install wstunnel: https://github.com/erebe/wstunnel/releases '
             f'(path {ssh_tunnel_ingress_path(workspace)} on {DOMAIN_NAME})'

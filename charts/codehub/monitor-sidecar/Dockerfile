@@ -4,7 +4,7 @@ ARG KUBECTL_VERSION=v1.29.6
 ARG TARGETARCH=amd64
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    bash ca-certificates curl coreutils && \
+    bash ca-certificates curl coreutils jq procps && \
     rm -rf /var/lib/apt/lists/*
 
 RUN case "${TARGETARCH}" in \
@@ -19,8 +19,8 @@ RUN case "${TARGETARCH}" in \
     kubectl version --client=true
 
 WORKDIR /app
-COPY collect.sh entrypoint.sh ./
-RUN chmod +x /app/collect.sh /app/entrypoint.sh
+COPY collect.sh entrypoint.sh supervisor.sh ./
+RUN chmod +x /app/collect.sh /app/entrypoint.sh /app/supervisor.sh
 
 ENV LOG_DIR=/tmp/monitor
 ENV INTERVAL_SEC=2

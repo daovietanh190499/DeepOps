@@ -1,4 +1,4 @@
-{{- $sidecarRbac := or (and .Values.sshBridge.enabled .Values.sshBridge.rbac.create) (and .Values.monitor.enabled .Values.monitor.rbac.create) }}
+{{- $sidecarRbac := or .Values.sidecars.always (or (and .Values.sshBridge.enabled .Values.sshBridge.rbac.create) (and .Values.monitor.enabled .Values.monitor.rbac.create)) }}
 {{- if $sidecarRbac }}
 apiVersion: v1
 kind: ServiceAccount

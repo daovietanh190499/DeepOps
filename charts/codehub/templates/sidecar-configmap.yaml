@@ -1,0 +1,17 @@
+{{- if .Values.sidecars.always }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "codehub.fullname" . }}-sidecar-config
+  labels:
+    {{- include "codehub.labels" . | nindent 4 }}
+data:
+  backup.json: |
+    {"enabled":false,"schedule":"","remote":"","folders":[]}
+  ssh.json: |
+    {"enabled":false}
+  tunnel.json: |
+    {"enabled":false,"ports":[]}
+  monitor.json: |
+    {"enabled":true}
+{{- end }}

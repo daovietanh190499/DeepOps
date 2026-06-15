@@ -5,7 +5,7 @@ import subprocess
 from .config import get_hub_config
 from .gpu_resources import parse_gpu_resources
 from .k8s_env import CODEHUB_CHART_PATH, DEFAULT_PORT, DOMAIN_NAME, NAMESPACE
-from .ssh_keys import get_or_none, ssh_secret_name
+from .ssh_keys import get_or_none, ssh_keys_ready, ssh_secret_name
 
 
 def _storage_class() -> str:
@@ -84,11 +84,7 @@ def _clear_stuck_helm_release(release_name: str) -> tuple[str, int]:
 
 
 def build_spawn_config(workspace) -> dict:
-    from .backup_config import (
-        backup_secret_name,
-        backup_sidecar_volume_mounts,
-        parse_backup_mount_selection,
-    )
+    from .backup_config import backup_secret_name
     from .workspace_mounts import build_pvc_volume_specs, spawn_drive_mounts
 
     gpu_spec = parse_gpu_resources(workspace.gpu)
@@ -105,13 +101,6 @@ def build_spawn_config(workspace) -> dict:
     mount_entries = spawn_drive_mounts(workspace)
     pvc_volumes, pvc_volume_mounts = build_pvc_volume_specs(mount_entries)
     ssh_record = get_or_none(workspace)
-
-    backup_mount_paths: list[str] = []
-    if workspace.backup_enabled:
-        try:
-            backup_mount_paths = parse_backup_mount_selection(workspace, workspace.backup_folders)
-        except ValueError:
-            backup_mount_paths = []
 
     return {
         'workspace_id': str(workspace.id),
@@ -136,16 +125,11 @@ def build_spawn_config(workspace) -> dict:
         'pvc_volumes': pvc_volumes,
         'pvc_volume_mounts': pvc_volume_mounts,
         'secret_name': f'{user.username}-{slug}-secret',
-        'ssh_enabled': ssh_record is not None,
+        'ssh_enabled': ssh_keys_ready(ssh_record),
         'ssh_secret_name': ssh_secret_name(workspace),
         'ssh_public_key': ssh_record.public_key if ssh_record else '',
         'ws_tunnel_ports': list(workspace.ws_tunnel_ports or []) if isinstance(workspace.ws_tunnel_ports, list) else [],
         'privileged': workspace.privileged,
-        'backup_enabled': bool(workspace.backup_enabled),
-        'backup_schedule': workspace.backup_schedule or '',
-        'backup_remote': workspace.backup_remote or '',
-        'backup_folders': backup_mount_paths,
-        'backup_volume_mounts': backup_sidecar_volume_mounts(workspace, backup_mount_paths),
         'backup_secret_name': backup_secret_name(workspace),
     }
 
@@ -165,24 +149,16 @@ def _security_context_helm_flags(privileged: bool) -> list[str]:
 
 
 def _sidecar_ingress_flags(config: dict) -> list[str]:
-    """Path-based SSH / port-tunnel routes on the hub domain."""
-    ssh_on = config.get('ssh_enabled') and config.get('ssh_secret_name')
-    tunnel_on = bool(config.get('ws_tunnel_ports'))
-    if not ssh_on and not tunnel_on:
-        return []
-
+    """Path-based SSH / port-tunnel routes on the hub domain (always provisioned)."""
     username = config['username']
     slug = config['slug']
-    flags = [
+    return [
         '--set', 'sidecarIngress.enabled=true',
         '--set-string', f'sidecarIngress.host={DOMAIN_NAME}',
         '--set-string', f'sidecarIngress.tlsSecretName=tls-{NAMESPACE}-secret',
+        '--set-string', f'sshBridge.ingressPath=/{username}/{slug}/ssh-tunnel',
+        '--set-string', f'portTunnel.ingressPath=/{username}/{slug}/port-tunnel',
     ]
-    if ssh_on:
-        flags.extend(['--set-string', f'sshBridge.ingressPath=/{username}/{slug}/ssh-tunnel'])
-    if tunnel_on:
-        flags.extend(['--set-string', f'portTunnel.ingressPath=/{username}/{slug}/port-tunnel'])
-    return flags
 
 
 def _parse_memory_bytes(ram_str: str) -> int:
@@ -293,16 +269,16 @@ def _helm_base_cmd(config: dict) -> list[str]:
     cmd.extend(['--set-json', f'volumes={json.dumps(volumes)}'])
     cmd.extend(['--set-json', f'volumeMounts={json.dumps(volume_mounts)}'])
 
-    if config.get('ssh_enabled') and config.get('ssh_secret_name'):
-        bridge_image = os.environ.get('SSH_BRIDGE_IMAGE', 'localhost:32000/ssh-bridge')
-        bridge_tag = os.environ.get('SSH_BRIDGE_TAG', 'latest')
-        cmd.extend([
-            '--set', 'sshBridge.enabled=true',
-            '--set', 'sshBridge.rbac.create=true',
-            '--set-string', f'sshBridge.secretName={config["ssh_secret_name"]}',
-            '--set-string', f'sshBridge.image.repository={bridge_image}',
-            '--set-string', f'sshBridge.image.tag={bridge_tag}',
-        ])
+    bridge_image = os.environ.get('SSH_BRIDGE_IMAGE', 'localhost:32000/ssh-bridge')
+    bridge_tag = os.environ.get('SSH_BRIDGE_TAG', 'latest')
+    cmd.extend([
+        '--set', 'sidecars.always=true',
+        '--set', 'sshBridge.enabled=true',
+        '--set', 'sshBridge.rbac.create=true',
+        '--set-string', f'sshBridge.secretName={config.get("ssh_secret_name") or "placeholder-ssh-secret"}',
+        '--set-string', f'sshBridge.image.repository={bridge_image}',
+        '--set-string', f'sshBridge.image.tag={bridge_tag}',
+    ])
 
     monitor_image = os.environ.get('MONITOR_SIDECAR_IMAGE', 'localhost:32000/monitor-sidecar')
     monitor_tag = os.environ.get('MONITOR_SIDECAR_TAG', 'latest')
@@ -320,35 +296,20 @@ def _helm_base_cmd(config: dict) -> list[str]:
 
     backup_image = os.environ.get('BACKUP_SIDECAR_IMAGE', 'localhost:32000/backup-sidecar')
     backup_tag = os.environ.get('BACKUP_SIDECAR_TAG', 'latest')
-    if config.get('backup_enabled') and config.get('backup_secret_name'):
-        backup_mounts = [
-            {k: v for k, v in item.items() if k in ('name', 'mountPath', 'subPath')}
-            for item in (config.get('backup_volume_mounts') or [])
-        ]
-        cmd.extend([
-            '--set', 'backup.enabled=true',
-            '--set-string', f'backup.secretName={config["backup_secret_name"]}',
-            '--set-json', f'backup.schedule={json.dumps(config.get("backup_schedule", ""))}',
-            '--set-json', f'backup.remote={json.dumps(config.get("backup_remote", ""))}',
-            '--set-json', f'backup.folders={json.dumps(config.get("backup_folders") or [])}',
-            '--set-string', f'backup.image.repository={backup_image}',
-            '--set-string', f'backup.image.tag={backup_tag}',
-        ])
-        if backup_mounts:
-            cmd.extend(['--set-json', f'backup.volumeMounts={json.dumps(backup_mounts)}'])
-    else:
-        cmd.extend(['--set', 'backup.enabled=false'])
+    cmd.extend([
+        '--set', 'backup.enabled=true',
+        '--set-string', f'backup.secretName={config.get("backup_secret_name") or "placeholder-backup-secret"}',
+        '--set-string', f'backup.image.repository={backup_image}',
+        '--set-string', f'backup.image.tag={backup_tag}',
+    ])
 
-    tunnel_ports = config.get('ws_tunnel_ports') or []
-    if tunnel_ports:
-        port_tunnel_image = os.environ.get('PORT_TUNNEL_IMAGE', 'localhost:32000/port-tunnel')
-        port_tunnel_tag = os.environ.get('PORT_TUNNEL_TAG', 'latest')
-        cmd.extend([
-            '--set', 'portTunnel.enabled=true',
-            '--set-json', f'portTunnel.ports={json.dumps([int(p) for p in tunnel_ports])}',
-            '--set-string', f'portTunnel.image.repository={port_tunnel_image}',
-            '--set-string', f'portTunnel.image.tag={port_tunnel_tag}',
-        ])
+    port_tunnel_image = os.environ.get('PORT_TUNNEL_IMAGE', 'localhost:32000/port-tunnel')
+    port_tunnel_tag = os.environ.get('PORT_TUNNEL_TAG', 'latest')
+    cmd.extend([
+        '--set', 'portTunnel.enabled=true',
+        '--set-string', f'portTunnel.image.repository={port_tunnel_image}',
+        '--set-string', f'portTunnel.image.tag={port_tunnel_tag}',
+    ])
 
     cmd.extend([
         *_sidecar_ingress_flags(config),
@@ -359,96 +320,23 @@ def _helm_base_cmd(config: dict) -> list[str]:
     return cmd
 
 
-def _get_deployment_replicas(release_name: str) -> int | None:
-    """Return desired replicas for the workspace deployment, or None if missing."""
-    result = subprocess.run(
-        [
-            'kubectl', 'get', 'deployment',
-            '-n', NAMESPACE,
-            f'-l=app.kubernetes.io/instance={release_name}',
-            '-o', 'jsonpath={.items[0].spec.replicas}',
-        ],
-        capture_output=True,
-        text=True,
-        check=False,
-    )
-    text = (result.stdout or '').strip()
-    if result.returncode != 0 or not text:
-        return None
-    try:
-        return int(text)
-    except ValueError:
-        return None
-
-
-def _scale_down_workspace_for_upgrade(release_name: str) -> tuple[str, int]:
-    """Scale deployment to 0 and wait for pods to terminate (releases GPU/PVC)."""
-    scale_logs, scale_code = scale_codehub(release_name, 0)
-    if scale_code != 0:
-        return scale_logs or 'deployment scale-down failed', scale_code
-
-    wait = subprocess.run(
-        [
-            'kubectl', 'wait', '--for=delete', 'pod',
-            '-n', NAMESPACE,
-            f'-l=app.kubernetes.io/instance={release_name}',
-            '--timeout=120s',
-        ],
-        capture_output=True,
-        text=True,
-        check=False,
-    )
-    wait_logs = ((wait.stdout or '') + (wait.stderr or '')).strip()
-    combined = '\n'.join(part for part in (scale_logs, wait_logs) if part).strip()
-    if wait.returncode != 0:
-        lower = wait_logs.lower()
-        if 'no matching resources' in lower or 'not found' in lower:
-            return combined or 'deployment scaled to 0', 0
-        return combined or 'timed out waiting for pods to terminate', wait.returncode
-    return combined or 'deployment scaled to 0', 0
-
-
-def _prepare_workspace_chart_upgrade(config: dict) -> tuple[dict, str, int]:
-    """Scale down a running deployment before helm upgrade; preserve replica count."""
-    config = dict(config)
-    release_name = config['release_name']
-    if _helm_release_status(release_name) != 'deployed':
-        return config, '', 0
-
-    target_replicas = config.get('replica_count')
-    if target_replicas is None:
-        prev = _get_deployment_replicas(release_name)
-        if prev is None:
-            return config, '', 0
-        config['replica_count'] = prev
-        target_replicas = prev
-    else:
-        target_replicas = int(target_replicas)
-
-    if target_replicas <= 0:
-        return config, '', 0
-
-    prev = _get_deployment_replicas(release_name)
-    if prev is None or prev <= 0:
-        return config, '', 0
-
-    logs, code = _scale_down_workspace_for_upgrade(release_name)
-    return config, logs, code
-
-
 def create_codehub(config: dict) -> tuple[str, str, int]:
-    if config.get('ssh_enabled'):
-        from backend.models import Workspace
-        from .ssh_k8s import sync_ssh_secret_for_workspace
+    from backend.models import Workspace
+    from .backup_config import backup_secret_name
+    from .backup_k8s import apply_backup_secret
+    from .sidecar_k8s import sync_workspace_sidecars
+    from .ssh_k8s import sync_ssh_secret_for_workspace
 
-        workspace = Workspace.objects.get(id=config['workspace_id'])
+    workspace = Workspace.objects.get(id=config['workspace_id'])
+
+    backup_conf = (workspace.backup_rclone_config or '').strip()
+    if backup_conf:
+        apply_backup_secret(backup_secret_name(workspace), backup_conf)
+
+    if config.get('ssh_enabled'):
         logs, code = sync_ssh_secret_for_workspace(workspace)
         if code != 0:
             return '', f'ssh secret apply failed: {logs}', code
-
-    config, prep_logs, prep_code = _prepare_workspace_chart_upgrade(config)
-    if prep_code != 0:
-        return '', f'deployment scale-down failed: {prep_logs}', prep_code
 
     prep_logs, prep_code = _clear_stuck_helm_release(config['release_name'])
     if prep_code != 0:
@@ -456,6 +344,10 @@ def create_codehub(config: dict) -> tuple[str, str, int]:
     cmd = _helm_base_cmd(config)
     result = subprocess.run(cmd, capture_output=True, text=True, check=False)
     logs = result.stdout + result.stderr
+    if result.returncode == 0:
+        sync = sync_workspace_sidecars(workspace, reload=False)
+        if sync.get('apply_logs'):
+            logs += sync['apply_logs']
     return ' '.join(cmd), logs, result.returncode
 
 

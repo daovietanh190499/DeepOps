@@ -527,30 +527,29 @@ def workspace_backup_status(
         'trigger': '',
         'sidecar_active': False,
         'sidecar_ready': False,
+        'service_active': bool(workspace.backup_enabled),
     }
 
     selected, _, pod_error = _resolve_backup_pod(workspace, pod_name=pod_name)
     if pod_error:
-        if workspace.backup_enabled:
-            empty['last_message'] = pod_error
-        else:
-            empty['last_message'] = 'Backup not scheduled'
+        empty['last_message'] = pod_error if workspace.backup_enabled else 'Backup not scheduled'
         return empty
 
-    sidecar_active = _backup_sidecar_present(selected)
-    empty['sidecar_active'] = sidecar_active
+    sidecar_present = _backup_sidecar_present(selected)
+    sidecar_ready = sidecar_present and _backup_sidecar_ready(selected)
+    empty['sidecar_active'] = sidecar_present
+    empty['sidecar_ready'] = sidecar_ready
 
-    if not workspace.backup_enabled and not sidecar_active:
+    if not sidecar_present:
+        empty['last_message'] = 'Backup sidecar not deployed — restart the server.'
+        return empty
+
+    if not sidecar_ready:
+        empty['last_message'] = 'Backup sidecar not ready — wait for the pod to start.'
+        return empty
+
+    if not workspace.backup_enabled:
         empty['last_message'] = 'Backup not scheduled'
-        return empty
-
-    if not sidecar_active:
-        empty['last_message'] = 'Backup sidecar not deployed — click Schedule or restart the server.'
-        return empty
-
-    if not _backup_sidecar_ready(selected):
-        empty['last_message'] = 'Backup sidecar not ready — restart the server after scheduling.'
-        return empty
 
     stdout, stderr, code = _kubectl([
         'exec', selected,
@@ -559,16 +558,12 @@ def workspace_backup_status(
         '--', 'cat', BACKUP_STATUS_FILE,
     ], timeout=20)
     if code != 0:
-        empty['sidecar_active'] = True
-        empty['sidecar_ready'] = True
         empty['last_message'] = (stderr or stdout or '').strip() or 'Waiting for first backup status…'
         return empty
 
     try:
         data = json.loads(stdout)
     except json.JSONDecodeError:
-        empty['sidecar_active'] = True
-        empty['sidecar_ready'] = True
         empty['last_message'] = 'Invalid status from backup sidecar'
         return empty
 
@@ -578,8 +573,9 @@ def workspace_backup_status(
         'last_message': str(data.get('last_message') or ''),
         'running': bool(data.get('running')),
         'trigger': str(data.get('trigger') or ''),
-        'sidecar_active': True,
-        'sidecar_ready': True,
+        'sidecar_active': sidecar_present,
+        'sidecar_ready': sidecar_ready,
+        'service_active': bool(workspace.backup_enabled),
     }
 
 
@@ -587,6 +583,8 @@ def workspace_backup_trigger(
     workspace: Workspace,
     *,
     pod_name: str | None = None,
+    remote: str | None = None,
+    folders: list[str] | None = None,
 ) -> dict:
     selected, _, pod_error = _resolve_backup_pod(workspace, pod_name=pod_name)
     if pod_error:
@@ -595,12 +593,23 @@ def workspace_backup_trigger(
     if not _backup_sidecar_ready(selected):
         return {'ok': False, 'error': 'Backup sidecar is not ready'}
 
+    backup_remote = (remote if remote is not None else workspace.backup_remote or '').strip()
+    backup_folders = folders if folders is not None else (workspace.backup_folders or [])
+    folders_json = json.dumps(backup_folders)
+
+    shell_cmd = '; '.join([
+        f'export BACKUP_REMOTE={shlex.quote(backup_remote)}',
+        f'export BACKUP_FOLDERS={shlex.quote(folders_json)}',
+        'export LOG_DIR=/tmp/backup',
+        'export RCLONE_CONFIG=/config/rclone.conf',
+        'nohup /app/run-backup.sh manual >> /tmp/backup/trigger.log 2>&1 </dev/null &',
+    ])
+
     stdout, stderr, code = _kubectl([
         'exec', selected,
         '-n', NAMESPACE,
         '-c', BACKUP_CONTAINER,
-        '--', 'sh', '-c',
-        'nohup /app/run-backup.sh manual >> "${LOG_DIR:-/tmp/backup}/trigger.log" 2>&1 &',
+        '--', 'sh', '-c', shell_cmd,
     ], timeout=15)
     if code != 0:
         err = (stderr or stdout or '').strip() or 'Failed to trigger backup'

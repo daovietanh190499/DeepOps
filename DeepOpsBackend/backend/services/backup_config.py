@@ -185,5 +185,6 @@ def backup_info_payload(workspace: Workspace, *, status: dict | None = None) -> 
         'trigger': '',
         'sidecar_active': False,
         'sidecar_ready': False,
+        'service_active': bool(workspace.backup_enabled),
     }
     return payload

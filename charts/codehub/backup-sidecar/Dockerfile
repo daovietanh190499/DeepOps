@@ -3,7 +3,7 @@ FROM debian:bookworm-slim
 ARG TARGETARCH=amd64
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    bash ca-certificates curl cron jq coreutils unzip && \
+    bash ca-certificates curl cron jq coreutils unzip procps && \
     rm -rf /var/lib/apt/lists/*
 
 RUN case "${TARGETARCH}" in \
@@ -21,8 +21,8 @@ RUN case "${TARGETARCH}" in \
     rclone version
 
 WORKDIR /app
-COPY entrypoint.sh run-backup.sh ./
-RUN chmod +x /app/entrypoint.sh /app/run-backup.sh
+COPY entrypoint.sh run-backup.sh supervisor.sh ./
+RUN chmod +x /app/entrypoint.sh /app/run-backup.sh /app/supervisor.sh
 
 ENV LOG_DIR=/tmp/backup
 ENV RCLONE_CONFIG=/config/rclone.conf

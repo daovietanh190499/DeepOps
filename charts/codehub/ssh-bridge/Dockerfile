@@ -5,7 +5,7 @@ ARG KUBECTL_VERSION=v1.29.6
 ARG TARGETARCH=amd64
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    bash ca-certificates curl tar && \
+    bash ca-certificates curl tar jq procps && \
     rm -rf /var/lib/apt/lists/*
 
 RUN case "${TARGETARCH}" in \
@@ -36,8 +36,8 @@ RUN case "${TARGETARCH}" in \
 WORKDIR /app
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
-COPY server.py entrypoint.sh ./
-RUN chmod +x /app/entrypoint.sh
+COPY server.py entrypoint.sh supervisor.sh ./
+RUN chmod +x /app/entrypoint.sh /app/supervisor.sh
 
 ENV SSH_BIND_HOST=127.0.0.1
 ENV SSH_PORT=2222
