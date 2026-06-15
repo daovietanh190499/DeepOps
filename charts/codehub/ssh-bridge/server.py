@@ -305,18 +305,18 @@ async def handle_client(process: asyncssh.SSHServerProcess) -> None:
 
 
 async def ensure_host_key() -> None:
-    if HOST_KEY.is_file():
-        try:
-            asyncssh.import_private_key(HOST_KEY.read_text())
-            LOG.info('using SSH host key from %s', HOST_KEY)
-            return
-        except (asyncssh.KeyImportError, ValueError, OSError) as exc:
-            LOG.warning('invalid host key at %s (%s), regenerating', HOST_KEY, exc)
-            HOST_KEY.unlink(missing_ok=True)
-    HOST_KEY.parent.mkdir(parents=True, exist_ok=True)
-    key = asyncssh.generate_private_key('ssh-ed25519')
-    key.write_private_key(str(HOST_KEY))
-    LOG.info('generated ephemeral SSH host key at %s', HOST_KEY)
+    if not HOST_KEY.is_file():
+        LOG.error(
+            'SSH host key not found at %s — generate SSH keys in the hub and restart the workspace',
+            HOST_KEY,
+        )
+        sys.exit(1)
+    try:
+        asyncssh.import_private_key(HOST_KEY.read_text())
+    except (asyncssh.KeyImportError, ValueError, OSError) as exc:
+        LOG.error('invalid SSH host key at %s: %s', HOST_KEY, exc)
+        sys.exit(1)
+    LOG.info('using SSH host key from %s', HOST_KEY)
 
 
 def _validate_kubectl_target() -> None:

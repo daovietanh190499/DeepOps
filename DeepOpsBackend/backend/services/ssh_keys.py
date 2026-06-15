@@ -135,6 +135,18 @@ def host_key_plaintext(record: WorkspaceSSHKey) -> str:
     return decrypt_private_key(record.host_key_encrypted)
 
 
+def host_key_fingerprint(record: WorkspaceSSHKey) -> str:
+    host_key = host_key_plaintext(record)
+    if not host_key or not is_valid_openssh_private_key(host_key):
+        return ''
+    private_key = serialization.load_ssh_private_key(host_key.encode('utf-8'), password=None)
+    public_openssh = private_key.public_key().public_bytes(
+        encoding=serialization.Encoding.OpenSSH,
+        format=serialization.PublicFormat.OpenSSH,
+    ).decode('utf-8')
+    return public_key_fingerprint(public_openssh)
+
+
 def ensure_host_key_material(record: WorkspaceSSHKey) -> str:
     """Return ssh-bridge host private key, generating and persisting if needed."""
     existing = host_key_plaintext(record)
@@ -168,6 +180,7 @@ def ssh_info_payload(workspace: Workspace) -> dict:
     return {
         'has_key': ready,
         'fingerprint': record.fingerprint if record else '',
+        'host_key_fingerprint': host_key_fingerprint(record) if record else '',
         'public_key': record.public_key if record else '',
         'ssh_user': ssh_user(),
         'wss_url': wss_tunnel_url(workspace),

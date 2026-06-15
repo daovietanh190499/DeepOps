@@ -861,7 +861,8 @@
                             <span class="font-mono text-slate-800" v-text="modalWorkspace.ssh_command"></span>
                             <button type="button" @click="copyText(modalWorkspace.ssh_command, 'SSH command copied')" class="shrink-0 rounded border bg-white px-2 py-0.5 hover:bg-slate-50"><i class="fa fa-copy"></i></button>
                         </div>
-                        <p class="text-slate-500" v-text="'Fingerprint: ' + (modalWorkspace.fingerprint || '—')"></p>
+                        <p class="text-slate-500" v-text="'Client key: ' + (modalWorkspace.fingerprint || '—')"></p>
+                        <p class="text-slate-500" v-text="'Host key (stable across restarts): ' + (modalWorkspace.host_key_fingerprint || '—')"></p>
                         <pre class="overflow-x-auto rounded-lg bg-slate-900 p-3 text-[10px] text-slate-100 whitespace-pre-wrap" v-text="modalWorkspace.ssh_config"></pre>
                         <div class="flex flex-wrap gap-2">
                             <button type="button" @click="copyText(modalWorkspace.ssh_config, 'SSH config copied')"

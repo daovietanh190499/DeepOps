@@ -333,7 +333,8 @@ def create_codehub(config: dict) -> tuple[str, str, int]:
     if backup_conf:
         apply_backup_secret(backup_secret_name(workspace), backup_conf)
 
-    if config.get('ssh_enabled'):
+    ssh_record = get_or_none(workspace)
+    if ssh_keys_ready(ssh_record):
         logs, code = sync_ssh_secret_for_workspace(workspace)
         if code != 0:
             return '', f'ssh secret apply failed: {logs}', code
