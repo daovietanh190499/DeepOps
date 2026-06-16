@@ -144,10 +144,32 @@
             <p v-if="myDrivePagination.total===0 && !myDriveFilter" class="text-sm text-slate-500">No drives yet. Use <strong>Create drive</strong> or <strong>Bulk create drive</strong> to provision a DirectPV volume.</p>
             <p v-else-if="myDrives.length===0" class="text-sm text-slate-500">No drives match your filter.</p>
 
+            <div v-if="bulkSelectedCount('drives') > 0"
+                 class="flex flex-wrap items-center gap-2 rounded-xl border border-blue-200 bg-blue-50 px-4 py-2.5">
+                <span class="text-sm font-semibold text-blue-900" v-text="bulkSelectedCount('drives') + ' selected'"></span>
+                <button type="button" @click="bulkDeleteMyDrives" :disabled="bulkActionLoading || statusPending.myDrives"
+                        class="rounded-lg bg-rose-600 px-3 py-1.5 text-xs font-semibold text-white disabled:opacity-50">Delete</button>
+                <button type="button" @click="clearBulkSelection('drives')"
+                        class="rounded-lg border border-blue-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-600">Clear</button>
+            </div>
+            <div v-if="myDrives.length" class="flex items-center gap-2 text-xs text-slate-500">
+                <button type="button"
+                        @click="bulkToggleAllOnPage('drives', myDrives, !bulkAllOnPageSelected('drives', myDrives))"
+                        class="font-semibold text-blue-600 hover:text-blue-800 hover:underline">
+                    <span v-if="bulkAllOnPageSelected('drives', myDrives)">Deselect all on page</span>
+                    <span v-else>Select all on page</span>
+                </button>
+                <span>· Right-click to select · Shift+right-click for range</span>
+            </div>
+
             <div class="dohub-card-grid grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                <div v-for="d in myDrives" :key="d.id"
-                     class="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm transition"
-                     :class="statusPending.myDrives ? 'opacity-60 pointer-events-none select-none' : ''">
+                <div v-for="(d, idx) in myDrives" :key="d.id"
+                     class="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm transition select-none"
+                     :class="[
+                         statusPending.myDrives ? 'opacity-60 pointer-events-none' : '',
+                         bulkIsSelected('drives', d) ? 'ring-2 ring-blue-500 border-blue-300' : '',
+                     ]"
+                     @contextmenu.prevent="onBulkContextMenu('drives', myDrives, idx, $event)">
                     <div class="flex justify-between items-start gap-2">
                         <h3 class="font-bold text-slate-900" v-text="d.name"></h3>
                         <span class="text-xs font-bold uppercase px-2 py-0.5 rounded-full"
@@ -201,6 +223,24 @@
             <p v-if="myImagePagination.total===0 && !myImageFilter" class="text-sm text-slate-500">No images submitted yet.</p>
             <p v-else-if="myDockerImages.length===0" class="text-sm text-slate-500">No images match your filter.</p>
 
+            <div v-if="bulkSelectedCount('images') > 0"
+                 class="flex flex-wrap items-center gap-2 rounded-xl border border-blue-200 bg-blue-50 px-4 py-2.5">
+                <span class="text-sm font-semibold text-blue-900" v-text="bulkSelectedCount('images') + ' selected'"></span>
+                <button type="button" @click="bulkDeleteMyImages" :disabled="bulkActionLoading"
+                        class="rounded-lg bg-rose-600 px-3 py-1.5 text-xs font-semibold text-white disabled:opacity-50">Delete</button>
+                <button type="button" @click="clearBulkSelection('images')"
+                        class="rounded-lg border border-blue-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-600">Clear</button>
+            </div>
+            <div v-if="myDockerImages.length" class="flex items-center gap-2 text-xs text-slate-500 px-1">
+                <button type="button"
+                        @click="bulkToggleAllOnPage('images', myDockerImages, !bulkAllOnPageSelected('images', myDockerImages))"
+                        class="font-semibold text-blue-600 hover:text-blue-800 hover:underline">
+                    <span v-if="bulkAllOnPageSelected('images', myDockerImages)">Deselect all on page</span>
+                    <span v-else>Select all on page</span>
+                </button>
+                <span>· Right-click row to select · Shift+right-click for range</span>
+            </div>
+
             <div class="dohub-table-scroll dohub-images-table-wrap">
                 <table class="dohub-images-table">
                     <thead>
@@ -214,7 +254,10 @@
                         </tr>
                     </thead>
                     <tbody>
-                        <tr v-for="img in myDockerImages" :key="img.id">
+                        <tr v-for="(img, idx) in myDockerImages" :key="img.id"
+                            class="select-none cursor-default"
+                            :class="bulkIsSelected('images', img) ? 'dohub-images-table__row--selected' : ''"
+                            @contextmenu.prevent="onBulkContextMenu('images', myDockerImages, idx, $event)">
                             <td><span class="dohub-images-table__label" v-text="img.label"></span></td>
                             <td><span class="dohub-images-table__mono dohub-images-table__mono--truncate" :title="img.repository" v-text="img.repository"></span></td>
                             <td><span class="dohub-tag-chip dohub-tag-chip--default" v-text="img.default_tag"></span></td>
@@ -599,12 +642,39 @@
             <p v-if="myServerPagination.total===0 && !myServerFilter" class="text-sm text-slate-500">No servers yet. Use <strong>Create server</strong> or <strong>Bulk create server</strong> to get started.</p>
             <p v-else-if="myWorkspaces.length===0" class="text-sm text-slate-500">No servers match your filter.</p>
 
+            <div v-if="bulkSelectedCount('servers') > 0"
+                 class="flex flex-wrap items-center gap-2 rounded-xl border border-blue-200 bg-blue-50 px-4 py-2.5">
+                <span class="text-sm font-semibold text-blue-900" v-text="bulkSelectedCount('servers') + ' selected'"></span>
+                <button type="button" @click="bulkStartMyServers" :disabled="bulkActionLoading || statusPending.myWorkspaces"
+                        class="rounded-lg bg-blue-600 px-3 py-1.5 text-xs font-semibold text-white disabled:opacity-50">Start</button>
+                <button type="button" @click="bulkStopMyServers" :disabled="bulkActionLoading || statusPending.myWorkspaces"
+                        class="rounded-lg bg-amber-600 px-3 py-1.5 text-xs font-semibold text-white disabled:opacity-50">Stop</button>
+                <button type="button" @click="bulkDeleteMyServers" :disabled="bulkActionLoading || statusPending.myWorkspaces"
+                        class="rounded-lg bg-rose-600 px-3 py-1.5 text-xs font-semibold text-white disabled:opacity-50">Delete</button>
+                <button type="button" @click="clearBulkSelection('servers')"
+                        class="rounded-lg border border-blue-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-600">Clear</button>
+            </div>
+            <div v-if="myWorkspaces.length" class="flex items-center gap-2 text-xs text-slate-500">
+                <button type="button"
+                        @click="bulkToggleAllOnPage('servers', myWorkspaces, !bulkAllOnPageSelected('servers', myWorkspaces))"
+                        class="font-semibold text-blue-600 hover:text-blue-800 hover:underline">
+                    <span v-if="bulkAllOnPageSelected('servers', myWorkspaces)">Deselect all on page</span>
+                    <span v-else>Select all on page</span>
+                </button>
+                <span>· Right-click to select · Shift+right-click for range</span>
+            </div>
+
             <div class="dohub-card-grid grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-                <workspace-card v-for="ws in myWorkspaces" :key="ws.id" :ws="ws"
-                                :disabled="statusPending.myWorkspaces"
-                                @detail="openWorkspaceModal"
-                                @start="startWorkspace" @stop="stopWorkspace" @open="openWorkspace"
-                                @export="exportWorkspace" @delete="ws => openDeleteModal(ws, false)"></workspace-card>
+                <div v-for="(ws, idx) in myWorkspaces" :key="ws.id"
+                     class="flex min-h-0 flex-col rounded-2xl select-none"
+                     :class="bulkIsSelected('servers', ws) ? 'ring-2 ring-blue-500' : ''"
+                     @contextmenu.prevent="onBulkContextMenu('servers', myWorkspaces, idx, $event)">
+                    <workspace-card :ws="ws"
+                                    :disabled="statusPending.myWorkspaces"
+                                    @detail="openWorkspaceModal"
+                                    @start="startWorkspace" @stop="stopWorkspace" @open="openWorkspace"
+                                    @export="exportWorkspace" @delete="ws => openDeleteModal(ws, false)"></workspace-card>
+                </div>
             </div>
             <div v-if="myServerPagination.pages > 1" class="flex justify-center gap-2">
                 <button :disabled="myServerPagination.page<=1" @click="reloadMyWorkspaces(myServerPagination.page-1)"

@@ -1123,6 +1123,129 @@ const appVue = new Vue({
                 },
             })
         },
+        bulkDeleteMyDrives() {
+            const drives = this.bulkSelectedOnPage('drives', this.myDrives)
+            if (!drives.length) return
+            const inUse = drives.filter((d) => d.in_use).length
+            const deletable = drives.filter((d) => !d.in_use)
+            if (!deletable.length) {
+                this.showToast('Selected drives are in use — stop servers first')
+                return
+            }
+            let desc = `Delete ${deletable.length} drive(s) and their PVCs?`
+            if (inUse) desc += ` (${inUse} in-use drive(s) will be skipped.)`
+            this.openBulkConfirmModal({
+                title: 'Delete drives',
+                description: desc,
+                confirmLabel: 'Yes, delete',
+                run: async () => {
+                    const results = await Promise.allSettled(
+                        deletable.map((d) => fetch('drives/' + d.id, { method: 'DELETE' })),
+                    )
+                    const ok = results.filter((r) => r.status === 'fulfilled' && r.value.status === 200).length
+                    this.showToast(`Deleted ${ok}/${deletable.length} drive(s)`)
+                    this.clearBulkSelection('drives')
+                    const page = this.myDrivePagination.page
+                    const next = this.myDrives.length <= deletable.length && page > 1 ? page - 1 : page
+                    await this.reloadMyDrives(next)
+                    await this.loadMyDrivesAll()
+                },
+            })
+        },
+        bulkStartMyServers() {
+            const servers = this.bulkSelectedOnPage('servers', this.myWorkspaces).filter((ws) => ws.state === 'offline')
+            if (!servers.length) {
+                this.showToast('No offline servers selected')
+                return
+            }
+            this.openBulkConfirmModal({
+                title: 'Start servers',
+                description: `Start ${servers.length} server(s)?`,
+                confirmLabel: 'Yes, start',
+                confirmClass: 'bg-blue-600 hover:bg-blue-700',
+                run: async () => {
+                    const results = await Promise.allSettled(
+                        servers.map((ws) => fetch('workspaces/' + ws.id + '/start', { method: 'POST' })),
+                    )
+                    const ok = results.filter((r) => r.status === 'fulfilled' && r.value.status === 200).length
+                    this.showToast(`Started ${ok}/${servers.length} server(s)`)
+                    this.clearBulkSelection('servers')
+                    await this.reloadServerLists()
+                },
+            })
+        },
+        bulkStopMyServers() {
+            const servers = this.bulkSelectedOnPage('servers', this.myWorkspaces).filter((ws) =>
+                ['running', 'pending_start', 'pending_stop'].includes(ws.state),
+            )
+            if (!servers.length) {
+                this.showToast('No running servers selected')
+                return
+            }
+            this.openBulkConfirmModal({
+                title: 'Stop servers',
+                description: `Stop ${servers.length} server(s)?`,
+                confirmLabel: 'Yes, stop',
+                confirmClass: 'bg-amber-600 hover:bg-amber-700',
+                run: async () => {
+                    const results = await Promise.allSettled(
+                        servers.map((ws) => fetch('workspaces/' + ws.id + '/stop', { method: 'POST' })),
+                    )
+                    const ok = results.filter((r) => r.status === 'fulfilled' && r.value.status === 200).length
+                    this.showToast(`Stopped ${ok}/${servers.length} server(s)`)
+                    this.clearBulkSelection('servers')
+                    await this.reloadServerLists()
+                },
+            })
+        },
+        bulkDeleteMyServers() {
+            const servers = this.bulkSelectedOnPage('servers', this.myWorkspaces)
+            const deletable = servers.filter((ws) => ws.state === 'offline')
+            if (!deletable.length) {
+                this.showToast('Only offline servers can be deleted — stop running servers first')
+                return
+            }
+            let desc = `Delete ${deletable.length} server(s)? This cannot be undone.`
+            if (deletable.length < servers.length) {
+                desc += ` (${servers.length - deletable.length} non-offline server(s) will be skipped.)`
+            }
+            this.openBulkConfirmModal({
+                title: 'Delete servers',
+                description: desc,
+                confirmLabel: 'Yes, delete',
+                run: async () => {
+                    const results = await Promise.allSettled(
+                        deletable.map((ws) => fetch('workspaces/' + ws.id, { method: 'DELETE' })),
+                    )
+                    const ok = results.filter((r) => r.status === 'fulfilled' && r.value.status === 200).length
+                    this.showToast(`Deleted ${ok}/${deletable.length} server(s)`)
+                    this.clearBulkSelection('servers')
+                    const page = this.myServerPagination.page
+                    const next = this.myWorkspaces.length <= deletable.length && page > 1 ? page - 1 : page
+                    await this.reloadMyWorkspaces(next)
+                },
+            })
+        },
+        bulkDeleteMyImages() {
+            const images = this.bulkSelectedOnPage('images', this.myDockerImages)
+            if (!images.length) return
+            this.openBulkConfirmModal({
+                title: 'Delete images',
+                description: `Delete ${images.length} image(s)? This cannot be undone.`,
+                confirmLabel: 'Yes, delete',
+                run: async () => {
+                    const results = await Promise.allSettled(
+                        images.map((img) => fetch('docker_images/' + img.id, { method: 'DELETE' })),
+                    )
+                    const ok = results.filter((r) => r.status === 'fulfilled' && r.value.status === 200).length
+                    this.showToast(`Deleted ${ok}/${images.length} image(s)`)
+                    this.clearBulkSelection('images')
+                    const page = this.myImagePagination.page
+                    const next = this.myDockerImages.length <= images.length && page > 1 ? page - 1 : page
+                    await this.reloadMyImages(next)
+                },
+            })
+        },
         setStatusPending(keys, value) {
             ;(keys || []).forEach((key) => {
                 if (key in this.statusPending) this.statusPending[key] = value
@@ -2792,6 +2915,7 @@ const appVue = new Vue({
             }
         },
         async loadMyDockerImages(page) {
+            this.clearBulkSelection('images')
             const q = new URLSearchParams({
                 page: page || this.myImagePagination.page || 1,
                 per_page: 12,
@@ -3041,6 +3165,7 @@ const appVue = new Vue({
             }
         },
         async loadMyDrives(page) {
+            this.clearBulkSelection('drives')
             const q = new URLSearchParams({
                 page: page || this.myDrivePagination.page || 1,
                 per_page: 12,
@@ -3286,6 +3411,7 @@ const appVue = new Vue({
             this.showToast(isEdit ? 'Server updated' : 'Server created')
         },
         async loadMyWorkspaces(page) {
+            this.clearBulkSelection('servers')
             const q = new URLSearchParams({
                 page: page || this.myServerPagination.page || 1,
                 per_page: 12,
