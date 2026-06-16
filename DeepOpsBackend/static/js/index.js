@@ -279,6 +279,7 @@ function defaultForm() {
         ram: '4G',
         drive_mounts: [],
         gpu: 'none',
+        node_hostname: 'auto',
         docker_image_id: '',
         docker_repository: 'codercom/code-server',
         docker_tag: '4.89.0-ubuntu',
@@ -316,6 +317,7 @@ function formPayload(form) {
         name: form.name,
         cpu: form.cpu,
         ram: form.ram,
+        node_hostname: form.node_hostname === 'auto' ? '' : (form.node_hostname || ''),
         drive_id: primary ? primary.drive_id : null,
         mount_path: primary ? (primary.mount_path || '/home/coder') : '/home/coder',
         drive_mounts: mounts.map((m) => ({
@@ -625,6 +627,9 @@ const appVue = new Vue({
         menu: 'servers',
         showCreateServerModal: false,
         showBulkCreateServerModal: false,
+        editingWorkspace: null,
+        k8sNodeOptions: [],
+        k8sNodeOptionsError: '',
         current_user: '',
         is_admin: false,
         runLoading: false,
@@ -2772,11 +2777,57 @@ const appVue = new Vue({
             this.resetCreateServerForm()
             await this.loadMyDrivesAll()
             await this.loadDockerImages()
+            await this.loadK8sNodeOptions()
+            this.editingWorkspace = null
             this.showCreateServerModal = true
         },
         closeCreateServerModal() {
             this.showCreateServerModal = false
             this.runError = ''
+            this.editingWorkspace = null
+        },
+        async loadK8sNodeOptions() {
+            this.k8sNodeOptionsError = ''
+            try {
+                const res = await fetch('k8s/nodes')
+                const data = await res.json().catch(() => ({}))
+                const result = data.result || {}
+                if (res.status !== 200 || result.ok === false) {
+                    this.k8sNodeOptionsError = result.error || data.message || 'Failed to load nodes'
+                    this.k8sNodeOptions = []
+                    return
+                }
+                this.k8sNodeOptions = Array.isArray(result.nodes) ? result.nodes : []
+            } catch (e) {
+                this.k8sNodeOptionsError = e.message || 'Failed to load nodes'
+                this.k8sNodeOptions = []
+            }
+        },
+        async openEditServerModal(ws) {
+            if (!ws || ws.state !== 'offline') {
+                this.showToast('Stop server before editing')
+                return
+            }
+            this.mobileNavOpen = false
+            this.resetCreateServerForm()
+            this.editingWorkspace = ws
+            await this.loadMyDrivesAll()
+            await this.loadDockerImages()
+            await this.loadK8sNodeOptions()
+            this.form.name = ws.name || ''
+            this.form.cpu = ws.cpu || 2
+            this.form.ram = ws.ram || '4G'
+            this.form.gpu = ws.gpu || 'none'
+            this.form.node_hostname = (ws.node_hostname || '').trim() ? (ws.node_hostname || '') : 'auto'
+            this.form.docker_repository = ws.docker_repository || this.form.docker_repository
+            this.form.docker_tag = ws.docker_tag || this.form.docker_tag
+            this.form.ports_text = (ws.exposed_ports && ws.exposed_ports.length) ? ws.exposed_ports.join(', ') : '8080'
+            this.form.command_text = (ws.container_command && ws.container_command.length) ? ws.container_command.join(' ') : ''
+            this.form.env_vars = { ...(ws.env_vars || {}) }
+            this.form.privileged = !!ws.privileged
+            const mounts = Array.isArray(ws.drive_mounts) ? ws.drive_mounts : []
+            this.form.drive_mounts = mounts.map((m) => ({ drive_id: m.drive_id || '', mount_path: m.mount_path || '/home/coder' }))
+            this.showCreateServerModal = true
         },
         openBulkCreateServerModal() {
             const limitErr = this.checkServerCountLimit()
@@ -2800,10 +2851,12 @@ const appVue = new Vue({
             this.runLoading = true
             this.runError = ''
             this.addEnv()
-            const res = await fetch('workspaces/run', {
-                method: 'POST',
+            const payload = formPayload(this.form)
+            const isEdit = !!this.editingWorkspace
+            const res = await fetch(isEdit ? ('workspaces/' + this.editingWorkspace.id) : 'workspaces/run', {
+                method: isEdit ? 'PUT' : 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(formPayload(this.form)),
+                body: JSON.stringify(payload),
             })
             const data = await res.json().catch(() => ({}))
             this.runLoading = false
@@ -2814,7 +2867,7 @@ const appVue = new Vue({
             }
             await this.reloadServerLists()
             this.closeCreateServerModal()
-            this.showToast('Server created')
+            this.showToast(isEdit ? 'Server updated' : 'Server created')
         },
         async loadMyWorkspaces(page) {
             const q = new URLSearchParams({

@@ -156,6 +156,8 @@ def _apply_workspace_fields(ws: Workspace, data: dict, owner: User | None = None
     for field in ('name', 'ram', 'docker_repository', 'docker_tag'):
         if field in data and data[field] is not None:
             setattr(ws, field, data[field])
+    if 'node_hostname' in data:
+        ws.node_hostname = str(data.get('node_hostname') or '').strip()
     if 'cpu' in data and data['cpu'] is not None:
         try:
             ws.cpu = parse_cpu_value(data['cpu'])

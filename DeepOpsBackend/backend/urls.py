@@ -9,6 +9,7 @@ from backend.views import groups as group_views
 from backend.views import ssh as ssh_views
 from backend.views import tunnel as tunnel_views
 from backend.views import workspaces as ws_views
+from backend.views import nodes as nodes_views
 
 urlpatterns = [
     path('', views.index, name='index'),
@@ -50,6 +51,7 @@ urlpatterns = [
     path('admin/platform/templates', catalog_views.admin_platform_template_create, name='admin-platform-template-create'),
     path('admin/platform/templates/<int:template_id>', catalog_views.admin_platform_template_detail, name='admin-platform-template-detail'),
     path('docker_images', ws_views.docker_images_list, name='docker-images'),
+    path('k8s/nodes', nodes_views.k8s_nodes, name='k8s-nodes'),
     path('workspaces/run', ws_views.workspace_run, name='workspace-run'),
     path('workspaces/bulk_run', ws_views.workspace_bulk_run, name='workspace-bulk-run'),
     path('workspaces/create', ws_views.workspace_create, name='workspace-create'),

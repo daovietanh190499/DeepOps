@@ -740,6 +740,10 @@
                 <span class="inline-block rounded-full px-2 py-0.5 text-xs font-bold"
                       :class="modalK8sDisplay.toLowerCase()==='running' ? 'bg-emerald-100 text-emerald-700' : modalK8sDisplay.toLowerCase()==='terminating' ? 'bg-rose-100 text-rose-700' : modalWorkspace.state==='offline' ? 'bg-slate-100 text-slate-600' : 'bg-amber-100 text-amber-700'"
                       v-text="modalK8sDisplay"></span>
+                <button v-if="modalWorkspace.state==='offline'" type="button" @click="openEditServerModal(modalWorkspace)"
+                        class="ml-2 rounded-lg border border-slate-300 bg-white px-3 py-1 text-xs font-semibold text-slate-700 hover:bg-slate-50">
+                    Edit
+                </button>
                 <div class="rounded-xl border border-slate-200 bg-slate-50 p-4 space-y-2">
                     <p class="font-semibold text-slate-800">Networking</p>
                     <p class="text-xs text-slate-600">Public ingress and in-cluster addresses (when the server is deployed).</p>
@@ -1185,13 +1189,13 @@
         </div>
     </div>
 
-    <!-- Create server modal -->
+    <!-- Create / Edit server modal -->
     <div v-if="showCreateServerModal" class="dohub-modal-backdrop fixed inset-0 z-[55] flex justify-center bg-slate-900/50">
         <div class="dohub-modal-panel w-full max-w-5xl border border-slate-200 bg-white shadow-xl max-h-[92vh] overflow-y-auto sm:mx-auto">
             <div class="flex items-center justify-between border-b border-slate-100 px-4 py-3 sticky top-0 bg-white z-10 sm:px-5 sm:py-4">
                 <div>
-                    <h3 class="text-lg font-bold text-slate-900">Create server</h3>
-                    <p class="mt-0.5 text-xs text-slate-500">Configure and deploy a codehub workspace.</p>
+                    <h3 class="text-lg font-bold text-slate-900" v-text="editingWorkspace ? 'Edit server' : 'Create server'"></h3>
+                    <p class="mt-0.5 text-xs text-slate-500" v-text="editingWorkspace ? 'Edit settings for a stopped server. Changes apply on next start.' : 'Configure and deploy a codehub workspace.'"></p>
                 </div>
                 <button type="button" @click="closeCreateServerModal" class="text-slate-400 hover:text-slate-700"><i class="fa fa-times text-xl"></i></button>
             </div>
@@ -1232,6 +1236,18 @@
                                 <select v-model="form.ram" class="mt-1 w-full rounded-lg border px-3 py-2 text-sm">
                                     <option v-for="r in equipmentList.ram" :key="r" :value="r" v-text="r"></option>
                                 </select></div>
+                            <div class="sm:col-span-2">
+                                <label class="text-sm font-medium text-slate-600">Node</label>
+                                <select v-model="form.node_hostname" class="mt-1 w-full rounded-lg border px-3 py-2 text-sm font-mono">
+                                    <option value="auto">auto</option>
+                                    <option v-for="n in k8sNodeOptions" :key="n" :value="n" v-text="n"></option>
+                                </select>
+                                <p class="mt-1 text-xs text-slate-500">
+                                    Choose <strong>auto</strong> to let Kubernetes schedule. Selecting a node pins the workspace using
+                                    <code class="rounded bg-slate-100 px-1">nodeSelector</code>.
+                                </p>
+                                <p v-if="k8sNodeOptionsError" class="mt-1 text-xs text-amber-700" v-text="k8sNodeOptionsError"></p>
+                            </div>
                             <div class="sm:col-span-2 space-y-2">
                                 <div class="flex items-center justify-between gap-2">
                                     <label class="text-sm font-medium text-slate-600">Mount drives (optional)</label>
@@ -1323,6 +1339,7 @@
                             <spec-row label="Name" :value="form.name"></spec-row>
                             <spec-row label="CPU" :value="form.cpu + ' vCPU'"></spec-row>
                             <spec-row label="RAM" :value="form.ram"></spec-row>
+                            <spec-row label="Node" :value="form.node_hostname || 'auto'"></spec-row>
                             <spec-row label="Drives" :value="selectedDrivesLabel"></spec-row>
                             <spec-row label="GPU" :value="form.gpu || 'none'"></spec-row>
                             <spec-row v-if="canChangePrivileged" label="Privileged" :value="form.privileged ? 'yes' : 'no'"></spec-row>
@@ -1337,7 +1354,7 @@
                             <button type="button" @click="runWorkspace" :disabled="runLoading"
                                     class="rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700 disabled:opacity-50">
                                 <span v-if="runLoading">Starting…</span>
-                                <span v-else>Create server</span>
+                                <span v-else v-text="editingWorkspace ? 'Save changes' : 'Create server'"></span>
                             </button>
                         </div>
                     </section>

@@ -114,6 +114,12 @@ class Workspace(models.Model):
     gpu = models.CharField(max_length=255, blank=True, default='')
     docker_repository = models.CharField(max_length=512, default='codercom/code-server')
     docker_tag = models.CharField(max_length=128, default='4.89.0-ubuntu')
+    node_hostname = models.CharField(
+        max_length=255,
+        blank=True,
+        default='',
+        help_text='Kubernetes node hostname to pin this workspace to (empty = auto schedule)',
+    )
     env_vars = models.JSONField(default=_default_env, blank=True)
     exposed_ports = models.JSONField(default=_default_ports, blank=True)
     ws_tunnel_ports = models.JSONField(
@@ -175,6 +181,7 @@ class Workspace(models.Model):
             'username': self.user.username,
             'cpu': self.cpu,
             'ram': self.ram,
+            'node_hostname': self.node_hostname or '',
             'drive_id': str(self.user_drive_id) if self.user_drive_id else None,
             'drive_name': self.user_drive.name if self.user_drive_id and self.user_drive else None,
             'drive_size': self.user_drive.size if self.user_drive_id and self.user_drive else None,

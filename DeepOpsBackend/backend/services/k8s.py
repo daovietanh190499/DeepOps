@@ -131,6 +131,7 @@ def build_spawn_config(workspace) -> dict:
         'ws_tunnel_ports': list(workspace.ws_tunnel_ports or []) if isinstance(workspace.ws_tunnel_ports, list) else [],
         'privileged': workspace.privileged,
         'backup_secret_name': backup_secret_name(workspace),
+        'node_hostname': (workspace.node_hostname or '').strip(),
     }
 
 
@@ -219,6 +220,14 @@ def _helm_base_cmd(config: dict) -> list[str]:
         '--set', f'resources.requests.cpu={config["cpu"]}',
         '--set', f'resources.requests.memory={config["ram"]}',
     ]
+
+    node_hostname = str(config.get('node_hostname') or '').strip()
+    if node_hostname:
+        # Pin workspace to a specific node by hostname.
+        cmd.extend([
+            '--set-string',
+            f'nodeSelector.kubernetes\\.io/hostname={node_hostname}',
+        ])
 
     pvc_volumes = config.get('pvc_volumes') or []
     pvc_volume_mounts = config.get('pvc_volume_mounts') or []
