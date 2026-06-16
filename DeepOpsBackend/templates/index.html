@@ -169,6 +169,68 @@
             </div>
         </section>
 
+        <!-- My images -->
+        <section v-if="is_login && menu==='images'" class="space-y-4">
+            <div class="flex flex-wrap items-center justify-between gap-3">
+                <div>
+                    <h2 class="text-lg font-bold text-slate-900">My images</h2>
+                    <p class="text-xs text-slate-500 mt-0.5">Submit custom Docker images for use in servers. New images require admin approval.</p>
+                    <p v-if="resourceLimits.limited && resourceLimits.limits.max_images" class="text-xs text-slate-500 mt-0.5"
+                       v-text="'Images: ' + (resourceLimits.limits.image_count ?? myImagePagination.total) + ' / ' + resourceLimits.limits.max_images"></p>
+                </div>
+            </div>
+
+            <div class="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm space-y-3 sm:p-5">
+                <h3 class="text-sm font-bold text-slate-800">Submit image</h3>
+                <div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                    <input v-model="newUserImage.label" placeholder="Label" class="rounded-lg border px-3 py-2 text-sm">
+                    <input v-model="newUserImage.repository" placeholder="repository/name" class="rounded-lg border px-3 py-2 text-sm lg:col-span-2">
+                    <input v-model="newUserImage.default_tag" placeholder="Default tag" class="rounded-lg border px-3 py-2 text-sm font-mono">
+                    <input v-model="newUserImage.tags_text" placeholder="Tags (comma-separated)" class="rounded-lg border px-3 py-2 text-sm font-mono sm:col-span-2 lg:col-span-3">
+                </div>
+                <button type="button" @click="createUserDockerImage" :disabled="!canCreateMoreImages"
+                        class="rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700 disabled:opacity-40">Submit image</button>
+            </div>
+
+            <div class="flex flex-wrap items-center gap-3">
+                <input v-model="myImageFilter" @input="reloadMyImages(1)" placeholder="Filter by name…"
+                       class="dohub-filter-input rounded-lg border px-3 py-1.5 text-sm">
+                <span class="text-sm text-slate-500" v-text="'Page ' + myImagePagination.page + ' / ' + myImagePagination.pages"></span>
+            </div>
+
+            <p v-if="myImagePagination.total===0 && !myImageFilter" class="text-sm text-slate-500">No images submitted yet.</p>
+            <p v-else-if="myDockerImages.length===0" class="text-sm text-slate-500">No images match your filter.</p>
+
+            <div class="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
+                <div class="dohub-table-scroll -mx-1 px-1">
+                <table class="w-full min-w-[560px] text-sm">
+                    <thead><tr class="border-b text-left text-slate-500">
+                        <th class="py-2">Label</th><th>Repository</th><th>Default tag</th><th>Tags</th><th>Status</th>
+                    </tr></thead>
+                    <tbody>
+                        <tr v-for="img in myDockerImages" :key="img.id" class="border-b border-slate-100">
+                            <td class="py-2" v-text="img.label"></td>
+                            <td class="font-mono text-xs" v-text="img.repository"></td>
+                            <td class="font-mono text-xs" v-text="img.default_tag"></td>
+                            <td class="font-mono text-xs" v-text="(img.tags || []).join(', ')"></td>
+                            <td>
+                                <span class="text-xs font-bold uppercase px-2 py-0.5 rounded-full"
+                                      :class="img.is_accepted ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'"
+                                      v-text="img.is_accepted ? 'accepted' : 'pending'"></span>
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+                </div>
+            </div>
+            <div v-if="myImagePagination.pages > 1" class="flex justify-center gap-2">
+                <button :disabled="myImagePagination.page<=1" @click="reloadMyImages(myImagePagination.page-1)"
+                        class="rounded-lg border px-4 py-2 text-sm disabled:opacity-40">Prev</button>
+                <button :disabled="myImagePagination.page>=myImagePagination.pages" @click="reloadMyImages(myImagePagination.page+1)"
+                        class="rounded-lg border px-4 py-2 text-sm disabled:opacity-40">Next</button>
+            </div>
+        </section>
+
         <!-- Admin overall -->
         <section v-if="is_login && menu==='admin-overall' && is_admin" class="space-y-6">
             <div class="flex flex-wrap items-center justify-between gap-3">
@@ -583,6 +645,7 @@
                             <span v-text="'GPU VRAM ≤ ' + g.max_gpu_vram_g + 'G'"></span>
                             <span v-text="'Servers ≤ ' + (g.max_servers || '∞')"></span>
                             <span v-text="'Drives ≤ ' + (g.max_drives || '∞')"></span>
+                            <span v-text="'Images ≤ ' + (g.max_images || '∞')"></span>
                             <span class="sm:col-span-2" v-text="g.can_change_privileged ? 'Privileged pods: allowed' : 'Privileged pods: denied'"></span>
                         </div>
                     </div>
@@ -814,10 +877,23 @@
                 <input v-model="newImage.tags_text" placeholder="Tags (comma-separated)" class="rounded-lg border px-3 py-2 text-sm font-mono sm:col-span-2 lg:col-span-3">
             </div>
             <button @click="createDockerImage" class="rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white">Add image</button>
+            <div class="flex flex-wrap items-center gap-3">
+                <input v-model="adminImageNameFilter" @input="reloadAdminDockerImagesFilters" placeholder="Filter by name…"
+                       class="dohub-filter-input rounded-lg border px-3 py-1.5 text-sm">
+                <input v-model="adminImageCreatorFilter" @input="reloadAdminDockerImagesFilters" placeholder="Filter by creator…"
+                       class="dohub-filter-input rounded-lg border px-3 py-1.5 text-sm">
+                <select v-model="adminImageStatusFilter" @change="reloadAdminDockerImagesFilters"
+                        class="rounded-lg border px-3 py-1.5 text-sm">
+                    <option value="all">All statuses</option>
+                    <option value="accepted">Accepted</option>
+                    <option value="pending">Pending</option>
+                </select>
+                <span class="text-sm text-slate-500" v-text="'Page ' + adminImagePagination.page + ' / ' + adminImagePagination.pages"></span>
+            </div>
             <div class="dohub-table-scroll -mx-1 px-1">
-            <table class="w-full min-w-[560px] text-sm">
+            <table class="w-full min-w-[720px] text-sm">
                 <thead><tr class="border-b text-left text-slate-500">
-                    <th class="py-2">Label</th><th>Repository</th><th>Default tag</th><th>Tags</th><th>Active</th><th></th>
+                    <th class="py-2">Label</th><th>Repository</th><th>Default tag</th><th>Tags</th><th>Creator</th><th>Status</th><th>Active</th><th></th>
                 </tr></thead>
                 <tbody>
                     <tr v-for="img in adminDockerImages" :key="img.id" class="border-b border-slate-100">
@@ -849,6 +925,16 @@
                             <template v-else><span v-text="(img.tags || []).join(', ')"></span></template>
                         </td>
                         <td>
+                            <img v-if="img.creator" :src="img.creator_image || '/static/img/logo.png'"
+                                 class="h-7 w-7 rounded-full border object-cover" :alt="img.creator" :title="img.creator">
+                            <span v-else class="text-xs text-slate-400">—</span>
+                        </td>
+                        <td>
+                            <span class="text-xs font-bold uppercase px-2 py-0.5 rounded-full"
+                                  :class="img.is_accepted ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'"
+                                  v-text="img.is_accepted ? 'accepted' : 'pending'"></span>
+                        </td>
+                        <td>
                             <template v-if="editingDockerImage && editingDockerImage.id===img.id">
                                 <select v-model="editingDockerImage.is_active" class="rounded border px-2 py-1 text-xs">
                                     <option :value="true">yes</option>
@@ -863,6 +949,7 @@
                                 <button type="button" @click="cancelEditDockerImage" class="text-slate-500 text-xs hover:underline">Cancel</button>
                             </template>
                             <template v-else>
+                                <button v-if="!img.is_accepted" type="button" @click="acceptDockerImage(img)" class="text-emerald-600 text-xs hover:underline">Accept</button>
                                 <button type="button" @click="openEditDockerImage(img)" class="text-blue-600 text-xs hover:underline">Edit</button>
                                 <button type="button" @click="deleteDockerImage(img)" class="text-rose-600 text-xs hover:underline">Delete</button>
                             </template>
@@ -870,6 +957,12 @@
                     </tr>
                 </tbody>
             </table>
+            </div>
+            <div v-if="adminImagePagination.pages > 1" class="flex justify-center gap-2">
+                <button :disabled="adminImagePagination.page<=1" @click="reloadAdminDockerImages(adminImagePagination.page-1)"
+                        class="rounded-lg border px-4 py-2 text-sm disabled:opacity-40">Prev</button>
+                <button :disabled="adminImagePagination.page>=adminImagePagination.pages" @click="reloadAdminDockerImages(adminImagePagination.page+1)"
+                        class="rounded-lg border px-4 py-2 text-sm disabled:opacity-40">Next</button>
             </div>
         </section>
     </main>
@@ -1890,8 +1983,12 @@
                         <label class="block text-xs font-medium text-slate-600">Max drives</label>
                         <input v-model.number="groupForm.max_drives" type="number" min="0" class="mt-1 w-full rounded-lg border px-3 py-2 text-sm">
                     </div>
+                    <div>
+                        <label class="block text-xs font-medium text-slate-600">Max images</label>
+                        <input v-model.number="groupForm.max_images" type="number" min="0" class="mt-1 w-full rounded-lg border px-3 py-2 text-sm">
+                    </div>
                 </div>
-                <p class="text-xs text-slate-500">Limits apply per member. Use 0 for unlimited servers/drives.</p>
+                <p class="text-xs text-slate-500">Limits apply per member. Use 0 for unlimited servers, drives, or images.</p>
                 <label class="flex items-start gap-3 rounded-lg border border-slate-200 bg-slate-50/60 p-3 cursor-pointer">
                     <input v-model="groupForm.can_change_privileged" type="checkbox" class="mt-0.5 rounded border-slate-300">
                     <span>

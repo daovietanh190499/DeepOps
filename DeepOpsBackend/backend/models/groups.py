@@ -23,6 +23,10 @@ class ResourceGroup(models.Model):
         default=0,
         help_text='Max drives per member; 0 = unlimited',
     )
+    max_images = models.PositiveIntegerField(
+        default=0,
+        help_text='Max submitted docker images per member; 0 = unlimited',
+    )
     can_change_privileged = models.BooleanField(
         default=False,
         help_text='Members may enable privileged (root) pods when creating servers',

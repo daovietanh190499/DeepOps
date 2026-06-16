@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import re
 
-from backend.models import ResourceGroup, ResourceGroupMember, User, UserDrive, Workspace
+from backend.models import DockerImage, ResourceGroup, ResourceGroupMember, User, UserDrive, Workspace
 from backend.services.gpu_resources import normalize_gpu_value
 from backend.services.platform_catalog import (
     all_cpu,
@@ -68,6 +68,10 @@ def user_server_count(user: User) -> int:
     return Workspace.objects.filter(user=user).count()
 
 
+def user_image_count(user: User) -> int:
+    return DockerImage.objects.filter(created_by=user).count()
+
+
 def limits_payload(group: ResourceGroup | None, user: User | None = None) -> dict | None:
     if group is None:
         return None
@@ -80,11 +84,13 @@ def limits_payload(group: ResourceGroup | None, user: User | None = None) -> dic
         'max_gpu_vram_g': group.max_gpu_vram_g,
         'max_servers': group.max_servers,
         'max_drives': group.max_drives,
+        'max_images': group.max_images,
         'can_change_privileged': group.can_change_privileged,
     }
     if user is not None:
         payload['server_count'] = user_server_count(user)
         payload['drive_count'] = user_drive_count(user)
+        payload['image_count'] = user_image_count(user)
     return payload
 
 
@@ -175,4 +181,14 @@ def validate_drive_count(user: User) -> str | None:
     current = user_drive_count(user)
     if current >= group.max_drives:
         return f'Drive count exceeds group limit ({group.max_drives} max, you have {current})'
+    return None
+
+
+def validate_image_count(user: User) -> str | None:
+    group = get_user_group(user)
+    if group is None or not group.max_images:
+        return None
+    current = user_image_count(user)
+    if current >= group.max_images:
+        return f'Image count exceeds group limit ({group.max_images} max, you have {current})'
     return None

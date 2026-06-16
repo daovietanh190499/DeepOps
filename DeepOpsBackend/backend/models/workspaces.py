@@ -33,8 +33,20 @@ class DockerImage(models.Model):
         blank=True,
         help_text='Selectable image tags; default_tag should be included',
     )
+    created_by = models.ForeignKey(
+        User,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='docker_images',
+    )
+    is_accepted = models.BooleanField(
+        default=True,
+        help_text='User-submitted images require admin acceptance before use in servers',
+    )
     is_active = models.BooleanField(default=True)
     sort_order = models.PositiveIntegerField(default=0)
+    created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
         ordering = ['sort_order', 'label']
@@ -52,14 +64,21 @@ class DockerImage(models.Model):
         return tags or ['latest']
 
     def to_dict(self) -> dict:
+        creator = self.created_by.username if self.created_by_id else ''
+        creator_image = self.created_by.image if self.created_by_id else ''
         return {
             'id': self.id,
             'label': self.label,
             'repository': self.repository,
             'default_tag': self.default_tag,
             'tags': self.available_tags(),
+            'creator': creator,
+            'creator_image': creator_image,
+            'creator_id': self.created_by_id,
+            'is_accepted': self.is_accepted,
             'is_active': self.is_active,
             'sort_order': self.sort_order,
+            'created_at': self.created_at.isoformat() if self.created_at else '',
         }
 
 

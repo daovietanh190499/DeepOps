@@ -506,7 +506,15 @@ const appVue = new Vue({
         adminServerNameFilter: '',
         adminServerGroupFilter: '',
         adminDockerImages: [],
+        adminImageNameFilter: '',
+        adminImageCreatorFilter: '',
+        adminImageStatusFilter: 'all',
+        myDockerImages: [],
+        myImageFilter: '',
+        myImagePagination: { page: 1, pages: 1, total: 0, per_page: 12 },
+        adminImagePagination: { page: 1, pages: 1, total: 0, per_page: 12 },
         newImage: { label: '', repository: '', default_tag: 'latest', tags_text: '' },
+        newUserImage: { label: '', repository: '', default_tag: 'latest', tags_text: '' },
         editingDockerImage: null,
         dockerImageBulkMode: 'json',
         dockerImageBulkText: '',
@@ -623,7 +631,7 @@ const appVue = new Vue({
         resourceGroups: [],
         showGroupFormModal: false,
         editingGroup: null,
-        groupForm: { name: '', max_cpu: 4, max_ram_g: 8, max_drive_size_gi: 50, max_gpu_vram_g: 10, max_servers: 5, max_drives: 3, can_change_privileged: false },
+        groupForm: { name: '', max_cpu: 4, max_ram_g: 8, max_drive_size_gi: 50, max_gpu_vram_g: 10, max_servers: 5, max_drives: 3, max_images: 10, can_change_privileged: false },
         groupFormLoading: false,
         groupMembersModal: null,
         memberSearchQuery: '',
@@ -695,6 +703,7 @@ const appVue = new Vue({
             return [
                 { id: 'servers', label: 'My servers' },
                 { id: 'drives', label: 'My drives' },
+                { id: 'images', label: 'My images' },
             ]
         },
         adminTabs() {
@@ -782,6 +791,12 @@ const appVue = new Vue({
             if (!this.resourceLimits.limited || !l || !l.max_drives) return true
             const count = l.drive_count ?? this.myDrivePagination.total ?? this.myDrives.length
             return count < l.max_drives
+        },
+        canCreateMoreImages() {
+            const l = this.resourceLimits.limits
+            if (!this.resourceLimits.limited || !l || !l.max_images) return true
+            const count = l.image_count ?? this.myImagePagination.total ?? this.myDockerImages.length
+            return count < l.max_images
         },
     },
     created() {
@@ -1951,6 +1966,7 @@ const appVue = new Vue({
             window.history.replaceState({}, '', '/?tab=' + menu)
             if (menu === 'drives') await this.reloadMyDrives(1)
             if (menu === 'servers') await this.reloadMyWorkspaces(1)
+            if (menu === 'images') await this.reloadMyImages(1)
             if (menu === 'admin-overall') {
                 await this.loadClusterOverview()
                 await this.loadDirectpvDiscover()
@@ -1973,7 +1989,7 @@ const appVue = new Vue({
                 if (this.adminUsersTab === 'groups') await this.loadResourceGroups()
                 else await this.loadAdminUsers(1)
             }
-            if (menu === 'admin-images') await this.loadAdminDockerImages()
+            if (menu === 'admin-images') await this.reloadAdminDockerImages(1)
             if (['drives', 'servers', 'admin-drives', 'admin-servers', 'admin-overall'].includes(menu)) {
                 this.startStatusPolling()
             }
@@ -1996,12 +2012,13 @@ const appVue = new Vue({
                     }
                 }
             }, () => this.pollStatuses(), () => this.statusPendingKeysForMenu())
+            if (this.menu === 'images') await this.reloadMyImages(1)
             if (this.is_admin) {
                 if (this.menu === 'admin-users') {
                     if (this.adminUsersTab === 'groups') await this.loadResourceGroups()
                     else await this.loadAdminUsers(1)
                 }
-                await this.loadAdminDockerImages()
+                await this.loadAdminDockerImages(this.adminImagePagination.page)
             }
             if (this.menu === 'admin-overall') {
                 await this.loadClusterOverview()
@@ -2433,10 +2450,21 @@ const appVue = new Vue({
             }
             return null
         },
+        checkImageCountLimit() {
+            if (!this.resourceLimits.limited || !this.resourceLimits.limits) return null
+            const l = this.resourceLimits.limits
+            if (!l.max_images) return null
+            const count = l.image_count ?? this.myImagePagination.total ?? this.myDockerImages.length
+            if (count >= l.max_images) {
+                return `Image count exceeds group limit (${l.max_images} max, you have ${count})`
+            }
+            return null
+        },
         syncResourceUsageCounts() {
             if (!this.resourceLimits.limits) return
             this.resourceLimits.limits.server_count = this.myServerPagination.total ?? this.myWorkspaces.length
             this.resourceLimits.limits.drive_count = this.myDrivePagination.total ?? this.myDrives.length
+            this.resourceLimits.limits.image_count = this.myImagePagination.total ?? this.myDockerImages.length
         },
         async loadDockerImages() {
             const res = await fetch('docker_images')
@@ -2450,6 +2478,51 @@ const appVue = new Vue({
                 const tags = (first.tags && first.tags.length) ? first.tags : [first.default_tag || 'latest']
                 this.form.docker_tag = tags.includes(first.default_tag) ? first.default_tag : tags[0]
             }
+        },
+        async loadMyDockerImages(page) {
+            const q = new URLSearchParams({
+                page: page || this.myImagePagination.page || 1,
+                per_page: 12,
+            })
+            if (this.myImageFilter) q.set('name', this.myImageFilter)
+            const res = await fetch('docker_images/mine?' + q)
+            if (res.status !== 200) return
+            const data = await res.json()
+            this.myDockerImages = data.result || []
+            this.myImagePagination = data.pagination || this.myImagePagination
+            this.syncResourceUsageCounts()
+        },
+        async reloadMyImages(page) {
+            await this.loadMyDockerImages(page || 1)
+        },
+        async createUserDockerImage() {
+            const limitErr = this.checkImageCountLimit()
+            if (limitErr) {
+                this.showToast(limitErr)
+                return
+            }
+            const tags = String(this.newUserImage.tags_text || '')
+                .split(/[,;\s]+/)
+                .map((t) => t.trim())
+                .filter(Boolean)
+            const res = await fetch('docker_images/create', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    label: this.newUserImage.label,
+                    repository: this.newUserImage.repository,
+                    default_tag: this.newUserImage.default_tag || 'latest',
+                    tags,
+                }),
+            })
+            if (res.status !== 201) {
+                const data = await res.json().catch(() => ({}))
+                this.showToast(data.message || 'Failed to submit image')
+                return
+            }
+            this.newUserImage = { label: '', repository: '', default_tag: 'latest', tags_text: '' }
+            await this.reloadMyImages(this.myImagePagination.page)
+            this.showToast('Image submitted — waiting for admin approval')
         },
         onDockerImageChange() {
             const img = this.dockerImages.find((i) => i.id === this.form.docker_image_id)
@@ -3009,7 +3082,7 @@ const appVue = new Vue({
         },
         openCreateGroupModal() {
             this.editingGroup = null
-            this.groupForm = { name: '', max_cpu: 4, max_ram_g: 8, max_drive_size_gi: 50, max_gpu_vram_g: 10, max_servers: 5, max_drives: 3, can_change_privileged: false }
+            this.groupForm = { name: '', max_cpu: 4, max_ram_g: 8, max_drive_size_gi: 50, max_gpu_vram_g: 10, max_servers: 5, max_drives: 3, max_images: 10, can_change_privileged: false }
             this.showGroupFormModal = true
         },
         openEditGroupModal(g) {
@@ -3022,6 +3095,7 @@ const appVue = new Vue({
                 max_gpu_vram_g: g.max_gpu_vram_g,
                 max_servers: g.max_servers,
                 max_drives: g.max_drives,
+                max_images: g.max_images,
                 can_change_privileged: !!g.can_change_privileged,
             }
             this.showGroupFormModal = true
@@ -3159,12 +3233,39 @@ const appVue = new Vue({
                 this.memberBulkLoading = false
             }
         },
-        async loadAdminDockerImages() {
-            const res = await fetch('admin/docker_images')
+        async loadAdminDockerImages(page) {
+            const q = new URLSearchParams({
+                page: page || this.adminImagePagination.page || 1,
+                per_page: 12,
+            })
+            if (this.adminImageNameFilter) q.set('name', this.adminImageNameFilter)
+            if (this.adminImageCreatorFilter) q.set('creator', this.adminImageCreatorFilter)
+            if (this.adminImageStatusFilter && this.adminImageStatusFilter !== 'all') {
+                q.set('status', this.adminImageStatusFilter)
+            }
+            const res = await fetch('admin/docker_images?' + q)
             if (res.status === 200) {
                 const data = await res.json()
-                this.adminDockerImages = data.result
+                this.adminDockerImages = data.result || []
+                this.adminImagePagination = data.pagination || this.adminImagePagination
             }
+        },
+        reloadAdminDockerImagesFilters() {
+            this.loadAdminDockerImages(1)
+        },
+        async reloadAdminDockerImages(page) {
+            await this.loadAdminDockerImages(page || 1)
+        },
+        async acceptDockerImage(img) {
+            if (!img || !img.id) return
+            await fetch('admin/docker_images/' + img.id, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ is_accepted: true }),
+            })
+            await this.loadAdminDockerImages(this.adminImagePagination.page)
+            await this.loadDockerImages()
+            this.showToast('Image accepted')
         },
         openEditDockerImage(img) {
             this.editingDockerImage = {
@@ -3195,7 +3296,7 @@ const appVue = new Vue({
                 }),
             })
             this.editingDockerImage = null
-            await this.loadAdminDockerImages()
+            await this.loadAdminDockerImages(this.adminImagePagination.page)
             await this.loadDockerImages()
         },
         downloadDockerImagesJson() {
@@ -3270,7 +3371,7 @@ const appVue = new Vue({
                 if (failed.length) {
                     this.dockerImageBulkSummary += '\n' + failed.map((r) => (r.label || r.repository || '?') + ': ' + (r.error || 'failed')).join('\n')
                 }
-                await this.loadAdminDockerImages()
+                await this.loadAdminDockerImages(this.adminImagePagination.page)
                 await this.loadDockerImages()
             } finally {
                 this.dockerImageBulkLoading = false
@@ -3283,13 +3384,13 @@ const appVue = new Vue({
                 body: JSON.stringify(this.newImage),
             })
             this.newImage = { label: '', repository: '', default_tag: 'latest', tags_text: '' }
-            await this.loadAdminDockerImages()
+            await this.loadAdminDockerImages(this.adminImagePagination.page)
             await this.loadDockerImages()
         },
         async deleteDockerImage(img) {
             if (!confirm('Delete image ' + img.label + '?')) return
             await fetch('admin/docker_images/' + img.id, { method: 'DELETE' })
-            await this.loadAdminDockerImages()
+            await this.loadAdminDockerImages(this.adminImagePagination.page)
             await this.loadDockerImages()
         },
     },

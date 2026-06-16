@@ -22,7 +22,7 @@ from backend.services.k8s_status import (
 from backend.services.gpu_resources import normalize_gpu_value
 from backend.services.platform_catalog import parse_cpu_value
 from backend.services.env_templates import expand_env_vars
-from backend.services.resource_limits import can_change_privileged, validate_server_count, validate_workspace_resources
+from backend.services.resource_limits import can_change_privileged, validate_image_count, validate_server_count, validate_workspace_resources
 from backend.services.ssh_keys import ssh_info_payload
 from backend.services.workspace_kubectl import (
     MONITOR_DEFAULT_WINDOW_MINUTES,
@@ -232,9 +232,59 @@ def docker_images_list(request, user):
     denied = _require_accepted(user)
     if denied:
         return denied
-    images = DockerImage.objects.filter(is_active=True)
+    images = DockerImage.objects.filter(is_active=True, is_accepted=True)
     result = [img.to_dict() for img in images]
     return JsonResponse({'result': result})
+
+
+@auth.verify
+@require_http_methods(['GET'])
+def my_docker_images(request, user):
+    denied = _require_accepted(user)
+    if denied:
+        return denied
+    page = max(1, int(request.GET.get('page', 1)))
+    per_page = min(500, max(6, int(request.GET.get('per_page', 12))))
+    name_filter = (request.GET.get('name') or '').strip()
+    qs = DockerImage.objects.filter(created_by=user).select_related('created_by').order_by('-created_at', '-id')
+    if name_filter:
+        qs = qs.filter(label__icontains=name_filter)
+    paginator = Paginator(qs, per_page)
+    page_obj = paginator.get_page(page)
+    return JsonResponse({
+        'result': [img.to_dict() for img in page_obj.object_list],
+        'pagination': {
+            'page': page_obj.number,
+            'per_page': per_page,
+            'total': paginator.count,
+            'pages': paginator.num_pages or 1,
+        },
+    })
+
+
+@auth.verify
+@csrf_exempt
+@require_http_methods(['POST'])
+def docker_image_create(request, user):
+    denied = _require_accepted(user)
+    if denied:
+        return denied
+    try:
+        data = _parse_body(request)
+    except json.JSONDecodeError:
+        return JsonResponse({'message': 'invalid json'}, status=400)
+    fields, err = _docker_image_fields(data)
+    if err:
+        return JsonResponse({'message': err}, status=400)
+    limit_err = validate_image_count(user)
+    if limit_err:
+        return JsonResponse({'message': limit_err}, status=400)
+    img = DockerImage.objects.create(
+        **fields,
+        created_by=user,
+        is_accepted=False,
+    )
+    return JsonResponse({'result': img.to_dict()}, status=201)
 
 
 @auth.verify
@@ -650,9 +700,32 @@ def admin_docker_images(request, user):
     denied = _require_admin(user)
     if denied:
         return denied
-    images = DockerImage.objects.all()
+    name_filter = (request.GET.get('name') or '').strip()
+    creator_filter = (request.GET.get('creator') or request.GET.get('user') or '').strip()
+    status_filter = (request.GET.get('status') or '').strip().lower()
+    page = max(1, int(request.GET.get('page', 1)))
+    per_page = min(500, max(6, int(request.GET.get('per_page', 12))))
+
+    images = DockerImage.objects.select_related('created_by').order_by('-created_at', '-id')
+    if name_filter:
+        images = images.filter(label__icontains=name_filter)
+    if creator_filter:
+        images = images.filter(created_by__username__icontains=creator_filter)
+    if status_filter in ('accepted', 'accept', 'yes', 'true'):
+        images = images.filter(is_accepted=True)
+    elif status_filter in ('pending', 'not_accepted', 'no', 'false'):
+        images = images.filter(is_accepted=False)
+
+    paginator = Paginator(images, per_page)
+    page_obj = paginator.get_page(page)
     return JsonResponse({
-        'result': [img.to_dict() for img in images],
+        'result': [img.to_dict() for img in page_obj.object_list],
+        'pagination': {
+            'page': page_obj.number,
+            'per_page': per_page,
+            'total': paginator.count,
+            'pages': paginator.num_pages or 1,
+        },
     })
 
 
@@ -670,7 +743,7 @@ def admin_docker_image_create(request, user):
     fields, err = _docker_image_fields(data)
     if err:
         return JsonResponse({'message': err}, status=400)
-    img = DockerImage.objects.create(**fields)
+    img = DockerImage.objects.create(**fields, is_accepted=True)
     return JsonResponse({'result': img.to_dict()}, status=201)
 
 
@@ -706,6 +779,9 @@ def admin_docker_image_detail(request, user, image_id):
             return JsonResponse({'message': err}, status=400)
         for key, value in fields.items():
             setattr(img, key, value)
+        img.save()
+    if 'is_accepted' in data:
+        img.is_accepted = bool(data.get('is_accepted'))
         img.save()
     return JsonResponse({'result': img.to_dict()})
 
