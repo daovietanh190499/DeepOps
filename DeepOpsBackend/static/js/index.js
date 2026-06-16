@@ -463,6 +463,8 @@ const appVue = new Vue({
         adminDrives: [],
         adminDrivePagination: { page: 1, pages: 1, total: 0, per_page: 12 },
         adminDriveFilter: '',
+        adminDriveNameFilter: '',
+        adminDriveGroupFilter: '',
         newDrive: { name: 'My drive', size: '20Gi' },
         showCreateDriveModal: false,
         showBulkCreateDriveModal: false,
@@ -493,8 +495,17 @@ const appVue = new Vue({
         adminWorkspaces: [],
         adminPagination: { page: 1, pages: 1, total: 0, per_page: 12 },
         adminServerFilter: '',
+        adminServerNameFilter: '',
+        adminServerGroupFilter: '',
         adminDockerImages: [],
         newImage: { label: '', repository: '', default_tag: 'latest', tags_text: '' },
+        editingDockerImage: null,
+        dockerImageBulkMode: 'json',
+        dockerImageBulkText: '',
+        dockerImageBulkFileName: '',
+        dockerImageBulkLoading: false,
+        dockerImageBulkSummary: '',
+        showDockerImageBulkModal: false,
         clusterOverview: null,
         clusterLoading: false,
         joinCommand: '',
@@ -1938,11 +1949,17 @@ const appVue = new Vue({
             }
             if (menu === 'admin-drives') {
                 if (this.adminDrivesTab === 'catalog') await this.loadAdminPlatformCatalog()
-                else await this.reloadAdminDrives(1)
+                else {
+                    await this.loadResourceGroups()
+                    await this.reloadAdminDrives(1)
+                }
             }
             if (menu === 'admin-servers') {
                 if (this.adminServersTab === 'catalog') await this.loadAdminPlatformCatalog()
-                else await this.reloadAdminWorkspaces(1)
+                else {
+                    await this.loadResourceGroups()
+                    await this.reloadAdminWorkspaces(1)
+                }
             }
             if (menu === 'admin-users') {
                 if (this.adminUsersTab === 'groups') await this.loadResourceGroups()
@@ -2652,11 +2669,16 @@ const appVue = new Vue({
         },
         async loadAdminDrives(page) {
             const q = new URLSearchParams({ page: page || 1, per_page: 12, user: this.adminDriveFilter })
+            if (this.adminDriveNameFilter) q.set('name', this.adminDriveNameFilter)
+            if (this.adminDriveGroupFilter && this.adminDriveGroupFilter !== 'all') q.set('group', this.adminDriveGroupFilter)
             const res = await fetch('admin/drives?' + q)
             if (res.status !== 200) return
             const data = await res.json()
             this.adminDrives = data.result || []
             this.adminDrivePagination = data.pagination || this.adminDrivePagination
+        },
+        reloadAdminDrivesFilters() {
+            this.reloadAdminDrives(1)
         },
         openCreateDriveModal() {
             this.mobileNavOpen = false
@@ -2888,11 +2910,16 @@ const appVue = new Vue({
                 per_page: 12,
                 user: this.adminServerFilter,
             })
+            if (this.adminServerNameFilter) q.set('name', this.adminServerNameFilter)
+            if (this.adminServerGroupFilter && this.adminServerGroupFilter !== 'all') q.set('group', this.adminServerGroupFilter)
             const res = await fetch('admin/workspaces?' + q)
             if (res.status !== 200) return
             const data = await res.json()
             this.adminWorkspaces = data.result || []
             this.adminPagination = data.pagination || this.adminPagination
+        },
+        reloadAdminWorkspacesFilters() {
+            this.reloadAdminWorkspaces(1)
         },
         async startWorkspace(ws) {
             await fetch('workspaces/' + ws.id + '/start', { method: 'POST' })
@@ -2953,12 +2980,18 @@ const appVue = new Vue({
         async switchAdminServersTab(tab) {
             this.adminServersTab = tab
             if (tab === 'catalog') await this.loadAdminPlatformCatalog()
-            else await this.reloadAdminWorkspaces(1)
+            else {
+                await this.loadResourceGroups()
+                await this.reloadAdminWorkspaces(1)
+            }
         },
         async switchAdminDrivesTab(tab) {
             this.adminDrivesTab = tab
             if (tab === 'catalog') await this.loadAdminPlatformCatalog()
-            else await this.reloadAdminDrives(1)
+            else {
+                await this.loadResourceGroups()
+                await this.reloadAdminDrives(1)
+            }
         },
         async loadResourceGroups() {
             const res = await fetch('admin/resource_groups')
@@ -3123,6 +3156,116 @@ const appVue = new Vue({
             if (res.status === 200) {
                 const data = await res.json()
                 this.adminDockerImages = data.result
+            }
+        },
+        openEditDockerImage(img) {
+            this.editingDockerImage = {
+                ...img,
+                tags_text: ((img && img.tags) ? img.tags : []).join(', '),
+            }
+        },
+        cancelEditDockerImage() {
+            this.editingDockerImage = null
+        },
+        async saveDockerImage(img) {
+            if (!img || !img.id) return
+            const tags = String(img.tags_text || '')
+                .split(/[,;\s]+/)
+                .map((t) => t.trim())
+                .filter(Boolean)
+            await fetch('admin/docker_images/' + img.id, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    label: img.label,
+                    repository: img.repository,
+                    default_tag: img.default_tag,
+                    tags,
+                    tags_text: tags.join(', '),
+                    is_active: img.is_active,
+                    sort_order: img.sort_order,
+                }),
+            })
+            this.editingDockerImage = null
+            await this.loadAdminDockerImages()
+            await this.loadDockerImages()
+        },
+        downloadDockerImagesJson() {
+            window.location = 'admin/docker_images/export'
+        },
+        openDockerImageBulkModal() {
+            this.showDockerImageBulkModal = true
+            this.dockerImageBulkMode = 'json'
+            this.dockerImageBulkText = ''
+            this.dockerImageBulkFileName = ''
+            this.dockerImageBulkSummary = ''
+        },
+        closeDockerImageBulkModal() {
+            this.showDockerImageBulkModal = false
+            this.dockerImageBulkLoading = false
+        },
+        onDockerImageBulkFileSelected(event) {
+            const file = event && event.target && event.target.files && event.target.files[0]
+            if (!file) return
+            this.dockerImageBulkFileName = file.name || ''
+            const reader = new FileReader()
+            reader.onload = () => {
+                this.dockerImageBulkText = String(reader.result || '')
+            }
+            reader.readAsText(file)
+        },
+        parseDockerImagesBulk() {
+            const text = (this.dockerImageBulkText || '').trim()
+            if (!text) return { error: 'paste JSON/CSV or upload a file' }
+            if (this.dockerImageBulkMode === 'json') {
+                try {
+                    const parsed = JSON.parse(text)
+                    const items = Array.isArray(parsed) ? parsed : (parsed.items || parsed.result || [])
+                    if (!Array.isArray(items)) return { error: 'JSON must be an array of images (or {items:[...]})' }
+                    return { items }
+                } catch {
+                    return { error: 'invalid JSON' }
+                }
+            }
+            try {
+                const items = parseCsvRows(text, (row) => ({
+                    id: row.id || row.image_id || '',
+                    label: row.label || '',
+                    repository: row.repository || row.repo || '',
+                    default_tag: row.default_tag || row.tag || 'latest',
+                    tags_text: row.tags || row.tags_text || '',
+                    sort_order: row.sort_order || 0,
+                    is_active: (row.is_active || 'true').toString().toLowerCase() !== 'false',
+                }))
+                return { items }
+            } catch (e) {
+                return { error: e.message || 'invalid CSV' }
+            }
+        },
+        async importDockerImagesBulk() {
+            const built = this.parseDockerImagesBulk()
+            if (built.error) {
+                this.dockerImageBulkSummary = built.error
+                return
+            }
+            this.dockerImageBulkLoading = true
+            this.dockerImageBulkSummary = ''
+            try {
+                const res = await fetch('admin/docker_images/import', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ items: built.items }),
+                })
+                const data = await res.json().catch(() => ({}))
+                const failed = (data.results || []).filter((r) => !r.ok)
+                this.dockerImageBulkSummary = `Imported: ${data.ok || 0} ok, ${data.failed || failed.length} failed`
+                if (failed.length) {
+                    this.dockerImageBulkSummary += '\n' + failed.map((r) => (r.label || r.repository || '?') + ': ' + (r.error || 'failed')).join('\n')
+                }
+                await this.loadAdminDockerImages()
+                await this.loadDockerImages()
+            } finally {
+                this.dockerImageBulkLoading = false
             }
         },
         async createDockerImage() {

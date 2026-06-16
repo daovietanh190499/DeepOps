@@ -1,8 +1,10 @@
 import json
 import re
+import uuid
 
 from django.conf import settings
 from django.core.paginator import Paginator
+from django.db.models import Q
 from django.http import HttpResponse, JsonResponse
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_http_methods
@@ -586,10 +588,31 @@ def admin_workspaces(request, user):
     page = max(1, int(request.GET.get('page', 1)))
     per_page = min(48, max(6, int(request.GET.get('per_page', 12))))
     user_filter = (request.GET.get('user') or '').strip()
+    name_filter = (request.GET.get('name') or '').strip()
+    group_filter = (request.GET.get('group') or '').strip()
 
-    qs = Workspace.objects.select_related('user', 'user_drive').order_by('-updated_at')
+    qs = Workspace.objects.select_related(
+        'user',
+        'user_drive',
+        'user__resource_group_membership__group',
+    ).order_by('-updated_at')
     if user_filter:
         qs = qs.filter(user__username__icontains=user_filter)
+    if name_filter:
+        qs = qs.filter(name__icontains=name_filter)
+    if group_filter:
+        if group_filter == '(none)':
+            qs = qs.filter(user__resource_group_membership__isnull=True)
+        else:
+            # group filter may be UUID (group id) or group name substring
+            try:
+                group_id = uuid.UUID(group_filter)
+            except (TypeError, ValueError):
+                group_id = None
+            if group_id is not None:
+                qs = qs.filter(user__resource_group_membership__group_id=group_id)
+            else:
+                qs = qs.filter(user__resource_group_membership__group__name__icontains=group_filter)
 
     paginator = Paginator(qs, per_page)
     page_obj = paginator.get_page(page)
@@ -685,3 +708,101 @@ def admin_docker_image_detail(request, user, image_id):
             setattr(img, key, value)
         img.save()
     return JsonResponse({'result': img.to_dict()})
+
+
+@auth.verify
+@require_http_methods(['GET'])
+def admin_docker_images_export(request, user):
+    denied = _require_admin(user)
+    if denied:
+        return denied
+    images = DockerImage.objects.all().order_by('sort_order', 'label', 'id')
+    payload = [img.to_dict() for img in images]
+    content = json.dumps(payload, indent=2)
+    response = HttpResponse(content, content_type='application/json')
+    response['Content-Disposition'] = 'attachment; filename="dohub-docker-images.json"'
+    return response
+
+
+@auth.verify
+@csrf_exempt
+@require_http_methods(['POST'])
+def admin_docker_images_import(request, user):
+    """Bulk import docker images from JSON/CSV-parsed items.
+
+    Upsert rules:
+    - If id provided and exists: update that record
+    - Else if repository+label matches an existing record (first match): update it
+    - Else: create a new record
+    """
+    denied = _require_admin(user)
+    if denied:
+        return denied
+    try:
+        data = _parse_body(request)
+    except json.JSONDecodeError:
+        return JsonResponse({'message': 'invalid json'}, status=400)
+
+    items = data.get('items') or []
+    if not isinstance(items, list) or not items:
+        return JsonResponse({'message': 'items required'}, status=400)
+
+    results = []
+    ok = 0
+    for idx, item in enumerate(items):
+        if not isinstance(item, dict):
+            results.append({'index': idx, 'ok': False, 'error': 'invalid item'})
+            continue
+
+        try_id = str(item.get('id') or item.get('image_id') or '').strip()
+        label = str(item.get('label') or '').strip()
+        repo = str(item.get('repository') or item.get('repo') or '').strip()
+        default_tag = str(item.get('default_tag') or item.get('tag') or '').strip()
+        tags_text = str(item.get('tags_text') or item.get('tags') or '').strip()
+        tags = item.get('tags')
+        if isinstance(tags, str) and not tags_text:
+            tags_text = tags
+        sort_order = item.get('sort_order', 0)
+        is_active = item.get('is_active', True)
+
+        merged = {
+            'label': label,
+            'repository': repo,
+            'default_tag': default_tag or 'latest',
+            'tags': tags if isinstance(tags, list) else [],
+            'tags_text': tags_text,
+            'is_active': bool(is_active),
+            'sort_order': int(sort_order or 0),
+        }
+        fields, err = _docker_image_fields(merged)
+        if err:
+            results.append({'index': idx, 'ok': False, 'error': err, 'label': label, 'repository': repo})
+            continue
+
+        img = None
+        if try_id:
+            try:
+                img = DockerImage.objects.filter(id=int(try_id)).first()
+            except ValueError:
+                img = None
+        if not img and repo and label:
+            img = DockerImage.objects.filter(repository=repo, label=label).order_by('id').first()
+
+        if img:
+            for k, v in fields.items():
+                setattr(img, k, v)
+            img.save()
+            out = img.to_dict()
+        else:
+            created = DockerImage.objects.create(**fields)
+            out = created.to_dict()
+
+        ok += 1
+        results.append({'index': idx, 'ok': True, 'result': out})
+
+    return JsonResponse({
+        'message': 'success',
+        'ok': ok,
+        'failed': len(results) - ok,
+        'results': results,
+    })

@@ -1,6 +1,8 @@
 import json
+import uuid
 
 from django.core.paginator import Paginator
+from django.db.models import Q
 from django.http import JsonResponse
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_http_methods
@@ -314,10 +316,29 @@ def admin_drives(request, user):
     page = max(1, int(request.GET.get('page', 1)))
     per_page = min(48, max(6, int(request.GET.get('per_page', 12))))
     user_filter = (request.GET.get('user') or '').strip()
+    name_filter = (request.GET.get('name') or '').strip()
+    group_filter = (request.GET.get('group') or '').strip()
 
-    qs = UserDrive.objects.select_related('user').order_by('-created_at')
+    qs = UserDrive.objects.select_related(
+        'user',
+        'user__resource_group_membership__group',
+    ).order_by('-created_at')
     if user_filter:
         qs = qs.filter(user__username__icontains=user_filter)
+    if name_filter:
+        qs = qs.filter(name__icontains=name_filter)
+    if group_filter:
+        if group_filter == '(none)':
+            qs = qs.filter(user__resource_group_membership__isnull=True)
+        else:
+            try:
+                group_id = uuid.UUID(group_filter)
+            except (TypeError, ValueError):
+                group_id = None
+            if group_id is not None:
+                qs = qs.filter(user__resource_group_membership__group_id=group_id)
+            else:
+                qs = qs.filter(user__resource_group_membership__group__name__icontains=group_filter)
 
     paginator = Paginator(qs, per_page)
     page_obj = paginator.get_page(page)
