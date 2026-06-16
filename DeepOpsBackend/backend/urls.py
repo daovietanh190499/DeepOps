@@ -53,6 +53,7 @@ urlpatterns = [
     path('docker_images', ws_views.docker_images_list, name='docker-images'),
     path('docker_images/mine', ws_views.my_docker_images, name='my-docker-images'),
     path('docker_images/create', ws_views.docker_image_create, name='docker-image-create'),
+    path('docker_images/<int:image_id>', ws_views.docker_image_delete, name='docker-image-delete'),
     path('k8s/nodes', nodes_views.k8s_nodes, name='k8s-nodes'),
     path('workspaces/run', ws_views.workspace_run, name='workspace-run'),
     path('workspaces/bulk_run', ws_views.workspace_bulk_run, name='workspace-bulk-run'),

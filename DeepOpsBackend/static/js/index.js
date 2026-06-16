@@ -666,6 +666,14 @@ const appVue = new Vue({
         deleteModalIsAdmin: false,
         deleteConfirmInput: '',
         deleteInProgress: false,
+        deleteModalUser: null,
+        deleteUserConfirmInput: '',
+        deleteUserInProgress: false,
+        deleteModalImage: null,
+        deleteImageIsAdmin: false,
+        deleteImageInProgress: false,
+        deleteYesNoModal: null,
+        deleteYesNoInProgress: false,
         toastMessage: '',
         toastTimer: null,
         mobileNavOpen: false,
@@ -684,6 +692,10 @@ const appVue = new Vue({
         },
         canConfirmDeleteDrive() {
             return this.deleteDriveConfirmInput.trim().toLowerCase() === 'delete'
+        },
+        canConfirmDeleteUser() {
+            if (!this.deleteModalUser) return false
+            return this.deleteUserConfirmInput.trim() === this.deleteModalUser.username
         },
         canChangePrivileged() {
             return this.is_admin || !!(this.resourceLimits && this.resourceLimits.can_change_privileged)
@@ -2273,14 +2285,22 @@ const appVue = new Vue({
             this.showToast('Option added')
         },
         async deleteCatalogOption(option) {
-            if (!confirm('Delete option ' + option.value + '?')) return
+            this.openDeleteYesNoModal({
+                kind: 'catalog_option',
+                item: option,
+                title: 'Delete catalog option',
+                description: 'Remove option "' + option.value + '" from the platform catalog?',
+            })
+        },
+        async _executeDeleteCatalogOption(option) {
             const res = await fetch('admin/platform/options/' + option.id, { method: 'DELETE' })
             if (res.status !== 200) {
                 this.showToast('Delete failed')
-                return
+                return false
             }
             await this.loadAdminPlatformCatalog()
             this.showToast('Option deleted')
+            return true
         },
         async toggleCatalogOption(option) {
             const res = await fetch('admin/platform/options/' + option.id, {
@@ -2371,15 +2391,23 @@ const appVue = new Vue({
             }
         },
         async deletePlanTemplate(template) {
-            if (!confirm('Delete template ' + template.name + '?')) return
+            this.openDeleteYesNoModal({
+                kind: 'plan_template',
+                item: template,
+                title: 'Delete quick template',
+                description: 'Remove template "' + template.name + '" from the catalog?',
+            })
+        },
+        async _executeDeletePlanTemplate(template) {
             const res = await fetch('admin/platform/templates/' + template.id, { method: 'DELETE' })
             if (res.status !== 200) {
                 this.showToast('Delete failed')
-                return
+                return false
             }
             await this.loadAdminPlatformCatalog()
             await this.loadPlatformCatalog()
             this.showToast('Template deleted')
+            return true
         },
         async togglePlanTemplate(template) {
             const res = await fetch('admin/platform/templates/' + template.id, {
@@ -3041,13 +3069,35 @@ const appVue = new Vue({
         adminAcceptUser(u) {
             fetch('accept_user/' + u.username).then(() => this.loadAdminUsers(this.adminUserPagination.page))
         },
-        adminDeleteUser(u) {
-            if (!confirm('Delete user ' + u.username + '?')) return
-            fetch('delete_user/' + u.username, { method: 'DELETE' }).then(() => {
+        openDeleteUserModal(u) {
+            this.deleteModalUser = u
+            this.deleteUserConfirmInput = ''
+            this.deleteUserInProgress = false
+        },
+        closeDeleteUserModal() {
+            this.deleteModalUser = null
+            this.deleteUserConfirmInput = ''
+            this.deleteUserInProgress = false
+        },
+        async confirmDeleteUser() {
+            if (!this.canConfirmDeleteUser || !this.deleteModalUser) return
+            const u = this.deleteModalUser
+            this.deleteUserInProgress = true
+            try {
+                const res = await fetch('delete_user/' + encodeURIComponent(u.username), { method: 'DELETE' })
+                if (res.status !== 200) {
+                    const data = await res.json().catch(() => ({}))
+                    this.showToast(data.message || 'Delete failed')
+                    return
+                }
+                this.closeDeleteUserModal()
                 const page = this.adminUserPagination.page
                 const next = this.userList.length <= 1 && page > 1 ? page - 1 : page
-                this.loadAdminUsers(next)
-            })
+                await this.loadAdminUsers(next)
+                this.showToast('User deleted')
+            } finally {
+                this.deleteUserInProgress = false
+            }
         },
         adminChangeRole(u, role) {
             fetch('change_role/' + u.username + '/' + role, { method: 'PUT' })
@@ -3127,16 +3177,90 @@ const appVue = new Vue({
                 this.groupFormLoading = false
             }
         },
-        async deleteResourceGroup(g) {
-            if (!confirm('Delete group "' + g.name + '"? Members will lose limits.')) return
+        deleteResourceGroup(g) {
+            this.openDeleteYesNoModal({
+                kind: 'group',
+                item: g,
+                title: 'Delete group',
+                description: 'Delete group "' + g.name + '"? Members will lose limits.',
+            })
+        },
+        async _executeDeleteResourceGroup(g) {
             const res = await fetch('admin/resource_groups/' + g.id + '/update', { method: 'DELETE' })
             if (res.status !== 200) {
                 const data = await res.json().catch(() => ({}))
                 this.showToast(data.message || 'Delete failed')
-                return
+                return false
             }
             await this.loadResourceGroups()
             this.showToast('Group deleted')
+            return true
+        },
+        openDeleteYesNoModal(payload) {
+            this.deleteYesNoModal = payload
+            this.deleteYesNoInProgress = false
+        },
+        closeDeleteYesNoModal() {
+            this.deleteYesNoModal = null
+            this.deleteYesNoInProgress = false
+        },
+        async confirmDeleteYesNo() {
+            if (!this.deleteYesNoModal || this.deleteYesNoInProgress) return
+            const modal = this.deleteYesNoModal
+            this.deleteYesNoInProgress = true
+            try {
+                let ok = false
+                if (modal.kind === 'catalog_option') {
+                    ok = await this._executeDeleteCatalogOption(modal.item)
+                } else if (modal.kind === 'plan_template') {
+                    ok = await this._executeDeletePlanTemplate(modal.item)
+                } else if (modal.kind === 'group') {
+                    ok = await this._executeDeleteResourceGroup(modal.item)
+                }
+                if (ok) this.closeDeleteYesNoModal()
+            } finally {
+                this.deleteYesNoInProgress = false
+            }
+        },
+        openDeleteImageModal(img, isAdmin) {
+            this.deleteModalImage = img
+            this.deleteImageIsAdmin = !!isAdmin
+            this.deleteImageInProgress = false
+        },
+        closeDeleteImageModal() {
+            this.deleteModalImage = null
+            this.deleteImageIsAdmin = false
+            this.deleteImageInProgress = false
+        },
+        async confirmDeleteImage() {
+            if (!this.deleteModalImage || this.deleteImageInProgress) return
+            const img = this.deleteModalImage
+            const isAdmin = this.deleteImageIsAdmin
+            this.deleteImageInProgress = true
+            try {
+                const url = isAdmin
+                    ? 'admin/docker_images/' + img.id
+                    : 'docker_images/' + img.id
+                const res = await fetch(url, { method: 'DELETE' })
+                if (res.status !== 200) {
+                    const data = await res.json().catch(() => ({}))
+                    this.showToast(data.message || 'Delete failed')
+                    return
+                }
+                this.closeDeleteImageModal()
+                if (isAdmin) {
+                    await this.loadAdminDockerImages(this.adminImagePagination.page)
+                    await this.loadDockerImages()
+                } else {
+                    const page = this.myImagePagination.page
+                    const next = this.myDockerImages.length <= 1 && page > 1 ? page - 1 : page
+                    await this.reloadMyImages(next)
+                    await this.loadDockerImages()
+                }
+                this.showToast('Image deleted')
+            } finally {
+                this.deleteImageInProgress = false
+            }
         },
         async openGroupMembersModal(g) {
             const res = await fetch('admin/resource_groups/' + g.id)
@@ -3384,12 +3508,6 @@ const appVue = new Vue({
                 body: JSON.stringify(this.newImage),
             })
             this.newImage = { label: '', repository: '', default_tag: 'latest', tags_text: '' }
-            await this.loadAdminDockerImages(this.adminImagePagination.page)
-            await this.loadDockerImages()
-        },
-        async deleteDockerImage(img) {
-            if (!confirm('Delete image ' + img.label + '?')) return
-            await fetch('admin/docker_images/' + img.id, { method: 'DELETE' })
             await this.loadAdminDockerImages(this.adminImagePagination.page)
             await this.loadDockerImages()
         },

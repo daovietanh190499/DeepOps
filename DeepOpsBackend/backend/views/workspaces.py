@@ -288,6 +288,20 @@ def docker_image_create(request, user):
 
 
 @auth.verify
+@csrf_exempt
+@require_http_methods(['DELETE'])
+def docker_image_delete(request, user, image_id):
+    denied = _require_accepted(user)
+    if denied:
+        return denied
+    img = DockerImage.objects.filter(id=image_id, created_by=user).first()
+    if not img:
+        return JsonResponse({'message': 'not found'}, status=404)
+    img.delete()
+    return JsonResponse({'message': 'success'})
+
+
+@auth.verify
 @require_http_methods(['GET'])
 def my_workspaces(request, user):
     denied = _require_accepted(user)
