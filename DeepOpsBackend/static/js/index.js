@@ -444,6 +444,14 @@ function downloadJson(obj, filename) {
 
 const appVue = new Vue({
     el: '#root',
+    mounted() {
+        const splash = document.getElementById('dohub-boot-splash')
+        if (splash) {
+            splash.style.opacity = '0'
+            splash.style.transition = 'opacity 180ms ease'
+            window.setTimeout(() => splash.remove(), 220)
+        }
+    },
     data: {
         fullEquipmentList: { cpu: [], ram: [], gpu: [], drive_sizes: [] },
         equipmentList: { cpu: [], ram: [], gpu: [] },
