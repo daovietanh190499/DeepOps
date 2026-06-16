@@ -245,3 +245,176 @@ input[type="range"].dohub-range:disabled::-webkit-slider-thumb {
     font-size: 0.875rem;
   }
 }
+
+/* Docker images table (admin + user) */
+.dohub-images-table-wrap {
+  border: 1px solid #e2e8f0;
+  border-radius: 1rem;
+  overflow: hidden;
+  background: #fff;
+}
+
+.dohub-images-table {
+  width: 100%;
+  min-width: 52rem;
+  border-collapse: separate;
+  border-spacing: 0;
+  font-size: 0.875rem;
+}
+
+.dohub-images-table thead th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: #f8fafc;
+  font-size: 0.6875rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: #64748b;
+  padding: 0.75rem 1rem;
+  border-bottom: 1px solid #e2e8f0;
+  white-space: nowrap;
+  text-align: left;
+}
+
+.dohub-images-table tbody td {
+  padding: 0.875rem 1rem;
+  vertical-align: middle;
+  border-bottom: 1px solid #f1f5f9;
+  color: #475569;
+}
+
+.dohub-images-table tbody tr:last-child td {
+  border-bottom: none;
+}
+
+.dohub-images-table tbody tr:nth-child(even):not(.dohub-images-table__row--selected) {
+  background: #fafbfc;
+}
+
+.dohub-images-table tbody tr:hover:not(.dohub-images-table__row--selected) {
+  background: #f1f5f9;
+}
+
+.dohub-images-table__row--selected {
+  background: #eff6ff !important;
+  box-shadow: inset 3px 0 0 #3b82f6;
+}
+
+.dohub-images-table__label {
+  font-weight: 600;
+  color: #0f172a;
+  white-space: nowrap;
+}
+
+.dohub-images-table__mono {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 0.75rem;
+  color: #334155;
+  word-break: break-all;
+}
+
+.dohub-images-table__mono--truncate {
+  display: block;
+  max-width: 11rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.dohub-tag-chip {
+  display: inline-block;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 0.6875rem;
+  line-height: 1.25;
+  padding: 0.15rem 0.45rem;
+  border-radius: 0.375rem;
+  background: #f1f5f9;
+  color: #475569;
+  border: 1px solid #e2e8f0;
+}
+
+.dohub-tag-chip--default {
+  background: #dbeafe;
+  color: #1d4ed8;
+  border-color: #bfdbfe;
+  font-weight: 600;
+}
+
+.dohub-tag-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem;
+  max-width: 16rem;
+}
+
+.dohub-images-table__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.375rem;
+  justify-content: flex-end;
+}
+
+.dohub-images-table__btn {
+  border-radius: 0.375rem;
+  padding: 0.25rem 0.5rem;
+  font-size: 0.6875rem;
+  font-weight: 600;
+  border: 1px solid transparent;
+  white-space: nowrap;
+}
+
+.dohub-images-table__btn--edit {
+  color: #2563eb;
+  border-color: #bfdbfe;
+  background: #eff6ff;
+}
+
+.dohub-images-table__btn--edit:hover {
+  background: #dbeafe;
+}
+
+.dohub-images-table__btn--accept {
+  color: #047857;
+  border-color: #a7f3d0;
+  background: #ecfdf5;
+}
+
+.dohub-images-table__btn--accept:hover {
+  background: #d1fae5;
+}
+
+.dohub-images-table__btn--delete {
+  color: #dc2626;
+  border-color: #fecaca;
+  background: #fef2f2;
+}
+
+.dohub-images-table__btn--delete:hover {
+  background: #fee2e2;
+}
+
+.dohub-images-table__btn--muted {
+  color: #64748b;
+  border-color: #e2e8f0;
+  background: #fff;
+}
+
+.dohub-images-table__badge-active {
+  display: inline-block;
+  font-size: 0.6875rem;
+  font-weight: 600;
+  padding: 0.15rem 0.5rem;
+  border-radius: 9999px;
+}
+
+.dohub-images-table__badge-active--yes {
+  background: #f1f5f9;
+  color: #475569;
+}
+
+.dohub-images-table__badge-active--no {
+  background: #fef2f2;
+  color: #b91c1c;
+}

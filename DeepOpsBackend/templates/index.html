@@ -195,39 +195,51 @@
             <div class="flex flex-wrap items-center gap-3">
                 <input v-model="myImageFilter" @input="reloadMyImages(1)" placeholder="Filter by name…"
                        class="dohub-filter-input rounded-lg border px-3 py-1.5 text-sm">
-                <span class="text-sm text-slate-500" v-text="'Page ' + myImagePagination.page + ' / ' + myImagePagination.pages"></span>
+                <span class="text-sm text-slate-500" v-text="'Page ' + myImagePagination.page + ' / ' + myImagePagination.pages + ' (' + myImagePagination.total + ' images)'"></span>
             </div>
 
             <p v-if="myImagePagination.total===0 && !myImageFilter" class="text-sm text-slate-500">No images submitted yet.</p>
             <p v-else-if="myDockerImages.length===0" class="text-sm text-slate-500">No images match your filter.</p>
 
-            <div class="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
-                <div class="dohub-table-scroll -mx-1 px-1">
-                <table class="w-full min-w-[560px] text-sm">
-                    <thead><tr class="border-b text-left text-slate-500">
-                        <th class="py-2">Label</th><th>Repository</th><th>Default tag</th><th>Tags</th><th>Status</th><th></th>
-                    </tr></thead>
+            <div class="dohub-table-scroll dohub-images-table-wrap">
+                <table class="dohub-images-table">
+                    <thead>
+                        <tr>
+                            <th>Label</th>
+                            <th>Repository</th>
+                            <th>Default tag</th>
+                            <th>Tags</th>
+                            <th>Status</th>
+                            <th class="text-right">Actions</th>
+                        </tr>
+                    </thead>
                     <tbody>
-                        <tr v-for="img in myDockerImages" :key="img.id" class="border-b border-slate-100">
-                            <td class="py-2" v-text="img.label"></td>
-                            <td class="font-mono text-xs" v-text="img.repository"></td>
-                            <td class="font-mono text-xs" v-text="img.default_tag"></td>
-                            <td class="font-mono text-xs" v-text="(img.tags || []).join(', ')"></td>
+                        <tr v-for="img in myDockerImages" :key="img.id">
+                            <td><span class="dohub-images-table__label" v-text="img.label"></span></td>
+                            <td><span class="dohub-images-table__mono dohub-images-table__mono--truncate" :title="img.repository" v-text="img.repository"></span></td>
+                            <td><span class="dohub-tag-chip dohub-tag-chip--default" v-text="img.default_tag"></span></td>
                             <td>
-                                <span class="text-xs font-bold uppercase px-2 py-0.5 rounded-full"
+                                <div class="dohub-tag-list">
+                                    <span v-for="tag in (img.tags || []).slice(0, 5)" :key="tag" class="dohub-tag-chip" v-text="tag"></span>
+                                    <span v-if="(img.tags || []).length > 5" class="dohub-tag-chip text-slate-400" v-text="'+' + ((img.tags || []).length - 5)"></span>
+                                </div>
+                            </td>
+                            <td>
+                                <span class="text-xs font-bold uppercase px-2.5 py-1 rounded-full"
                                       :class="img.is_accepted ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'"
                                       v-text="img.is_accepted ? 'accepted' : 'pending'"></span>
                             </td>
                             <td>
-                                <button type="button" @click="openDeleteImageModal(img, false)"
-                                        class="text-rose-600 text-xs hover:underline">Delete</button>
+                                <div class="dohub-images-table__actions">
+                                    <button type="button" @click="openDeleteImageModal(img, false)"
+                                            class="dohub-images-table__btn dohub-images-table__btn--delete">Delete</button>
+                                </div>
                             </td>
                         </tr>
                     </tbody>
                 </table>
-                </div>
             </div>
-            <div v-if="myImagePagination.pages > 1" class="flex justify-center gap-2">
+            <div class="flex justify-center gap-2">
                 <button :disabled="myImagePagination.page<=1" @click="reloadMyImages(myImagePagination.page-1)"
                         class="rounded-lg border px-4 py-2 text-sm disabled:opacity-40">Prev</button>
                 <button :disabled="myImagePagination.page>=myImagePagination.pages" @click="reloadMyImages(myImagePagination.page+1)"
@@ -962,7 +974,7 @@
                     <option value="accepted">Accepted</option>
                     <option value="pending">Pending</option>
                 </select>
-                <span class="text-sm text-slate-500" v-text="'Page ' + adminImagePagination.page + ' / ' + adminImagePagination.pages"></span>
+                <span class="text-sm text-slate-500" v-text="'Page ' + adminImagePagination.page + ' / ' + adminImagePagination.pages + ' (' + adminImagePagination.total + ' images)'"></span>
             </div>
             <div v-if="bulkSelectedCount('images') > 0"
                  class="flex flex-wrap items-center gap-2 rounded-xl border border-blue-200 bg-blue-50 px-4 py-2.5">
@@ -983,78 +995,107 @@
                 </button>
                 <span>· Right-click row to select · Shift+right-click for range</span>
             </div>
-            <div class="dohub-table-scroll -mx-1 px-1">
-            <table class="w-full min-w-[720px] text-sm">
-                <thead><tr class="border-b text-left text-slate-500">
-                    <th class="py-2">Label</th><th>Repository</th><th>Default tag</th><th>Tags</th><th>Creator</th><th>Status</th><th>Active</th><th></th>
-                </tr></thead>
+            <div class="dohub-table-scroll dohub-images-table-wrap">
+            <table class="dohub-images-table">
+                <thead>
+                    <tr>
+                        <th>Label</th>
+                        <th>Repository</th>
+                        <th>Default tag</th>
+                        <th>Tags</th>
+                        <th>Creator</th>
+                        <th>Status</th>
+                        <th>Active</th>
+                        <th class="text-right">Actions</th>
+                    </tr>
+                </thead>
                 <tbody>
+                    <tr v-if="adminDockerImages.length===0">
+                        <td colspan="8" class="py-10 text-center text-sm text-slate-500">No images match your filters.</td>
+                    </tr>
                     <tr v-for="(img, idx) in adminDockerImages" :key="img.id"
-                        class="border-b border-slate-100 select-none cursor-default"
-                        :class="bulkIsSelected('images', img) ? 'ring-2 ring-inset ring-blue-500 bg-blue-50/60' : ''"
+                        class="select-none cursor-default"
+                        :class="bulkIsSelected('images', img) ? 'dohub-images-table__row--selected' : ''"
                         @contextmenu.prevent="onBulkContextMenu('images', adminDockerImages, idx, $event)">
-                        <td class="py-2">
+                        <td>
                             <template v-if="editingDockerImage && editingDockerImage.id===img.id">
-                                <input v-model="editingDockerImage.label" class="w-full rounded border px-2 py-1 text-sm">
+                                <input v-model="editingDockerImage.label" class="w-full rounded-lg border border-slate-200 px-2 py-1.5 text-sm">
                             </template>
                             <template v-else>
-                                <span v-text="img.label"></span>
+                                <span class="dohub-images-table__label" v-text="img.label"></span>
                             </template>
                         </td>
-                        <td class="font-mono text-xs">
+                        <td>
                             <template v-if="editingDockerImage && editingDockerImage.id===img.id">
-                                <input v-model="editingDockerImage.repository" class="w-full rounded border px-2 py-1 text-xs font-mono">
+                                <input v-model="editingDockerImage.repository" class="w-full rounded-lg border border-slate-200 px-2 py-1.5 text-xs font-mono">
                             </template>
-                            <template v-else><span v-text="img.repository"></span></template>
+                            <template v-else>
+                                <span class="dohub-images-table__mono dohub-images-table__mono--truncate" :title="img.repository" v-text="img.repository"></span>
+                            </template>
                         </td>
-                        <td class="font-mono text-xs">
+                        <td>
                             <template v-if="editingDockerImage && editingDockerImage.id===img.id">
-                                <input v-model="editingDockerImage.default_tag" class="w-full rounded border px-2 py-1 text-xs font-mono">
+                                <input v-model="editingDockerImage.default_tag" class="w-full rounded-lg border border-slate-200 px-2 py-1.5 text-xs font-mono">
                             </template>
-                            <template v-else><span v-text="img.default_tag"></span></template>
+                            <template v-else>
+                                <span class="dohub-tag-chip dohub-tag-chip--default" v-text="img.default_tag"></span>
+                            </template>
                         </td>
-                        <td class="font-mono text-xs">
+                        <td>
                             <template v-if="editingDockerImage && editingDockerImage.id===img.id">
                                 <input v-model="editingDockerImage.tags_text" placeholder="tag1, tag2"
-                                       class="w-full rounded border px-2 py-1 text-xs font-mono">
+                                       class="w-full rounded-lg border border-slate-200 px-2 py-1.5 text-xs font-mono">
                             </template>
-                            <template v-else><span v-text="(img.tags || []).join(', ')"></span></template>
+                            <template v-else>
+                                <div class="dohub-tag-list">
+                                    <span v-for="tag in (img.tags || []).slice(0, 5)" :key="tag"
+                                          class="dohub-tag-chip" v-text="tag"></span>
+                                    <span v-if="(img.tags || []).length > 5" class="dohub-tag-chip text-slate-400"
+                                          v-text="'+' + ((img.tags || []).length - 5)"></span>
+                                </div>
+                            </template>
                         </td>
-                        <td>
+                        <td class="text-center">
                             <img v-if="img.creator" :src="img.creator_image || '/static/img/logo.png'"
-                                 class="h-7 w-7 rounded-full border object-cover" :alt="img.creator" :title="img.creator">
-                            <span v-else class="text-xs text-slate-400">—</span>
+                                 class="mx-auto h-8 w-8 rounded-full border border-slate-200 object-cover shadow-sm" :alt="img.creator" :title="img.creator">
+                            <span v-else class="text-xs text-slate-300">—</span>
                         </td>
                         <td>
-                            <span class="text-xs font-bold uppercase px-2 py-0.5 rounded-full"
+                            <span class="text-xs font-bold uppercase px-2.5 py-1 rounded-full"
                                   :class="img.is_accepted ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'"
                                   v-text="img.is_accepted ? 'accepted' : 'pending'"></span>
                         </td>
                         <td>
                             <template v-if="editingDockerImage && editingDockerImage.id===img.id">
-                                <select v-model="editingDockerImage.is_active" class="rounded border px-2 py-1 text-xs">
+                                <select v-model="editingDockerImage.is_active" class="rounded-lg border border-slate-200 px-2 py-1 text-xs">
                                     <option :value="true">yes</option>
                                     <option :value="false">no</option>
                                 </select>
                             </template>
-                            <template v-else><span v-text="img.is_active ? 'yes' : 'no'"></span></template>
-                        </td>
-                        <td class="whitespace-nowrap space-x-2">
-                            <template v-if="editingDockerImage && editingDockerImage.id===img.id">
-                                <button type="button" @click="saveDockerImage(editingDockerImage)" class="text-blue-600 text-xs hover:underline">Save</button>
-                                <button type="button" @click="cancelEditDockerImage" class="text-slate-500 text-xs hover:underline">Cancel</button>
-                            </template>
                             <template v-else>
-                                <button v-if="!img.is_accepted" type="button" @click="acceptDockerImage(img)" class="text-emerald-600 text-xs hover:underline">Accept</button>
-                                <button type="button" @click="openEditDockerImage(img)" class="text-blue-600 text-xs hover:underline">Edit</button>
-                                <button type="button" @click="openDeleteImageModal(img, true)" class="text-rose-600 text-xs hover:underline">Delete</button>
+                                <span class="dohub-images-table__badge-active"
+                                      :class="img.is_active ? 'dohub-images-table__badge-active--yes' : 'dohub-images-table__badge-active--no'"
+                                      v-text="img.is_active ? 'active' : 'hidden'"></span>
                             </template>
+                        </td>
+                        <td>
+                            <div class="dohub-images-table__actions">
+                                <template v-if="editingDockerImage && editingDockerImage.id===img.id">
+                                    <button type="button" @click="saveDockerImage(editingDockerImage)" class="dohub-images-table__btn dohub-images-table__btn--edit">Save</button>
+                                    <button type="button" @click="cancelEditDockerImage" class="dohub-images-table__btn dohub-images-table__btn--muted">Cancel</button>
+                                </template>
+                                <template v-else>
+                                    <button v-if="!img.is_accepted" type="button" @click="acceptDockerImage(img)" class="dohub-images-table__btn dohub-images-table__btn--accept">Accept</button>
+                                    <button type="button" @click="openEditDockerImage(img)" class="dohub-images-table__btn dohub-images-table__btn--edit">Edit</button>
+                                    <button type="button" @click="openDeleteImageModal(img, true)" class="dohub-images-table__btn dohub-images-table__btn--delete">Delete</button>
+                                </template>
+                            </div>
                         </td>
                     </tr>
                 </tbody>
             </table>
             </div>
-            <div v-if="adminImagePagination.pages > 1" class="flex justify-center gap-2">
+            <div class="flex justify-center gap-2">
                 <button :disabled="adminImagePagination.page<=1" @click="reloadAdminDockerImages(adminImagePagination.page-1)"
                         class="rounded-lg border px-4 py-2 text-sm disabled:opacity-40">Prev</button>
                 <button :disabled="adminImagePagination.page>=adminImagePagination.pages" @click="reloadAdminDockerImages(adminImagePagination.page+1)"
