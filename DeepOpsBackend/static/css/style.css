@@ -162,6 +162,18 @@ input[type="range"].dohub-range:disabled::-webkit-slider-thumb {
   min-width: 0;
 }
 
+/* Bulk-select wrapper around workspace-card must pass grid row height through */
+.dohub-card-grid > *:not(.dohub-workspace-card) {
+  display: flex;
+  flex-direction: column;
+  min-height: 100%;
+}
+
+.dohub-card-grid > * .dohub-workspace-card {
+  flex: 1 1 auto;
+  min-height: 100%;
+}
+
 .dohub-workspace-card {
   width: 100%;
   max-width: 100%;

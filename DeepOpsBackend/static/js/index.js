@@ -674,6 +674,20 @@ const appVue = new Vue({
         deleteImageInProgress: false,
         deleteYesNoModal: null,
         deleteYesNoInProgress: false,
+        bulkSelected: {
+            users: {},
+            drives: {},
+            servers: {},
+            images: {},
+        },
+        bulkLastIndex: {
+            users: -1,
+            drives: -1,
+            servers: -1,
+            images: -1,
+        },
+        bulkActionLoading: false,
+        bulkConfirmModal: null,
         toastMessage: '',
         toastTimer: null,
         mobileNavOpen: false,
@@ -838,6 +852,276 @@ const appVue = new Vue({
         },
         endListLoad() {
             this.listLoading = Math.max(0, this.listLoading - 1)
+        },
+        bulkKey(context, item) {
+            if (context === 'users') return item.username
+            return String(item.id)
+        },
+        clearBulkSelection(context) {
+            if (context) {
+                this.$set(this.bulkSelected, context, {})
+                this.bulkLastIndex[context] = -1
+                return
+            }
+            ;['users', 'drives', 'servers', 'images'].forEach((c) => {
+                this.$set(this.bulkSelected, c, {})
+                this.bulkLastIndex[c] = -1
+            })
+        },
+        bulkIsSelected(context, item) {
+            return !!this.bulkSelected[context][this.bulkKey(context, item)]
+        },
+        bulkSelectedCount(context) {
+            return Object.keys(this.bulkSelected[context] || {}).length
+        },
+        bulkSelectedOnPage(context, items) {
+            return (items || []).filter((item) => this.bulkIsSelected(context, item))
+        },
+        bulkAllOnPageSelected(context, items) {
+            const list = items || []
+            if (!list.length) return false
+            return list.every((item) => this.bulkIsSelected(context, item))
+        },
+        bulkSomeOnPageSelected(context, items) {
+            const list = items || []
+            if (!list.length) return false
+            const n = list.filter((item) => this.bulkIsSelected(context, item)).length
+            return n > 0 && n < list.length
+        },
+        onBulkSelectToggle(context, items, index, event) {
+            if (!items || !items[index]) return
+            const key = this.bulkKey(context, items[index])
+            const willSelect = !this.bulkSelected[context][key]
+            if (event.shiftKey && this.bulkLastIndex[context] >= 0) {
+                const from = Math.min(this.bulkLastIndex[context], index)
+                const to = Math.max(this.bulkLastIndex[context], index)
+                for (let i = from; i <= to; i++) {
+                    const k = this.bulkKey(context, items[i])
+                    if (willSelect) this.$set(this.bulkSelected[context], k, true)
+                    else this.$delete(this.bulkSelected[context], k)
+                }
+            } else if (willSelect) {
+                this.$set(this.bulkSelected[context], key, true)
+            } else {
+                this.$delete(this.bulkSelected[context], key)
+            }
+            this.bulkLastIndex[context] = index
+        },
+        onBulkContextMenu(context, items, index, event) {
+            if (event) event.preventDefault()
+            this.onBulkSelectToggle(context, items, index, event)
+        },
+        bulkToggleAllOnPage(context, items, checked) {
+            ;(items || []).forEach((item) => {
+                const key = this.bulkKey(context, item)
+                if (checked) this.$set(this.bulkSelected[context], key, true)
+                else this.$delete(this.bulkSelected[context], key)
+            })
+        },
+        openBulkConfirmModal(payload) {
+            this.bulkConfirmModal = payload
+        },
+        closeBulkConfirmModal() {
+            this.bulkConfirmModal = null
+        },
+        async confirmBulkAction() {
+            if (!this.bulkConfirmModal || this.bulkActionLoading) return
+            const modal = this.bulkConfirmModal
+            this.bulkActionLoading = true
+            try {
+                await modal.run()
+                this.closeBulkConfirmModal()
+            } finally {
+                this.bulkActionLoading = false
+            }
+        },
+        bulkAcceptUsers() {
+            const users = this.bulkSelectedOnPage('users', this.userList).filter((u) => !u.is_accept)
+            if (!users.length) {
+                this.showToast('No pending users selected')
+                return
+            }
+            this.openBulkConfirmModal({
+                title: 'Accept users',
+                description: `Accept ${users.length} user(s)?`,
+                confirmLabel: 'Yes, accept',
+                confirmClass: 'bg-emerald-600 hover:bg-emerald-700',
+                run: async () => {
+                    const results = await Promise.allSettled(
+                        users.map((u) => fetch('accept_user/' + encodeURIComponent(u.username))),
+                    )
+                    const ok = results.filter((r) => r.status === 'fulfilled' && r.value.status === 200).length
+                    this.showToast(`Accepted ${ok}/${users.length} user(s)`)
+                    this.clearBulkSelection('users')
+                    await this.loadAdminUsers(this.adminUserPagination.page)
+                },
+            })
+        },
+        bulkDeleteUsers() {
+            const users = this.bulkSelectedOnPage('users', this.userList)
+            if (!users.length) return
+            this.openBulkConfirmModal({
+                title: 'Delete users',
+                description: `Permanently delete ${users.length} user(s) and all their servers, drives, and images?`,
+                confirmLabel: 'Yes, delete',
+                run: async () => {
+                    const results = await Promise.allSettled(
+                        users.map((u) => fetch('delete_user/' + encodeURIComponent(u.username), { method: 'DELETE' })),
+                    )
+                    const ok = results.filter((r) => r.status === 'fulfilled' && r.value.status === 200).length
+                    this.showToast(`Deleted ${ok}/${users.length} user(s)`)
+                    this.clearBulkSelection('users')
+                    const page = this.adminUserPagination.page
+                    const next = this.userList.length <= users.length && page > 1 ? page - 1 : page
+                    await this.loadAdminUsers(next)
+                },
+            })
+        },
+        bulkAcceptImages() {
+            const images = this.bulkSelectedOnPage('images', this.adminDockerImages).filter((img) => !img.is_accepted)
+            if (!images.length) {
+                this.showToast('No pending images selected')
+                return
+            }
+            this.openBulkConfirmModal({
+                title: 'Accept images',
+                description: `Accept ${images.length} image(s) for use in servers?`,
+                confirmLabel: 'Yes, accept',
+                confirmClass: 'bg-emerald-600 hover:bg-emerald-700',
+                run: async () => {
+                    const results = await Promise.allSettled(
+                        images.map((img) => fetch('admin/docker_images/' + img.id, {
+                            method: 'PUT',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ is_accepted: true }),
+                        })),
+                    )
+                    const ok = results.filter((r) => r.status === 'fulfilled' && r.value.status === 200).length
+                    this.showToast(`Accepted ${ok}/${images.length} image(s)`)
+                    this.clearBulkSelection('images')
+                    await this.loadAdminDockerImages(this.adminImagePagination.page)
+                    await this.loadDockerImages()
+                },
+            })
+        },
+        bulkDeleteImages() {
+            const images = this.bulkSelectedOnPage('images', this.adminDockerImages)
+            if (!images.length) return
+            this.openBulkConfirmModal({
+                title: 'Delete images',
+                description: `Delete ${images.length} image(s)? This cannot be undone.`,
+                confirmLabel: 'Yes, delete',
+                run: async () => {
+                    const results = await Promise.allSettled(
+                        images.map((img) => fetch('admin/docker_images/' + img.id, { method: 'DELETE' })),
+                    )
+                    const ok = results.filter((r) => r.status === 'fulfilled' && r.value.status === 200).length
+                    this.showToast(`Deleted ${ok}/${images.length} image(s)`)
+                    this.clearBulkSelection('images')
+                    await this.loadAdminDockerImages(this.adminImagePagination.page)
+                    await this.loadDockerImages()
+                },
+            })
+        },
+        bulkDeleteDrives() {
+            const drives = this.bulkSelectedOnPage('drives', this.adminDrives)
+            if (!drives.length) return
+            const inUse = drives.filter((d) => d.in_use).length
+            const deletable = drives.filter((d) => !d.in_use)
+            if (!deletable.length) {
+                this.showToast('Selected drives are in use — stop servers first')
+                return
+            }
+            let desc = `Delete ${deletable.length} drive(s) and their PVCs?`
+            if (inUse) desc += ` (${inUse} in-use drive(s) will be skipped.)`
+            this.openBulkConfirmModal({
+                title: 'Delete drives',
+                description: desc,
+                confirmLabel: 'Yes, delete',
+                run: async () => {
+                    const results = await Promise.allSettled(
+                        deletable.map((d) => fetch('drives/' + d.id, { method: 'DELETE' })),
+                    )
+                    const ok = results.filter((r) => r.status === 'fulfilled' && r.value.status === 200).length
+                    this.showToast(`Deleted ${ok}/${deletable.length} drive(s)`)
+                    this.clearBulkSelection('drives')
+                    await this.reloadAdminDrives(this.adminDrivePagination.page)
+                },
+            })
+        },
+        bulkStartServers() {
+            const servers = this.bulkSelectedOnPage('servers', this.adminWorkspaces).filter((ws) => ws.state === 'offline')
+            if (!servers.length) {
+                this.showToast('No offline servers selected')
+                return
+            }
+            this.openBulkConfirmModal({
+                title: 'Start servers',
+                description: `Start ${servers.length} server(s)?`,
+                confirmLabel: 'Yes, start',
+                confirmClass: 'bg-blue-600 hover:bg-blue-700',
+                run: async () => {
+                    const results = await Promise.allSettled(
+                        servers.map((ws) => fetch('workspaces/' + ws.id + '/start', { method: 'POST' })),
+                    )
+                    const ok = results.filter((r) => r.status === 'fulfilled' && r.value.status === 200).length
+                    this.showToast(`Started ${ok}/${servers.length} server(s)`)
+                    this.clearBulkSelection('servers')
+                    await this.reloadAdminWorkspaces(this.adminPagination.page)
+                    await this.pollStatuses()
+                },
+            })
+        },
+        bulkStopServers() {
+            const servers = this.bulkSelectedOnPage('servers', this.adminWorkspaces).filter((ws) =>
+                ['running', 'pending_start', 'pending_stop'].includes(ws.state),
+            )
+            if (!servers.length) {
+                this.showToast('No running servers selected')
+                return
+            }
+            this.openBulkConfirmModal({
+                title: 'Stop servers',
+                description: `Stop ${servers.length} server(s)?`,
+                confirmLabel: 'Yes, stop',
+                confirmClass: 'bg-amber-600 hover:bg-amber-700',
+                run: async () => {
+                    const results = await Promise.allSettled(
+                        servers.map((ws) => fetch('workspaces/' + ws.id + '/stop', { method: 'POST' })),
+                    )
+                    const ok = results.filter((r) => r.status === 'fulfilled' && r.value.status === 200).length
+                    this.showToast(`Stopped ${ok}/${servers.length} server(s)`)
+                    this.clearBulkSelection('servers')
+                    await this.reloadAdminWorkspaces(this.adminPagination.page)
+                    await this.pollStatuses()
+                },
+            })
+        },
+        bulkDeleteServers() {
+            const servers = this.bulkSelectedOnPage('servers', this.adminWorkspaces)
+            const deletable = servers.filter((ws) => ws.state === 'offline')
+            if (!deletable.length) {
+                this.showToast('Only offline servers can be deleted — stop running servers first')
+                return
+            }
+            let desc = `Delete ${deletable.length} server(s)? This cannot be undone.`
+            if (deletable.length < servers.length) {
+                desc += ` (${servers.length - deletable.length} non-offline server(s) will be skipped.)`
+            }
+            this.openBulkConfirmModal({
+                title: 'Delete servers',
+                description: desc,
+                confirmLabel: 'Yes, delete',
+                run: async () => {
+                    const results = await Promise.allSettled(
+                        deletable.map((ws) => fetch('workspaces/' + ws.id, { method: 'DELETE' })),
+                    )
+                    const ok = results.filter((r) => r.status === 'fulfilled' && r.value.status === 200).length
+                    this.showToast(`Deleted ${ok}/${deletable.length} server(s)`)
+                    this.clearBulkSelection('servers')
+                    await this.reloadAdminWorkspaces(this.adminPagination.page)
+                },
+            })
         },
         setStatusPending(keys, value) {
             ;(keys || []).forEach((key) => {
@@ -2777,6 +3061,7 @@ const appVue = new Vue({
             this.myDrivesAll = data.result || []
         },
         async loadAdminDrives(page) {
+            this.clearBulkSelection('drives')
             const q = new URLSearchParams({ page: page || 1, per_page: 12, user: this.adminDriveFilter })
             if (this.adminDriveNameFilter) q.set('name', this.adminDriveNameFilter)
             if (this.adminDriveGroupFilter && this.adminDriveGroupFilter !== 'all') q.set('group', this.adminDriveGroupFilter)
@@ -3014,6 +3299,7 @@ const appVue = new Vue({
             this.syncResourceUsageCounts()
         },
         async loadAdminWorkspaces(page) {
+            this.clearBulkSelection('servers')
             const q = new URLSearchParams({
                 page: page || 1,
                 per_page: 12,
@@ -3054,6 +3340,7 @@ const appVue = new Vue({
             await this.pollStatuses()
         },
         async loadAdminUsers(page) {
+            this.clearBulkSelection('users')
             const q = new URLSearchParams({
                 page: page || 1,
                 per_page: 10,
@@ -3358,6 +3645,7 @@ const appVue = new Vue({
             }
         },
         async loadAdminDockerImages(page) {
+            this.clearBulkSelection('images')
             const q = new URLSearchParams({
                 page: page || this.adminImagePagination.page || 1,
                 per_page: 12,
