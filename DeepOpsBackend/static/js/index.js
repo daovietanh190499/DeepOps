@@ -589,6 +589,7 @@ const appVue = new Vue({
         directpvInitResult: '',
         showDirectpvInitConfirm: false,
         sshGenerateLoading: false,
+        sshExecShell: 'bash',
         sshPrivateKeyOnce: '',
         sshSyncMessage: '',
         sshSyncError: '',
@@ -1606,6 +1607,7 @@ const appVue = new Vue({
             this.destroyMonitorCharts()
             this.workspaceLogsAutoScroll = true
             this.modalWorkspace = { ...ws, env_vars: { ...(ws.env_vars || {}) } }
+            this.sshExecShell = (ws.exec_shell === 'sh') ? 'sh' : 'bash'
             this.sshPrivateKeyOnce = ''
             this.sshSyncMessage = ''
             this.sshSyncError = ''
@@ -2046,6 +2048,9 @@ const appVue = new Vue({
                 if (k === 'private_key' || k === 'sync') return
                 this.$set(this.modalWorkspace, k, result[k])
             })
+            if (result.exec_shell) {
+                this.sshExecShell = result.exec_shell === 'sh' ? 'sh' : 'bash'
+            }
         },
         async loadWorkspaceSsh(ws) {
             const res = await fetch('workspaces/' + ws.id + '/ssh')
@@ -2111,7 +2116,11 @@ const appVue = new Vue({
             this.sshSyncMessage = ''
             this.sshSyncError = ''
             try {
-                const res = await fetch('workspaces/' + ws.id + '/ssh/generate', { method: 'POST' })
+                const res = await fetch('workspaces/' + ws.id + '/ssh/generate', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ exec_shell: this.sshExecShell === 'sh' ? 'sh' : 'bash' }),
+                })
                 const data = await res.json().catch(() => ({}))
                 const result = data.result || {}
                 this.applySshModalFields(result)

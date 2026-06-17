@@ -130,6 +130,7 @@ def build_spawn_config(workspace) -> dict:
         'ssh_public_key': ssh_record.public_key if ssh_record else '',
         'ws_tunnel_ports': list(workspace.ws_tunnel_ports or []) if isinstance(workspace.ws_tunnel_ports, list) else [],
         'privileged': workspace.privileged,
+        'exec_shell': workspace.exec_shell or 'bash',
         'backup_secret_name': backup_secret_name(workspace),
         'node_hostname': (workspace.node_hostname or '').strip(),
     }
@@ -285,6 +286,7 @@ def _helm_base_cmd(config: dict) -> list[str]:
         '--set', 'sshBridge.enabled=true',
         '--set', 'sshBridge.rbac.create=true',
         '--set-string', f'sshBridge.secretName={config.get("ssh_secret_name") or "placeholder-ssh-secret"}',
+        '--set-string', f'sshBridge.execShell={config.get("exec_shell") or "bash"}',
         '--set-string', f'sshBridge.image.repository={bridge_image}',
         '--set-string', f'sshBridge.image.tag={bridge_tag}',
     ])

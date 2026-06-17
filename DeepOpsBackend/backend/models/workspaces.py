@@ -156,6 +156,18 @@ class Workspace(models.Model):
         default=False,
         help_text='Run code-server container with securityContext.privileged=true',
     )
+    EXEC_SHELL_BASH = 'bash'
+    EXEC_SHELL_SH = 'sh'
+    EXEC_SHELL_CHOICES = (
+        (EXEC_SHELL_BASH, 'bash'),
+        (EXEC_SHELL_SH, 'sh'),
+    )
+    exec_shell = models.CharField(
+        max_length=16,
+        choices=EXEC_SHELL_CHOICES,
+        default=EXEC_SHELL_BASH,
+        help_text='Shell used by SSH bridge kubectl exec (bash or sh)',
+    )
     state = models.CharField(max_length=32, choices=STATE_CHOICES, default=STATE_OFFLINE)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
@@ -213,6 +225,7 @@ class Workspace(models.Model):
             'ws_tunnel_ports': self.ws_tunnel_ports if isinstance(self.ws_tunnel_ports, list) else [],
             'container_command': self.container_command or [],
             'privileged': self.privileged,
+            'exec_shell': self.exec_shell or self.EXEC_SHELL_BASH,
             'state': self.state,
             'hostname': self.hostname,
             'release_name': self.release_name,

@@ -43,8 +43,8 @@ ENV SSH_BIND_HOST=127.0.0.1
 ENV SSH_PORT=2222
 ENV WS_PORT=8022
 ENV WS_PATH_PREFIX=ssh-tunnel
-ENV AUTHORIZED_KEYS=/ssh/authorized_keys
-ENV HOST_KEY=/ssh-data/host_key
+ENV AUTHORIZED_KEYS=/ssh-secrets/authorized_keys
+ENV HOST_KEY=/ssh-secrets/host_key
 ENV SSH_USER=coder
 ENV TARGET_CONTAINER=codehub
 

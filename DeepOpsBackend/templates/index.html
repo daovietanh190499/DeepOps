@@ -1249,6 +1249,14 @@
                             <span v-else v-text="modalWorkspace.has_key ? 'Regenerate key pair' : 'Generate key pair'"></span>
                         </button>
                     </div>
+                    <div>
+                        <label class="text-xs font-medium text-slate-600">Container shell for SSH</label>
+                        <select v-model="sshExecShell" class="mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-sm">
+                            <option value="bash">bash (default)</option>
+                            <option value="sh">sh (minimal images without bash)</option>
+                        </select>
+                        <p class="mt-1 text-xs text-slate-500">Used by the SSH bridge for <code class="rounded bg-white px-1">kubectl exec</code>. Choose <strong>sh</strong> for Alpine or distroless images. Applied when you generate or regenerate keys.</p>
+                    </div>
                     <p class="text-xs text-slate-600">Tunnel SSH through <code class="rounded bg-white px-1">wss://&lt;domain&gt;/&lt;user&gt;/&lt;slug&gt;/ssh-tunnel</code> on the hub domain (port 443). The workspace subdomain is only for the main app.</p>
                     <div class="rounded-lg border border-slate-200 bg-white p-3 text-xs text-slate-600 space-y-1">
                         <p class="font-semibold text-slate-700">Install wstunnel (client)</p>

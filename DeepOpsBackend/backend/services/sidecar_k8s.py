@@ -45,6 +45,7 @@ def build_sidecar_config_data(workspace: Workspace) -> dict[str, str]:
         }),
         'ssh.json': json.dumps({
             'enabled': ssh_enabled,
+            'exec_shell': workspace.exec_shell or Workspace.EXEC_SHELL_BASH,
         }),
         'tunnel.json': json.dumps({
             'enabled': bool(tunnel_ports),

@@ -48,6 +48,8 @@ sshBridge:
   authorizedKeys: ""
   # Main workspace container kubectl exec target
   targetContainer: codehub
+  # Shell for kubectl exec into the main container (bash or sh)
+  execShell: bash
   serviceAccount:
     create: true
     name: ""

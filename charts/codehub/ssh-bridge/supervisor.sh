@@ -13,6 +13,7 @@ HOST_KEY="${HOST_KEY:-/ssh-data/host_key}"
 SSH_PID=""
 WSTUNNEL_PID=""
 ACTIVE=""
+RUNNING_SHELL=""
 
 stop_stack() {
   if [[ -n "${WSTUNNEL_PID}" ]] && kill -0 "${WSTUNNEL_PID}" 2>/dev/null; then
@@ -26,6 +27,7 @@ stop_stack() {
   WSTUNNEL_PID=""
   SSH_PID=""
   ACTIVE=""
+  RUNNING_SHELL=""
 }
 
 keys_ready() {
@@ -38,6 +40,7 @@ keys_ready() {
 
 start_stack() {
   stop_stack
+  export EXEC_SHELL="${DESIRED_SHELL:-bash}"
   python /app/server.py &
   SSH_PID=$!
 
@@ -69,17 +72,26 @@ start_stack() {
     "ws://[::]:${WS_PORT}" &
   WSTUNNEL_PID=$!
   ACTIVE=1
-  echo "ssh-bridge: active on ws :${WS_PORT}"
+  RUNNING_SHELL="${EXEC_SHELL}"
+  echo "ssh-bridge: active on ws :${WS_PORT} (shell=${EXEC_SHELL})"
 }
 
 apply_config() {
   local enabled="false"
+  DESIRED_SHELL="bash"
   if [[ -f "${CONFIG_FILE}" ]]; then
     enabled="$(jq -r '.enabled // false' "${CONFIG_FILE}")"
+    DESIRED_SHELL="$(jq -r '.exec_shell // "bash"' "${CONFIG_FILE}")"
   fi
+  case "${DESIRED_SHELL}" in
+    bash|sh) ;;
+    *) DESIRED_SHELL="bash" ;;
+  esac
 
   if [[ "${enabled}" == "true" ]] && keys_ready; then
     if [[ "${ACTIVE}" != "1" ]]; then
+      start_stack || true
+    elif [[ "${RUNNING_SHELL}" != "${DESIRED_SHELL}" ]]; then
       start_stack || true
     elif ! kill -0 "${SSH_PID}" 2>/dev/null || ! kill -0 "${WSTUNNEL_PID}" 2>/dev/null; then
       start_stack || true

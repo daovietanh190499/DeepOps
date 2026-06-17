@@ -29,15 +29,35 @@ SSH_USER = os.environ.get('SSH_USER', 'coder')
 POD_NAME = os.environ.get('POD_NAME', '')
 POD_NAMESPACE = os.environ.get('POD_NAMESPACE', '')
 TARGET_CONTAINER = os.environ.get('TARGET_CONTAINER', 'codehub')
+EXEC_SHELL = os.environ.get('EXEC_SHELL', 'bash').strip().lower()
+if EXEC_SHELL not in ('bash', 'sh'):
+    EXEC_SHELL = 'bash'
 READ_CHUNK = 65536
 SESSION_MARKER = b'___DOHUB_SSH_EOF___'
 LOGOUT_RE = re.compile(br'logout\r?\n')
-# Remote bash prints "logout" on exit; trap marker is a fallback if stream stalls.
-REMOTE_SHELL = (
-    'stty -echoctl 2>/dev/null; '
-    'trap \'printf "\\n___DOHUB_SSH_EOF___\\n"\' EXIT; '
-    'exec bash -l'
-)
+
+
+def _shell_binary() -> str:
+    return '/bin/bash' if EXEC_SHELL == 'bash' else '/bin/sh'
+
+
+def _remote_interactive_shell() -> str:
+    if EXEC_SHELL == 'bash':
+        exec_cmd = 'exec bash -l'
+    else:
+        exec_cmd = 'exec sh'
+    return (
+        'stty -echoctl 2>/dev/null; '
+        'trap \'printf "\\n___DOHUB_SSH_EOF___\\n"\' EXIT; '
+        f'{exec_cmd}'
+    )
+
+
+def _shell_invocation(command: str) -> list[str]:
+    binary = _shell_binary()
+    if EXEC_SHELL == 'bash':
+        return [binary, '-lc', command]
+    return [binary, '-c', command]
 
 
 class DohubSSHServer(asyncssh.SSHServer):
@@ -151,9 +171,7 @@ async def _run_command(process: asyncssh.SSHServerProcess) -> int:
         '-c',
         TARGET_CONTAINER,
         '--',
-        '/bin/bash',
-        '-lc',
-        process.command,
+        *_shell_invocation(process.command),
         stdin=asyncio.subprocess.PIPE,
         stdout=asyncio.subprocess.PIPE,
         stderr=asyncio.subprocess.PIPE,
@@ -231,9 +249,7 @@ async def _run_interactive_shell(process: asyncssh.SSHServerProcess) -> int:
             '-c',
             TARGET_CONTAINER,
             '--',
-            '/bin/bash',
-            '-lc',
-            REMOTE_SHELL,
+            *_shell_invocation(_remote_interactive_shell()),
         ],
         stdin=slave_fd,
         stdout=slave_fd,
@@ -348,11 +364,12 @@ async def main() -> None:
         encoding=None,
     )
     LOG.info(
-        '%s asyncssh listening on %s:%s user=%s kubectl=%s/%s container=%s',
+        '%s asyncssh listening on %s:%s user=%s shell=%s kubectl=%s/%s container=%s',
         BUILD_ID,
         SSH_BIND_HOST,
         SSH_PORT,
         SSH_USER,
+        EXEC_SHELL,
         POD_NAMESPACE,
         POD_NAME,
         TARGET_CONTAINER,

@@ -135,7 +135,9 @@ spec:
             - name: WS_PATH_PREFIX
               value: {{ .Values.sshBridge.pathPrefix | default "ssh-tunnel" | quote }}
             - name: AUTHORIZED_KEYS
-              value: /ssh/authorized_keys
+              value: /ssh-secrets/authorized_keys
+            - name: HOST_KEY
+              value: /ssh-secrets/host_key
             - name: POD_NAME
               valueFrom:
                 fieldRef:
@@ -146,6 +148,8 @@ spec:
                   fieldPath: metadata.namespace
             - name: TARGET_CONTAINER
               value: {{ .Values.sshBridge.targetContainer | default .Chart.Name | quote }}
+            - name: EXEC_SHELL
+              value: {{ .Values.sshBridge.execShell | default "bash" | quote }}
           resources:
             requests:
               cpu: 50m
@@ -154,13 +158,10 @@ spec:
               cpu: 200m
               memory: 256Mi
           volumeMounts:
+            # Mount the whole secret directory (not subPath files) so keys created
+            # after the pod starts are visible without restarting the workspace.
             - name: ssh-authorized-keys
-              mountPath: /ssh/authorized_keys
-              subPath: authorized_keys
-              readOnly: true
-            - name: ssh-authorized-keys
-              mountPath: /ssh-data/host_key
-              subPath: host_key
+              mountPath: /ssh-secrets
               readOnly: true
             - name: k8s-token
               mountPath: /var/run/secrets/kubernetes.io/serviceaccount

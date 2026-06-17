@@ -179,6 +179,7 @@ def ssh_info_payload(workspace: Workspace) -> dict:
     ready = ssh_keys_ready(record)
     return {
         'has_key': ready,
+        'exec_shell': workspace.exec_shell or Workspace.EXEC_SHELL_BASH,
         'fingerprint': record.fingerprint if record else '',
         'host_key_fingerprint': host_key_fingerprint(record) if record else '',
         'public_key': record.public_key if record else '',
