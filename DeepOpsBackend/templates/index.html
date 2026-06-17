@@ -702,6 +702,12 @@
                 <div class="flex flex-wrap items-center gap-3">
                     <input v-model="adminUserFilter" @input="loadAdminUsers(1)" placeholder="Filter by username or email…"
                            class="dohub-filter-input rounded-lg border px-3 py-1.5 text-sm">
+                    <select v-model="adminUserGroupFilter" @change="loadAdminUsers(1)"
+                            class="dohub-filter-input rounded-lg border px-3 py-1.5 text-sm">
+                        <option value="all">All groups</option>
+                        <option value="(none)">No group</option>
+                        <option v-for="g in resourceGroups" :key="g.id" :value="g.id" v-text="g.name"></option>
+                    </select>
                     <select v-model="adminUserStatus" @change="loadAdminUsers(1)"
                             class="dohub-filter-input rounded-lg border px-3 py-1.5 text-sm">
                         <option value="">All statuses</option>

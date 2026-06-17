@@ -1,5 +1,6 @@
 import time
 
+import uuid
 from django.core.paginator import Paginator
 from django.db.models import Q
 from django.http import HttpResponseRedirect, JsonResponse
@@ -98,6 +99,7 @@ def all_users(request, user):
     per_page = min(48, max(6, int(request.GET.get('per_page', 10))))
     user_filter = (request.GET.get('user') or '').strip()
     status = (request.GET.get('status') or '').strip().lower()
+    group_filter = (request.GET.get('group') or '').strip()
 
     qs = User.objects.select_related('resource_group_membership__group').order_by('username')
     if user_filter:
@@ -106,6 +108,15 @@ def all_users(request, user):
         qs = qs.filter(is_accept=True)
     elif status == 'pending':
         qs = qs.filter(is_accept=False)
+    if group_filter:
+        if group_filter in ('(none)', 'none', 'null'):
+            qs = qs.filter(resource_group_membership__isnull=True)
+        else:
+            try:
+                gid = uuid.UUID(group_filter)
+                qs = qs.filter(resource_group_membership__group_id=gid)
+            except (ValueError, AttributeError):
+                pass
 
     paginator = Paginator(qs, per_page)
     page_obj = paginator.get_page(page)

@@ -635,6 +635,7 @@ const appVue = new Vue({
         userList: [],
         adminUserFilter: '',
         adminUserStatus: '',
+        adminUserGroupFilter: 'all',
         adminUserPagination: { page: 1, pages: 1, total: 0, per_page: 10 },
         adminUsersTab: 'users',
         adminServersTab: 'servers',
@@ -2426,6 +2427,7 @@ const appVue = new Vue({
                 }
             }
             if (menu === 'admin-users') {
+                await this.loadResourceGroups()
                 if (this.adminUsersTab === 'groups') await this.loadResourceGroups()
                 else await this.loadAdminUsers(1)
             }
@@ -2437,6 +2439,10 @@ const appVue = new Vue({
         async init() {
             if (!this.is_login) return
             await this.getCurrentUserState()
+            if (this.is_admin) {
+                // Needed for admin filters (users/drives/servers) on first load.
+                await this.loadResourceGroups()
+            }
             await this.loadPlatformCatalog()
             await this.loadDockerImages()
             await this.loadListsThenPoll(async () => {
@@ -3466,8 +3472,12 @@ const appVue = new Vue({
             this.form.ram = ws.ram || '4G'
             this.form.gpu = ws.gpu || 'none'
             this.form.node_hostname = (ws.node_hostname || '').trim() ? (ws.node_hostname || '') : 'auto'
-            this.form.docker_repository = ws.docker_repository || this.form.docker_repository
-            this.form.docker_tag = ws.docker_tag || this.form.docker_tag
+            // Ensure the Docker image dropdown reflects the existing config.
+            this.applyTemplateDockerSettings({
+                docker_repository: ws.docker_repository,
+                docker_tag: ws.docker_tag,
+                exposed_ports: ws.exposed_ports,
+            })
             this.form.ports_text = (ws.exposed_ports && ws.exposed_ports.length) ? ws.exposed_ports.join(', ') : '8080'
             this.form.command_text = (ws.container_command && ws.container_command.length) ? ws.container_command.join(' ') : ''
             this.form.env_vars = { ...(ws.env_vars || {}) }
@@ -3579,6 +3589,7 @@ const appVue = new Vue({
                 user: this.adminUserFilter,
             })
             if (this.adminUserStatus) q.set('status', this.adminUserStatus)
+            if (this.adminUserGroupFilter && this.adminUserGroupFilter !== 'all') q.set('group', this.adminUserGroupFilter)
             const res = await fetch('all_users?' + q)
             if (res.status !== 200) return
             const data = await res.json()
