@@ -858,7 +858,19 @@
                     <p class="text-xs text-slate-500">Quick templates and selector options used on the Servers page (create server modal).</p>
                     
                     <div class="space-y-2">
-                        <h4 class="text-xs font-semibold uppercase tracking-wide text-slate-500">Quick templates</h4>
+                        <div class="flex flex-wrap items-center justify-between gap-2">
+                            <h4 class="text-xs font-semibold uppercase tracking-wide text-slate-500">Quick templates</h4>
+                            <div class="flex flex-wrap gap-2">
+                                <button type="button" @click="downloadPlanTemplatesJson"
+                                        class="rounded-lg border px-3 py-1.5 text-xs font-semibold hover:bg-slate-50">
+                                    <i class="fa fa-download"></i> Download JSON
+                                </button>
+                                <button type="button" @click="openPlanTemplateBulkModal"
+                                        class="rounded-lg border px-3 py-1.5 text-xs font-semibold hover:bg-slate-50">
+                                    <i class="fa fa-upload"></i> Import (JSON/CSV)
+                                </button>
+                            </div>
+                        </div>
                         <div class="dohub-table-scroll -mx-1 px-1">
                         <table class="w-full min-w-[640px] text-xs">
                             <thead><tr class="border-b text-left text-slate-500">
@@ -905,85 +917,6 @@
                             <code class="rounded bg-slate-100 px-1">&lt;&lt;tmsp&gt;&gt;</code> UTC timestamp (expanded when user picks template).</p>
                     </div>
                     
-                    <div class="grid gap-4 lg:grid-cols-3">
-                        <div v-for="cat in [{id:'cpu',label:'CPU options',placeholder:'0.5'},{id:'ram',label:'RAM options',placeholder:'8G'},{id:'gpu',label:'GPU options (count:MiB)',placeholder:'1:1024'}]"
-                             :key="cat.id" class="space-y-2">
-                            <h4 class="text-xs font-semibold uppercase tracking-wide text-slate-500" v-text="cat.label"></h4>
-                            <div class="flex flex-wrap gap-1.5">
-                                <span v-for="opt in catalogOptionsFor(cat.id)" :key="opt.id"
-                                      class="inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-xs"
-                                      :class="opt.is_active ? 'border-emerald-200 bg-emerald-50 text-emerald-800' : 'border-slate-200 bg-slate-50 text-slate-400 line-through'">
-                                    <span v-text="opt.value + (cat.id==='gpu' && opt.vram_g ? ' ('+opt.vram_g+'G)' : '')"></span>
-                                    <button type="button" @click="toggleCatalogOption(opt)" class="hover:underline" v-text="opt.is_active ? '·' : '+'"></button>
-                                    <button type="button" @click="deleteCatalogOption(opt)" class="text-rose-600">×</button>
-                                </span>
-                            </div>
-                            <div class="flex gap-1">
-                                <input v-model="newCatalogOption.value" :placeholder="cat.placeholder"
-                                       class="flex-1 rounded-lg border px-2 py-1 text-sm font-mono">
-                                <input v-if="cat.id==='gpu'" v-model.number="newCatalogOption.vram_g" type="number" min="0" placeholder="VRAM"
-                                       class="w-16 rounded-lg border px-2 py-1 text-sm">
-                                <button type="button" @click="newCatalogOption.category=cat.id; newCatalogOption.vram_g=cat.id==='gpu'?newCatalogOption.vram_g:0; addCatalogOption()"
-                                        class="rounded-lg border px-2 py-1 text-xs font-semibold hover:bg-slate-50">Add</button>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </template>
-            </template>
-
-            <template v-else>
-                <div class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm space-y-5">
-                    <p class="text-xs text-slate-500">Quick templates and selector options used on the Servers page (create server modal).</p>
-
-                    <div class="space-y-2">
-                        <h4 class="text-xs font-semibold uppercase tracking-wide text-slate-500">Quick templates</h4>
-                        <div class="dohub-table-scroll -mx-1 px-1">
-                        <table class="w-full min-w-[640px] text-xs">
-                            <thead><tr class="border-b text-left text-slate-500">
-                                <th class="py-1 pr-2">Name</th><th>CPU</th><th>RAM</th><th>GPU</th><th>Icon</th><th>Docker</th><th>Ports</th><th>Mounts</th><th>Active</th><th></th>
-                            </tr></thead>
-                            <tbody>
-                                <tr v-for="t in adminPlanTemplates" :key="t.id" class="border-b border-slate-100">
-                                    <td class="py-1.5 pr-2 font-medium" v-text="t.name"></td>
-                                    <td v-text="t.cpu"></td><td v-text="t.ram"></td><td v-text="t.gpu"></td>
-                                    <td class="font-mono" v-text="t.image"></td>
-                                    <td class="font-mono text-[10px]" v-text="(t.docker_repository || '—') + (t.docker_tag ? ':' + t.docker_tag : '')"></td>
-                                    <td class="font-mono" v-text="(t.exposed_ports || []).join(', ') || '8080'"></td>
-                                    <td class="font-mono text-[10px] max-w-[8rem] truncate" :title="(t.drive_mounts || []).map(m => m.mount_path).join(', ')"
-                                        v-text="(t.drive_mounts || []).map(m => m.mount_path).join(', ') || '—'"></td>
-                                    <td><button type="button" @click="togglePlanTemplate(t)" class="hover:underline" v-text="t.is_active ? 'yes' : 'no'"></button></td>
-                                    <td class="space-x-2 whitespace-nowrap">
-                                        <button type="button" @click="openEditPlanTemplateModal(t)" class="text-blue-600 hover:underline">Edit</button>
-                                        <button type="button" @click="deletePlanTemplate(t)" class="text-rose-600 hover:underline">Delete</button>
-                                    </td>
-                                </tr>
-                            </tbody>
-                        </table>
-                        </div>
-                        <div class="grid gap-2 grid-cols-1 sm:grid-cols-6 pt-2">
-                            <input v-model="newPlanTemplate.name" placeholder="Name" class="rounded-lg border px-2 py-1.5 text-sm">
-                            <input v-model.number="newPlanTemplate.cpu" type="number" min="0.1" step="0.1" placeholder="CPU" class="rounded-lg border px-2 py-1.5 text-sm">
-                            <input v-model="newPlanTemplate.ram" placeholder="RAM" class="rounded-lg border px-2 py-1.5 text-sm font-mono">
-                            <input v-model="newPlanTemplate.gpu" placeholder="GPU" class="rounded-lg border px-2 py-1.5 text-sm font-mono">
-                            <input v-model="newPlanTemplate.image" placeholder="icon.png" class="rounded-lg border px-2 py-1.5 text-sm font-mono">
-                            <button type="button" @click="savePlanTemplate" class="rounded-lg bg-blue-600 px-2 py-1.5 text-xs font-semibold text-white">Add template</button>
-                        </div>
-                        <div class="grid gap-2 sm:grid-cols-3">
-                            <input v-model="newPlanTemplate.docker_repository" placeholder="Docker repository" class="rounded-lg border px-2 py-1.5 text-sm font-mono sm:col-span-2">
-                            <input v-model="newPlanTemplate.docker_tag" placeholder="Docker tag" class="rounded-lg border px-2 py-1.5 text-sm font-mono">
-                            <input v-model="newPlanTemplate.ports_text" placeholder="Ports (8080, 3000)" class="rounded-lg border px-2 py-1.5 text-sm font-mono sm:col-span-3">
-                            <input v-model="newPlanTemplate.command_text" placeholder="Container command (space-separated)" class="rounded-lg border px-2 py-1.5 text-sm font-mono sm:col-span-3">
-                        </div>
-                        <input v-model="newPlanTemplate.drive_mounts_text" placeholder="Mount paths (/home/coder, /app/data)"
-                               class="w-full rounded-lg border px-2 py-1.5 text-xs font-mono">
-                        <textarea v-model="newPlanTemplate.env_defaults_text" rows="2" placeholder='{"SECRET_KEY":"secret-<<rdstring:64>>","PWA_APPNAME":"Workspace"}'
-                                  class="w-full rounded-lg border px-2 py-1.5 text-xs font-mono"></textarea>
-                        <p class="text-[10px] text-slate-500">Mount paths are pre-filled when users pick this template (they still choose drives). Env templates: <code class="rounded bg-slate-100 px-1">&lt;&lt;rdstring:N&gt;&gt;</code> random string,
-                            <code class="rounded bg-slate-100 px-1">&lt;&lt;rdnum:N&gt;&gt;</code> random digits,
-                            <code class="rounded bg-slate-100 px-1">&lt;&lt;tmsp&gt;&gt;</code> UTC timestamp (expanded when user picks template).</p>
-                    </div>
-
                     <div class="grid gap-4 lg:grid-cols-3">
                         <div v-for="cat in [{id:'cpu',label:'CPU options',placeholder:'0.5'},{id:'ram',label:'RAM options',placeholder:'8G'},{id:'gpu',label:'GPU options (count:MiB)',placeholder:'1:1024'}]"
                              :key="cat.id" class="space-y-2">
@@ -1686,13 +1619,56 @@
                     </div>
                 </div>
                 <textarea v-model="dockerImageBulkText" rows="10" class="w-full rounded-lg border px-3 py-2 text-xs font-mono"
-                          :placeholder="dockerImageBulkMode==='json' ? '[{\"label\":\"Code Server\",\"repository\":\"codercom/code-server\",\"default_tag\":\"4.89.0-ubuntu\",\"tags\":[\"4.89.0-ubuntu\",\"latest\"],\"is_active\":true,\"sort_order\":0}]' : 'label,repository,default_tag,tags_text,is_active,sort_order\\nCode Server,codercom/code-server,4.89.0-ubuntu,\"4.89.0-ubuntu;latest\",true,0'"></textarea>
+                          :placeholder="dockerImageBulkPlaceholder"></textarea>
                 <p v-if="dockerImageBulkSummary" class="text-xs whitespace-pre-wrap" :class="dockerImageBulkSummary.includes('failed') ? 'text-rose-600' : 'text-slate-600'" v-text="dockerImageBulkSummary"></p>
                 <div class="flex justify-end gap-2">
                     <button type="button" @click="closeDockerImageBulkModal" class="rounded-lg border px-4 py-2 text-sm">Cancel</button>
                     <button type="button" @click="importDockerImagesBulk" :disabled="dockerImageBulkLoading"
                             class="rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700 disabled:opacity-50">
                         <span v-if="dockerImageBulkLoading">Importing…</span>
+                        <span v-else>Import</span>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Bulk import plan templates modal -->
+    <div v-if="showPlanTemplateBulkModal" class="dohub-modal-backdrop fixed inset-0 z-[60] flex justify-center bg-slate-900/50">
+        <div class="dohub-modal-panel w-full max-w-2xl border border-slate-200 bg-white shadow-xl max-h-[90vh] overflow-y-auto sm:mx-auto">
+            <div class="flex items-center justify-between border-b border-slate-100 px-4 py-3 sticky top-0 bg-white z-10 sm:px-5 sm:py-4">
+                <div>
+                    <h3 class="text-lg font-bold text-slate-900">Import quick templates</h3>
+                    <p class="mt-0.5 text-xs text-slate-500">Paste JSON/CSV or upload a file. Existing templates are updated by id, or by name.</p>
+                </div>
+                <button type="button" @click="closePlanTemplateBulkModal" class="text-slate-400 hover:text-slate-700"><i class="fa fa-times text-xl"></i></button>
+            </div>
+            <div class="space-y-4 px-5 py-4">
+                <div class="flex flex-wrap items-center gap-2">
+                    <button type="button" @click="planTemplateBulkMode='json'"
+                            :class="planTemplateBulkMode==='json' ? 'bg-blue-600 text-white' : 'bg-slate-100 text-slate-700'"
+                            class="rounded-lg px-3 py-1.5 text-sm font-semibold">JSON</button>
+                    <button type="button" @click="planTemplateBulkMode='csv'"
+                            :class="planTemplateBulkMode==='csv' ? 'bg-blue-600 text-white' : 'bg-slate-100 text-slate-700'"
+                            class="rounded-lg px-3 py-1.5 text-sm font-semibold">CSV</button>
+                    <div class="ml-auto">
+                        <input ref="planTemplateBulkFileInput" type="file" accept=".json,.csv,application/json,text/csv" class="hidden"
+                               @change="onPlanTemplateBulkFileSelected">
+                        <button type="button" @click="$refs.planTemplateBulkFileInput.click()"
+                                class="rounded-lg border px-3 py-1.5 text-sm font-semibold hover:bg-slate-50">
+                            Choose file
+                        </button>
+                        <span v-if="planTemplateBulkFileName" class="ml-2 text-xs font-mono text-blue-600" v-text="planTemplateBulkFileName"></span>
+                    </div>
+                </div>
+                <textarea v-model="planTemplateBulkText" rows="10" class="w-full rounded-lg border px-3 py-2 text-xs font-mono"
+                          :placeholder="planTemplateBulkPlaceholder"></textarea>
+                <p v-if="planTemplateBulkSummary" class="text-xs whitespace-pre-wrap" :class="planTemplateBulkSummary.includes('failed') ? 'text-rose-600' : 'text-slate-600'" v-text="planTemplateBulkSummary"></p>
+                <div class="flex justify-end gap-2">
+                    <button type="button" @click="closePlanTemplateBulkModal" class="rounded-lg border px-4 py-2 text-sm">Cancel</button>
+                    <button type="button" @click="importPlanTemplatesBulk" :disabled="planTemplateBulkLoading"
+                            class="rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700 disabled:opacity-50">
+                        <span v-if="planTemplateBulkLoading">Importing…</span>
                         <span v-else>Import</span>
                     </button>
                 </div>

@@ -442,6 +442,11 @@ function downloadJson(obj, filename) {
     URL.revokeObjectURL(a.href)
 }
 
+const DOCKER_IMAGE_BULK_PLACEHOLDER_JSON = '[{"label":"Code Server","repository":"codercom/code-server","default_tag":"4.89.0-ubuntu","tags":["4.89.0-ubuntu","latest"],"is_active":true,"sort_order":0}]'
+const DOCKER_IMAGE_BULK_PLACEHOLDER_CSV = 'label,repository,default_tag,tags_text,is_active,sort_order\nCode Server,codercom/code-server,4.89.0-ubuntu,4.89.0-ubuntu;latest,true,0'
+const PLAN_TEMPLATE_BULK_PLACEHOLDER_JSON = '[{"name":"Code Server","cpu":2,"ram":"4G","gpu":"none","image":"logo.png","docker_repository":"codercom/code-server","docker_tag":"4.89.0-ubuntu","exposed_ports":[8080],"container_command":[],"env_defaults":{},"drive_mounts":[{"mount_path":"/home/coder"}],"is_active":true,"sort_order":0}]'
+const PLAN_TEMPLATE_BULK_PLACEHOLDER_CSV = 'name,cpu,ram,gpu,image,docker_repository,docker_tag,exposed_ports,command_text,drive_mounts_text,env_defaults,is_active,sort_order\nCode Server,2,4G,none,logo.png,codercom/code-server,4.89.0-ubuntu,8080,,/home/coder,{},true,0'
+
 const appVue = new Vue({
     el: '#root',
     mounted() {
@@ -522,6 +527,12 @@ const appVue = new Vue({
         dockerImageBulkLoading: false,
         dockerImageBulkSummary: '',
         showDockerImageBulkModal: false,
+        planTemplateBulkMode: 'json',
+        planTemplateBulkText: '',
+        planTemplateBulkFileName: '',
+        planTemplateBulkLoading: false,
+        planTemplateBulkSummary: '',
+        showPlanTemplateBulkModal: false,
         clusterOverview: null,
         clusterLoading: false,
         joinCommand: '',
@@ -823,6 +834,16 @@ const appVue = new Vue({
             if (!this.resourceLimits.limited || !l || !l.max_images) return true
             const count = l.image_count ?? this.myImagePagination.total ?? this.myDockerImages.length
             return count < l.max_images
+        },
+        dockerImageBulkPlaceholder() {
+            return this.dockerImageBulkMode === 'json'
+                ? DOCKER_IMAGE_BULK_PLACEHOLDER_JSON
+                : DOCKER_IMAGE_BULK_PLACEHOLDER_CSV
+        },
+        planTemplateBulkPlaceholder() {
+            return this.planTemplateBulkMode === 'json'
+                ? PLAN_TEMPLATE_BULK_PLACEHOLDER_JSON
+                : PLAN_TEMPLATE_BULK_PLACEHOLDER_CSV
         },
     },
     created() {
@@ -2828,6 +2849,91 @@ const appVue = new Vue({
             }
             await this.loadAdminPlatformCatalog()
             await this.loadPlatformCatalog()
+        },
+        downloadPlanTemplatesJson() {
+            window.location = 'admin/platform/templates/export'
+        },
+        openPlanTemplateBulkModal() {
+            this.showPlanTemplateBulkModal = true
+            this.planTemplateBulkMode = 'json'
+            this.planTemplateBulkText = ''
+            this.planTemplateBulkFileName = ''
+            this.planTemplateBulkSummary = ''
+        },
+        closePlanTemplateBulkModal() {
+            this.showPlanTemplateBulkModal = false
+            this.planTemplateBulkLoading = false
+        },
+        onPlanTemplateBulkFileSelected(event) {
+            const file = event && event.target && event.target.files && event.target.files[0]
+            if (!file) return
+            this.planTemplateBulkFileName = file.name || ''
+            const reader = new FileReader()
+            reader.onload = () => {
+                this.planTemplateBulkText = String(reader.result || '')
+            }
+            reader.readAsText(file)
+        },
+        parsePlanTemplatesBulk() {
+            const text = (this.planTemplateBulkText || '').trim()
+            if (!text) return { error: 'paste JSON/CSV or upload a file' }
+            if (this.planTemplateBulkMode === 'json') {
+                try {
+                    const parsed = JSON.parse(text)
+                    const items = Array.isArray(parsed) ? parsed : (parsed.items || parsed.templates || parsed.result || [])
+                    if (!Array.isArray(items)) return { error: 'JSON must be an array of templates (or {items:[...]})' }
+                    return { items }
+                } catch {
+                    return { error: 'invalid JSON' }
+                }
+            }
+            try {
+                const items = parseCsvRows(text, (row) => ({
+                    id: row.id || row.template_id || '',
+                    name: row.name || '',
+                    cpu: row.cpu || 2,
+                    ram: row.ram || '4G',
+                    gpu: row.gpu || 'none',
+                    image: row.image || 'logo.png',
+                    docker_repository: row.docker_repository || row.repository || '',
+                    docker_tag: row.docker_tag || row.tag || '',
+                    exposed_ports: row.exposed_ports || row.ports_text || row.ports || '8080',
+                    command_text: row.command_text || row.command || '',
+                    drive_mounts_text: row.drive_mounts_text || row.drive_mounts || '',
+                    env_defaults: row.env_defaults || row.env_defaults_text || '{}',
+                    is_active: (row.is_active || 'true').toString().toLowerCase() !== 'false',
+                    sort_order: row.sort_order || 0,
+                }))
+                return { items }
+            } catch (e) {
+                return { error: e.message || 'invalid CSV' }
+            }
+        },
+        async importPlanTemplatesBulk() {
+            const built = this.parsePlanTemplatesBulk()
+            if (built.error) {
+                this.planTemplateBulkSummary = built.error
+                return
+            }
+            this.planTemplateBulkLoading = true
+            this.planTemplateBulkSummary = ''
+            try {
+                const res = await fetch('admin/platform/templates/import', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ items: built.items }),
+                })
+                const data = await res.json().catch(() => ({}))
+                const failed = (data.results || []).filter((r) => !r.ok)
+                this.planTemplateBulkSummary = `Imported: ${data.ok || 0} ok, ${data.failed || failed.length} failed`
+                if (failed.length) {
+                    this.planTemplateBulkSummary += '\n' + failed.map((r) => (r.name || '?') + ': ' + (r.error || 'failed')).join('\n')
+                }
+                await this.loadAdminPlatformCatalog()
+                await this.loadPlatformCatalog()
+            } finally {
+                this.planTemplateBulkLoading = false
+            }
         },
         clampFormToLimits() {
             const eq = this.resourceLimits.equipment

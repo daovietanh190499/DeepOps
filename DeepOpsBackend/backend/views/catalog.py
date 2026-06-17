@@ -1,6 +1,6 @@
 import json
 
-from django.http import JsonResponse
+from django.http import HttpResponse, JsonResponse
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_http_methods
 
@@ -294,3 +294,148 @@ def admin_platform_template_detail(request, user, template_id):
         template.is_active = bool(data['is_active'])
     template.save()
     return JsonResponse({'result': _template_payload(template)})
+
+
+def _parse_env_defaults(raw) -> dict:
+    if isinstance(raw, dict):
+        return raw
+    if isinstance(raw, str) and raw.strip():
+        parsed = json.loads(raw)
+        if not isinstance(parsed, dict):
+            raise ValueError('env_defaults must be a JSON object')
+        return parsed
+    return {}
+
+
+def _template_fields_from_import_item(item: dict) -> tuple[dict | None, str | None]:
+    name = str(item.get('name') or '').strip()
+    if not name:
+        return None, 'name required'
+
+    try:
+        cpu = parse_cpu_value(item.get('cpu', 2) or 2)
+    except ValueError:
+        return None, 'invalid cpu'
+
+    try:
+        env_defaults = _parse_env_defaults(item.get('env_defaults', item.get('env_defaults_text')))
+    except json.JSONDecodeError:
+        return None, 'env_defaults must be valid JSON'
+
+    ports_raw = item.get('exposed_ports', item.get('ports_text', item.get('ports')))
+    try:
+        drive_mounts = _parse_template_drive_mounts(
+            item.get('drive_mounts', item.get('drive_mounts_text')),
+        )
+    except ValueError as exc:
+        return None, str(exc)
+
+    is_active = item.get('is_active', True)
+    if isinstance(is_active, str):
+        is_active = is_active.strip().lower() not in ('false', '0', 'no')
+
+    return {
+        'name': name,
+        'image': (item.get('image') or 'logo.png').strip(),
+        'cpu': cpu,
+        'ram': (item.get('ram') or '4G').strip(),
+        'gpu': (item.get('gpu') or 'none').strip() or 'none',
+        'docker_repository': (item.get('docker_repository') or '').strip(),
+        'docker_tag': (item.get('docker_tag') or '').strip(),
+        'exposed_ports': _parse_exposed_ports(ports_raw),
+        'container_command': _parse_container_command(
+            item.get('container_command', item.get('command_text', item.get('command'))),
+        ),
+        'env_defaults': env_defaults,
+        'drive_mounts': drive_mounts,
+        'sort_order': int(item.get('sort_order', 0) or 0),
+        'is_active': bool(is_active),
+    }, None
+
+
+@auth.verify
+@require_http_methods(['GET'])
+def admin_platform_templates_export(request, user):
+    denied = _require_admin(user)
+    if denied:
+        return denied
+    templates = [
+        _template_payload(row)
+        for row in ServerPlanTemplate.objects.order_by('sort_order', 'name')
+    ]
+    content = json.dumps(templates, indent=2)
+    response = HttpResponse(content, content_type='application/json')
+    response['Content-Disposition'] = 'attachment; filename="dohub-plan-templates.json"'
+    return response
+
+
+@auth.verify
+@csrf_exempt
+@require_http_methods(['POST'])
+def admin_platform_templates_import(request, user):
+    """Bulk import plan templates from JSON/CSV-parsed items.
+
+    Upsert rules:
+    - If id provided and exists: update that record
+    - Else if name matches an existing record: update it
+    - Else: create a new record
+    """
+    denied = _require_admin(user)
+    if denied:
+        return denied
+    try:
+        data = _parse_body(request)
+    except json.JSONDecodeError:
+        return JsonResponse({'message': 'invalid json'}, status=400)
+
+    items = data.get('items') or []
+    if not isinstance(items, list) or not items:
+        return JsonResponse({'message': 'items required'}, status=400)
+
+    results = []
+    ok = 0
+    for idx, item in enumerate(items):
+        if not isinstance(item, dict):
+            results.append({'index': idx, 'ok': False, 'error': 'invalid item'})
+            continue
+
+        fields, err = _template_fields_from_import_item(item)
+        if err:
+            results.append({'index': idx, 'ok': False, 'error': err, 'name': item.get('name')})
+            continue
+
+        template = None
+        try_id = str(item.get('id') or item.get('template_id') or '').strip()
+        if try_id:
+            try:
+                template = ServerPlanTemplate.objects.filter(id=int(try_id)).first()
+            except ValueError:
+                template = None
+        if not template:
+            template = ServerPlanTemplate.objects.filter(name=fields['name']).order_by('id').first()
+
+        if template:
+            new_name = fields['name']
+            if new_name != template.name and ServerPlanTemplate.objects.filter(name=new_name).exclude(id=template.id).exists():
+                results.append({'index': idx, 'ok': False, 'error': 'template already exists', 'name': new_name})
+                continue
+            for key, value in fields.items():
+                setattr(template, key, value)
+            template.save()
+            out = _template_payload(template)
+        else:
+            if ServerPlanTemplate.objects.filter(name=fields['name']).exists():
+                results.append({'index': idx, 'ok': False, 'error': 'template already exists', 'name': fields['name']})
+                continue
+            created = ServerPlanTemplate.objects.create(**fields)
+            out = _template_payload(created)
+
+        ok += 1
+        results.append({'index': idx, 'ok': True, 'result': out})
+
+    return JsonResponse({
+        'message': 'success',
+        'ok': ok,
+        'failed': len(results) - ok,
+        'results': results,
+    })
