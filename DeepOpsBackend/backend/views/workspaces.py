@@ -176,7 +176,7 @@ def _apply_workspace_fields(ws: Workspace, data: dict, owner: User | None = None
         if err:
             return err
     if 'env_vars' in data and isinstance(data['env_vars'], dict):
-        ws.env_vars = expand_env_vars(data['env_vars'])
+        ws.env_vars = expand_env_vars(data['env_vars'], owner.username)
     if 'exposed_ports' in data and isinstance(data['exposed_ports'], list):
         ws.exposed_ports = [int(p) for p in data['exposed_ports']]
     if 'container_command' in data:

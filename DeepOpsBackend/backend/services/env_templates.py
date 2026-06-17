@@ -1,4 +1,4 @@
-"""Expand <<rdstring:N>>, <<rdnum:N>>, <<tmsp>> placeholders in env values."""
+"""Expand <<rdstring:N>>, <<rdnum:N>>, <<tmsp>>, <<username>> placeholders in env values."""
 
 from __future__ import annotations
 
@@ -21,7 +21,7 @@ def _random_digits(length: int) -> str:
     return ''.join(secrets.choice(string.digits) for _ in range(n))
 
 
-def expand_env_template_value(value) -> str:
+def expand_env_template_value(value, username: str = '') -> str:
     text = '' if value is None else str(value)
 
     def repl(match: re.Match[str]) -> str:
@@ -33,20 +33,22 @@ def expand_env_template_value(value) -> str:
             return _random_digits(arg if arg > 0 else 6)
         if kind == 'tmsp':
             return datetime.now(timezone.utc).strftime('%Y-%m-%dT%H:%M:%SZ')
+        if kind == 'username':
+            return username
         return match.group(0)
 
     return ENV_TEMPLATE_RE.sub(repl, text)
 
 
-def expand_env_vars(env: dict | None) -> dict:
+def expand_env_vars(env: dict | None, username: str = '') -> dict:
     if not isinstance(env, dict):
         return {}
     out = {}
     for key, value in env.items():
         if key == 'PASSWORD_PREFIX':
             continue
-        out[str(key)] = expand_env_template_value(value)
+        out[str(key)] = expand_env_template_value(value, username)
     if 'PASSWORD_PREFIX' in env and 'PASSWORD' not in out:
         prefix = str(env.get('PASSWORD_PREFIX', ''))
-        out['PASSWORD'] = expand_env_template_value(f'{prefix}<<rdstring:6>>')
+        out['PASSWORD'] = expand_env_template_value(f'{prefix}<<rdstring:6>>', username)
     return out

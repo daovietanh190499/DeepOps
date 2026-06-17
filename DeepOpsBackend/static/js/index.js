@@ -145,7 +145,7 @@ function randomDigits(len) {
     return s
 }
 
-function expandEnvTemplateString(value) {
+function expandEnvTemplateString(value, username) {
     if (value == null) return ''
     return String(value).replace(ENV_TEMPLATE_RE, (_, kind, arg) => {
         const n = arg ? parseInt(arg, 10) : 0
@@ -156,13 +156,15 @@ function expandEnvTemplateString(value) {
                 return randomDigits(n > 0 ? n : 6)
             case 'tmsp':
                 return new Date().toISOString().replace(/\.\d{3}Z$/, 'Z')
+            case 'username':
+                return username || ''
             default:
                 return `<<${kind}>>`
         }
     })
 }
 
-function resolveTemplateEnv(envDefaults) {
+function resolveTemplateEnv(envDefaults, username) {
     const out = {}
     if (!envDefaults) return out
     const defaults = { ...envDefaults }
@@ -172,7 +174,7 @@ function resolveTemplateEnv(envDefaults) {
     }
     Object.keys(defaults).forEach((k) => {
         if (k === 'PASSWORD_PREFIX') return
-        out[k] = expandEnvTemplateString(defaults[k])
+        out[k] = expandEnvTemplateString(defaults[k], username)
     })
     return out
 }
@@ -3137,7 +3139,7 @@ const appVue = new Vue({
             } else {
                 this.form.command_text = ''
             }
-            const env = resolveTemplateEnv(t.env_defaults)
+            const env = resolveTemplateEnv(t.env_defaults, this.current_user)
             this.form.env_vars = { ...this.form.env_vars, ...env }
             const firstKey = Object.keys(env)[0] || ''
             this.envKey = firstKey
