@@ -6,6 +6,7 @@ from django.views.decorators.http import require_http_methods
 
 from backend.models import PlatformEquipmentOption, ServerPlanTemplate, User
 from backend.services.github_auth import auth
+from backend.services.command_parse import parse_container_command
 from backend.services.platform_catalog import (
     _template_payload,
     admin_catalog_payload,
@@ -59,14 +60,6 @@ def _parse_exposed_ports(raw) -> list[int]:
                 ports.append(port)
         return ports or [8080]
     return [8080]
-
-
-def _parse_container_command(raw) -> list[str]:
-    if isinstance(raw, list):
-        return [str(c).strip() for c in raw if str(c).strip()]
-    if isinstance(raw, str):
-        return [c for c in raw.split() if c]
-    return []
 
 
 def _parse_template_drive_mounts(raw) -> list[dict]:
@@ -230,7 +223,7 @@ def admin_platform_template_create(request, user):
         docker_repository=(data.get('docker_repository') or '').strip(),
         docker_tag=(data.get('docker_tag') or '').strip(),
         exposed_ports=_parse_exposed_ports(data.get('exposed_ports')),
-        container_command=_parse_container_command(
+        container_command=parse_container_command(
             data.get('container_command', data.get('command_text', data.get('command'))),
         ),
         env_defaults=data.get('env_defaults') if isinstance(data.get('env_defaults'), dict) else {},
@@ -276,7 +269,7 @@ def admin_platform_template_detail(request, user, template_id):
     if 'exposed_ports' in data:
         template.exposed_ports = _parse_exposed_ports(data['exposed_ports'])
     if any(key in data for key in ('container_command', 'command_text', 'command')):
-        template.container_command = _parse_container_command(
+        template.container_command = parse_container_command(
             data.get('container_command', data.get('command_text', data.get('command'))),
         )
     if 'env_defaults' in data and isinstance(data['env_defaults'], dict):
@@ -343,7 +336,7 @@ def _template_fields_from_import_item(item: dict) -> tuple[dict | None, str | No
         'docker_repository': (item.get('docker_repository') or '').strip(),
         'docker_tag': (item.get('docker_tag') or '').strip(),
         'exposed_ports': _parse_exposed_ports(ports_raw),
-        'container_command': _parse_container_command(
+        'container_command': parse_container_command(
             item.get('container_command', item.get('command_text', item.get('command'))),
         ),
         'env_defaults': env_defaults,

@@ -297,7 +297,43 @@ function parsePorts(text) {
 
 function parseCommand(text) {
     if (!text || !String(text).trim()) return []
-    return String(text).trim().split(/\s+/)
+    const out = []
+    let cur = ''
+    let quote = null
+    const s = String(text).trim()
+    for (let i = 0; i < s.length; i++) {
+        const ch = s[i]
+        if (quote) {
+            if (ch === quote) {
+                quote = null
+            } else if (ch === '\\' && quote === '"' && i + 1 < s.length) {
+                cur += s[++i]
+            } else {
+                cur += ch
+            }
+        } else if (ch === '"' || ch === "'") {
+            quote = ch
+        } else if (/\s/.test(ch)) {
+            if (cur) {
+                out.push(cur)
+                cur = ''
+            }
+        } else {
+            cur += ch
+        }
+    }
+    if (cur) out.push(cur)
+    return out
+}
+
+function formatCommand(parts) {
+    if (!parts || !parts.length) return ''
+    return parts.map((part) => {
+        const s = String(part)
+        if (!s) return ''
+        if (/[\s'"]/.test(s)) return "'" + s.replace(/'/g, "'\\''") + "'"
+        return s
+    }).filter(Boolean).join(' ')
 }
 
 function resolveEnvDefaults(envDefaults) {
@@ -874,6 +910,10 @@ const appVue = new Vue({
         },
         endListLoad() {
             this.listLoading = Math.max(0, this.listLoading - 1)
+        },
+        formatContainerCommand(cmd) {
+            const text = formatCommand(cmd || [])
+            return text || '(default)'
         },
         bulkKey(context, item) {
             if (context === 'users') return item.username
@@ -2780,7 +2820,7 @@ const appVue = new Vue({
                 docker_repository: template.docker_repository || '',
                 docker_tag: template.docker_tag || '',
                 ports_text: (template.exposed_ports || [8080]).join(', '),
-                command_text: (template.container_command || []).join(' '),
+                command_text: formatCommand(template.container_command || []),
                 drive_mounts_text: formatPlanTemplateDriveMountsText(template.drive_mounts),
                 env_defaults_text: JSON.stringify(template.env_defaults || {}, null, 2),
                 sort_order: template.sort_order || 0,
@@ -3093,7 +3133,7 @@ const appVue = new Vue({
             this.form.name = t.name + ' workspace'
             this.applyTemplateDockerSettings(t)
             if (t.container_command && t.container_command.length) {
-                this.form.command_text = t.container_command.join(' ')
+                this.form.command_text = formatCommand(t.container_command)
             } else {
                 this.form.command_text = ''
             }
@@ -3139,7 +3179,7 @@ const appVue = new Vue({
                 parts.push('ports ' + t.exposed_ports.join(','))
             }
             if (t.container_command && t.container_command.length) {
-                const cmd = t.container_command.join(' ')
+                const cmd = formatCommand(t.container_command)
                 parts.push('cmd ' + (cmd.length > 24 ? cmd.slice(0, 24) + '…' : cmd))
             }
             if (t.drive_mounts && t.drive_mounts.length) {
@@ -3479,7 +3519,9 @@ const appVue = new Vue({
                 exposed_ports: ws.exposed_ports,
             })
             this.form.ports_text = (ws.exposed_ports && ws.exposed_ports.length) ? ws.exposed_ports.join(', ') : '8080'
-            this.form.command_text = (ws.container_command && ws.container_command.length) ? ws.container_command.join(' ') : ''
+            this.form.command_text = (ws.container_command && ws.container_command.length)
+                ? formatCommand(ws.container_command)
+                : ''
             this.form.env_vars = { ...(ws.env_vars || {}) }
             this.form.privileged = !!ws.privileged
             const mounts = Array.isArray(ws.drive_mounts) ? ws.drive_mounts : []

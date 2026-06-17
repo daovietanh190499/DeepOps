@@ -21,6 +21,7 @@ from backend.services.k8s_status import (
 )
 from backend.services.gpu_resources import normalize_gpu_value
 from backend.services.platform_catalog import parse_cpu_value
+from backend.services.command_parse import parse_container_command
 from backend.services.env_templates import expand_env_vars
 from backend.services.resource_limits import can_change_privileged, validate_image_count, validate_server_count, validate_workspace_resources
 from backend.services.ssh_keys import ssh_info_payload
@@ -179,11 +180,7 @@ def _apply_workspace_fields(ws: Workspace, data: dict, owner: User | None = None
     if 'exposed_ports' in data and isinstance(data['exposed_ports'], list):
         ws.exposed_ports = [int(p) for p in data['exposed_ports']]
     if 'container_command' in data:
-        cmd = data['container_command']
-        if isinstance(cmd, str):
-            ws.container_command = [c for c in cmd.split() if c]
-        elif isinstance(cmd, list):
-            ws.container_command = [str(c) for c in cmd]
+        ws.container_command = parse_container_command(data['container_command'])
     if 'privileged' in data:
         requested = bool(data['privileged'])
         if requested and not can_change_privileged(owner):

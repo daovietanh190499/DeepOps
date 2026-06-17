@@ -1229,7 +1229,7 @@
                     <spec-row label="Privileged" :value="modalWorkspace.privileged ? 'yes' : 'no'"></spec-row>
                     <spec-row label="Image" :value="modalWorkspace.docker_repository + ':' + modalWorkspace.docker_tag"></spec-row>
                     <spec-row label="Ports" :value="(modalWorkspace.exposed_ports || []).join(', ') || '8080'"></spec-row>
-                    <spec-row label="Command" :value="(modalWorkspace.container_command || []).join(' ') || '(default)'"></spec-row>
+                    <spec-row label="Command" :value="formatContainerCommand(modalWorkspace.container_command)"></spec-row>
                 </div>
                 <div>
                     <p class="mb-2 font-semibold text-slate-700">Environment variables</p>
