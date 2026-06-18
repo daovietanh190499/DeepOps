@@ -670,6 +670,10 @@ const appVue = new Vue({
         sshNodeTerminal: null,
         sshNodeTerminalFit: null,
         sshNodeTerminalWs: null,
+        sshNodeTerminalPasteTarget: null,
+        sshNodeTerminalPasteHandler: null,
+        sshNodeTerminalClickTarget: null,
+        sshNodeTerminalClickHandler: null,
         sshGenerateLoading: false,
         sshExecShell: 'bash',
         sshPrivateKeyOnce: '',
@@ -1572,6 +1576,16 @@ const appVue = new Vue({
             }
         },
         destroySshNodeTerminal() {
+            if (this.sshNodeTerminalPasteTarget && this.sshNodeTerminalPasteHandler) {
+                this.sshNodeTerminalPasteTarget.removeEventListener('paste', this.sshNodeTerminalPasteHandler)
+            }
+            if (this.sshNodeTerminalClickTarget && this.sshNodeTerminalClickHandler) {
+                this.sshNodeTerminalClickTarget.removeEventListener('click', this.sshNodeTerminalClickHandler)
+            }
+            this.sshNodeTerminalPasteTarget = null
+            this.sshNodeTerminalPasteHandler = null
+            this.sshNodeTerminalClickTarget = null
+            this.sshNodeTerminalClickHandler = null
             if (this.sshNodeTerminalWs) {
                 try { this.sshNodeTerminalWs.close() } catch (e) { /* ignore */ }
                 this.sshNodeTerminalWs = null
@@ -1581,6 +1595,19 @@ const appVue = new Vue({
                 this.sshNodeTerminal = null
             }
             this.sshNodeTerminalFit = null
+        },
+        sshNodeNormalizeInput(text) {
+            return String(text || '').replace(/\r?\n/g, '\r')
+        },
+        sshNodeSendInput(ws, text) {
+            if (!text || !ws || ws.readyState !== WebSocket.OPEN) return
+            ws.send(JSON.stringify({ t: 'i', d: this.sshNodeNormalizeInput(text) }))
+        },
+        sshNodePasteFromClipboard(ws) {
+            if (!navigator.clipboard || !navigator.clipboard.readText) return
+            navigator.clipboard.readText().then((text) => {
+                this.sshNodeSendInput(ws, text)
+            }).catch(() => {})
         },
         initSshNodeTerminal() {
             if (!this.modalSshNode || typeof Terminal === 'undefined') return
@@ -1592,6 +1619,7 @@ const appVue = new Vue({
                 fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace',
                 fontSize: 13,
                 theme: { background: '#0f172a' },
+                allowProposedApi: true,
             })
             let fitAddon = null
             if (typeof FitAddon !== 'undefined' && FitAddon.FitAddon) {
@@ -1600,16 +1628,19 @@ const appVue = new Vue({
             }
             term.open(el)
             if (fitAddon) fitAddon.fit()
+            term.focus()
             const proto = window.location.protocol === 'https:' ? 'wss:' : 'ws:'
             const wsUrl = proto + '//' + window.location.host + '/ws/admin/ssh-nodes/' + this.modalSshNode.id + '/terminal'
             const ws = new WebSocket(wsUrl)
             ws.binaryType = 'arraybuffer'
+            const sendInput = (text) => this.sshNodeSendInput(ws, text)
             ws.onopen = () => {
                 term.writeln('Connecting to ' + this.modalSshNode.username + '@' + this.modalSshNode.host + '…')
                 if (fitAddon) {
                     fitAddon.fit()
                     ws.send(JSON.stringify({ t: 'r', c: term.cols, r: term.rows }))
                 }
+                term.focus()
             }
             ws.onmessage = (ev) => {
                 if (typeof ev.data === 'string') term.write(ev.data)
@@ -1617,14 +1648,51 @@ const appVue = new Vue({
             }
             ws.onclose = () => term.writeln('\r\n\x1b[33m[disconnected]\x1b[0m')
             ws.onerror = () => term.writeln('\r\n\x1b[31m[connection error]\x1b[0m')
-            term.onData((data) => {
-                if (ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify({ t: 'i', d: data }))
-            })
+            term.onData((data) => sendInput(data))
             term.onResize((size) => {
                 if (ws.readyState === WebSocket.OPEN) {
                     ws.send(JSON.stringify({ t: 'r', c: size.cols, r: size.rows }))
                 }
             })
+            term.attachCustomKeyEventHandler((ev) => {
+                if (ev.type !== 'keydown') return true
+                const key = (ev.key || '').toLowerCase()
+                const mod = ev.ctrlKey || ev.metaKey
+                if (!mod) return true
+                if (key === 'v' && !ev.shiftKey && !ev.altKey) {
+                    ev.preventDefault()
+                    this.sshNodePasteFromClipboard(ws)
+                    return false
+                }
+                if (key === 'c' && !ev.shiftKey && !ev.altKey) {
+                    if (term.hasSelection()) {
+                        ev.preventDefault()
+                        const selected = term.getSelection()
+                        if (selected && navigator.clipboard && navigator.clipboard.writeText) {
+                            navigator.clipboard.writeText(selected).catch(() => {})
+                        }
+                        return false
+                    }
+                    ev.preventDefault()
+                    sendInput('\x03')
+                    return false
+                }
+                return true
+            })
+            const pasteHandler = (ev) => {
+                const text = ev.clipboardData && ev.clipboardData.getData('text')
+                if (!text) return
+                ev.preventDefault()
+                sendInput(text)
+            }
+            const pasteTarget = term.textarea || el
+            pasteTarget.addEventListener('paste', pasteHandler)
+            this.sshNodeTerminalPasteTarget = pasteTarget
+            this.sshNodeTerminalPasteHandler = pasteHandler
+            const clickHandler = () => term.focus()
+            el.addEventListener('click', clickHandler)
+            this.sshNodeTerminalClickTarget = el
+            this.sshNodeTerminalClickHandler = clickHandler
             this.sshNodeTerminal = term
             this.sshNodeTerminalFit = fitAddon
             this.sshNodeTerminalWs = ws
