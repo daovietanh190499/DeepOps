@@ -49,4 +49,4 @@ RUN python3 manage.py collectstatic --noinput
 
 EXPOSE 5000
 
-CMD ["/bin/bash", "-c", "python3 manage.py migrate --noinput && gunicorn DeepOpsBackend.wsgi:application --bind 0.0.0.0:5000 --workers 2 --timeout 300"]
+CMD ["/bin/bash", "-c", "python3 manage.py migrate --noinput && uvicorn DeepOpsBackend.asgi:application --host 0.0.0.0 --port 5000 --workers 1 --timeout-keep-alive 300"]

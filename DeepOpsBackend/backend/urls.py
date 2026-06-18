@@ -7,6 +7,7 @@ from backend.views import cluster as cluster_views
 from backend.views import drives as drive_views
 from backend.views import groups as group_views
 from backend.views import ssh as ssh_views
+from backend.views import ssh_nodes as ssh_nodes_views
 from backend.views import tunnel as tunnel_views
 from backend.views import workspaces as ws_views
 from backend.views import nodes as nodes_views
@@ -41,6 +42,13 @@ urlpatterns = [
     path('admin/cluster/directpv/discover/run', cluster_views.admin_directpv_discover_run, name='admin-directpv-discover-run'),
     path('admin/cluster/directpv/discover/save', cluster_views.admin_directpv_discover_save, name='admin-directpv-discover-save'),
     path('admin/cluster/directpv/init', cluster_views.admin_directpv_init, name='admin-directpv-init'),
+    path('admin/ssh-nodes/key', ssh_nodes_views.admin_ssh_node_key, name='admin-ssh-node-key'),
+    path('admin/ssh-nodes/key/regenerate', ssh_nodes_views.admin_ssh_node_key_regenerate, name='admin-ssh-node-key-regenerate'),
+    path('admin/ssh-nodes/refresh', ssh_nodes_views.admin_ssh_nodes_refresh, name='admin-ssh-nodes-refresh'),
+    path('admin/ssh-nodes/create', ssh_nodes_views.admin_ssh_node_create, name='admin-ssh-node-create'),
+    path('admin/ssh-nodes/<uuid:node_id>/refresh', ssh_nodes_views.admin_ssh_node_refresh, name='admin-ssh-node-refresh'),
+    path('admin/ssh-nodes/<uuid:node_id>', ssh_nodes_views.admin_ssh_node_detail, name='admin-ssh-node-detail'),
+    path('admin/ssh-nodes', ssh_nodes_views.admin_ssh_nodes, name='admin-ssh-nodes'),
     path('admin/drives', drive_views.admin_drives, name='admin-drives'),
     path('admin/drives/status', drive_views.admin_drives_status, name='admin-drives-status'),
 

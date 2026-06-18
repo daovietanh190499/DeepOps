@@ -656,6 +656,20 @@ const appVue = new Vue({
         directpvInitError: '',
         directpvInitResult: '',
         showDirectpvInitConfirm: false,
+        sshManagerKey: null,
+        sshNodes: [],
+        sshNodePagination: { page: 1, pages: 1, total: 0, per_page: 12 },
+        sshNodeLoading: false,
+        sshNodeRefreshLoading: {},
+        sshNodePollTimer: null,
+        showSshNodeCreateModal: false,
+        sshNodeForm: { host: '', port: 22, username: 'root', label: '' },
+        sshNodeCreateLoading: false,
+        modalSshNode: null,
+        sshNodeModalTab: 'info',
+        sshNodeTerminal: null,
+        sshNodeTerminalFit: null,
+        sshNodeTerminalWs: null,
         sshGenerateLoading: false,
         sshExecShell: 'bash',
         sshPrivateKeyOnce: '',
@@ -970,6 +984,8 @@ const appVue = new Vue({
     },
     beforeDestroy() {
         this.stopStatusPolling()
+        this.stopSshNodeStatusPolling()
+        this.destroySshNodeTerminal()
         this.stopWorkspaceLogsPoll()
     },
     methods: {
@@ -982,6 +998,17 @@ const appVue = new Vue({
             if (this.statusPollTimer) {
                 clearInterval(this.statusPollTimer)
                 this.statusPollTimer = null
+            }
+        },
+        startSshNodeStatusPolling() {
+            this.stopSshNodeStatusPolling()
+            if (!this.is_login || this.menu !== 'admin-overall') return
+            this.sshNodePollTimer = setInterval(() => this.pollSshNodeStatuses(), 300000)
+        },
+        stopSshNodeStatusPolling() {
+            if (this.sshNodePollTimer) {
+                clearInterval(this.sshNodePollTimer)
+                this.sshNodePollTimer = null
             }
         },
         beginListLoad() {
@@ -1417,6 +1444,190 @@ const appVue = new Vue({
             if (m === 'admin-servers') tasks.push(this.pollAdminWorkspaceStatuses())
             if (m === 'admin-overall') await this.loadClusterOverview()
             await Promise.all(tasks)
+        },
+        sshNodeStatusClass(status) {
+            if (status === 'online') return 'bg-emerald-100 text-emerald-700'
+            if (status === 'offline') return 'bg-rose-100 text-rose-700'
+            if (status === 'checking') return 'bg-amber-100 text-amber-800'
+            return 'bg-slate-100 text-slate-600'
+        },
+        async loadSshManagerKey() {
+            const res = await fetch('admin/ssh-nodes/key')
+            if (res.status !== 200) return
+            const data = await res.json()
+            this.sshManagerKey = data.result || null
+        },
+        async loadSshNodes(page) {
+            this.sshNodeLoading = true
+            try {
+                const q = new URLSearchParams({ page: page || this.sshNodePagination.page || 1, per_page: 12 })
+                const res = await fetch('admin/ssh-nodes?' + q)
+                if (res.status !== 200) return
+                const data = await res.json()
+                this.sshNodes = data.result || []
+                this.sshNodePagination = data.pagination || this.sshNodePagination
+            } finally {
+                this.sshNodeLoading = false
+            }
+        },
+        async pollSshNodeStatuses() {
+            if (this.menu !== 'admin-overall' || !this.sshNodes.length) return
+            const ids = this.sshNodes.map((n) => n.id).filter(Boolean)
+            if (!ids.length) return
+            const res = await fetch('admin/ssh-nodes/refresh', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ ids }),
+            })
+            if (res.status !== 200) return
+            const data = await res.json()
+            const map = {}
+            ;(data.result || []).forEach((row) => { if (row.id) map[row.id] = row })
+            this.sshNodes.forEach((node, idx) => {
+                const fresh = map[node.id]
+                if (fresh) this.$set(this.sshNodes, idx, fresh)
+            })
+            if (this.modalSshNode && map[this.modalSshNode.id]) {
+                this.modalSshNode = map[this.modalSshNode.id]
+            }
+        },
+        async regenerateSshManagerKey() {
+            if (!confirm('Regenerate the SSH manager key? You must update authorized_keys on every SSH node.')) return
+            const res = await fetch('admin/ssh-nodes/key/regenerate', { method: 'POST' })
+            const data = await res.json().catch(() => ({}))
+            if (res.status !== 200) {
+                this.showToast(data.message || 'Failed to regenerate key')
+                return
+            }
+            this.sshManagerKey = data.result || null
+            this.showToast('SSH manager key regenerated')
+        },
+        copySshManagerPublicKey() {
+            const text = (this.sshManagerKey && this.sshManagerKey.public_key) || ''
+            if (!text) return
+            navigator.clipboard.writeText(text).then(() => this.showToast('Public key copied'))
+        },
+        openSshNodeCreateModal() {
+            this.sshNodeForm = { host: '', port: 22, username: 'root', label: '' }
+            this.showSshNodeCreateModal = true
+        },
+        closeSshNodeCreateModal() {
+            this.showSshNodeCreateModal = false
+        },
+        async createSshNode() {
+            this.sshNodeCreateLoading = true
+            try {
+                const res = await fetch('admin/ssh-nodes/create', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(this.sshNodeForm),
+                })
+                const data = await res.json().catch(() => ({}))
+                if (res.status !== 200) {
+                    this.showToast(data.message || 'Failed to create SSH node')
+                    return
+                }
+                this.showSshNodeCreateModal = false
+                await this.loadSshNodes(1)
+                this.showToast('SSH node created')
+            } finally {
+                this.sshNodeCreateLoading = false
+            }
+        },
+        openSshNodeModal(node) {
+            this.modalSshNode = node
+            this.sshNodeModalTab = 'info'
+            this.destroySshNodeTerminal()
+        },
+        closeSshNodeModal() {
+            this.destroySshNodeTerminal()
+            this.modalSshNode = null
+            this.sshNodeModalTab = 'info'
+        },
+        async switchSshNodeModalTab(tab) {
+            this.sshNodeModalTab = tab
+            if (tab === 'terminal') {
+                await this.$nextTick()
+                this.initSshNodeTerminal()
+            } else {
+                this.destroySshNodeTerminal()
+            }
+        },
+        async refreshSshNode(node) {
+            if (!node || !node.id) return
+            this.$set(this.sshNodeRefreshLoading, node.id, true)
+            try {
+                const res = await fetch('admin/ssh-nodes/' + node.id + '/refresh', { method: 'POST' })
+                const data = await res.json().catch(() => ({}))
+                if (res.status !== 200) {
+                    this.showToast(data.message || 'Refresh failed')
+                    return
+                }
+                const fresh = data.result
+                const idx = this.sshNodes.findIndex((n) => n.id === node.id)
+                if (idx >= 0) this.$set(this.sshNodes, idx, fresh)
+                if (this.modalSshNode && this.modalSshNode.id === node.id) this.modalSshNode = fresh
+            } finally {
+                this.$set(this.sshNodeRefreshLoading, node.id, false)
+            }
+        },
+        destroySshNodeTerminal() {
+            if (this.sshNodeTerminalWs) {
+                try { this.sshNodeTerminalWs.close() } catch (e) { /* ignore */ }
+                this.sshNodeTerminalWs = null
+            }
+            if (this.sshNodeTerminal) {
+                try { this.sshNodeTerminal.dispose() } catch (e) { /* ignore */ }
+                this.sshNodeTerminal = null
+            }
+            this.sshNodeTerminalFit = null
+        },
+        initSshNodeTerminal() {
+            if (!this.modalSshNode || typeof Terminal === 'undefined') return
+            const el = this.$refs.sshNodeTerminalEl
+            if (!el) return
+            this.destroySshNodeTerminal()
+            const term = new Terminal({
+                cursorBlink: true,
+                fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace',
+                fontSize: 13,
+                theme: { background: '#0f172a' },
+            })
+            let fitAddon = null
+            if (typeof FitAddon !== 'undefined' && FitAddon.FitAddon) {
+                fitAddon = new FitAddon.FitAddon()
+                term.loadAddon(fitAddon)
+            }
+            term.open(el)
+            if (fitAddon) fitAddon.fit()
+            const proto = window.location.protocol === 'https:' ? 'wss:' : 'ws:'
+            const wsUrl = proto + '//' + window.location.host + '/ws/admin/ssh-nodes/' + this.modalSshNode.id + '/terminal'
+            const ws = new WebSocket(wsUrl)
+            ws.binaryType = 'arraybuffer'
+            ws.onopen = () => {
+                term.writeln('Connecting to ' + this.modalSshNode.username + '@' + this.modalSshNode.host + '…')
+                if (fitAddon) {
+                    fitAddon.fit()
+                    ws.send(JSON.stringify({ t: 'r', c: term.cols, r: term.rows }))
+                }
+            }
+            ws.onmessage = (ev) => {
+                if (typeof ev.data === 'string') term.write(ev.data)
+                else term.write(new Uint8Array(ev.data))
+            }
+            ws.onclose = () => term.writeln('\r\n\x1b[33m[disconnected]\x1b[0m')
+            ws.onerror = () => term.writeln('\r\n\x1b[31m[connection error]\x1b[0m')
+            term.onData((data) => {
+                if (ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify({ t: 'i', d: data }))
+            })
+            term.onResize((size) => {
+                if (ws.readyState === WebSocket.OPEN) {
+                    ws.send(JSON.stringify({ t: 'r', c: size.cols, r: size.rows }))
+                }
+            })
+            this.sshNodeTerminal = term
+            this.sshNodeTerminalFit = fitAddon
+            this.sshNodeTerminalWs = ws
         },
         collectIds(items) {
             const seen = {}
@@ -2523,6 +2734,12 @@ const appVue = new Vue({
             if (menu === 'admin-overall') {
                 await this.loadClusterOverview()
                 await this.loadDirectpvDiscover()
+                await this.loadSshManagerKey()
+                await this.loadSshNodes(1)
+                await this.pollSshNodeStatuses()
+                this.startSshNodeStatusPolling()
+            } else {
+                this.stopSshNodeStatusPolling()
             }
             if (menu === 'admin-drives') {
                 if (this.adminDrivesTab === 'catalog') await this.loadAdminPlatformCatalog()
@@ -2581,6 +2798,12 @@ const appVue = new Vue({
             if (this.menu === 'admin-overall') {
                 await this.loadClusterOverview()
                 await this.loadDirectpvDiscover()
+                await this.loadSshManagerKey()
+                await this.loadSshNodes(1)
+                await this.pollSshNodeStatuses()
+                this.startSshNodeStatusPolling()
+            } else {
+                this.stopSshNodeStatusPolling()
             }
             if (['drives', 'servers', 'admin-drives', 'admin-servers', 'admin-overall'].includes(this.menu)) {
                 this.startStatusPolling()

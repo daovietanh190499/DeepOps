@@ -27,7 +27,7 @@ container:
       export DATABASE_HOST=${DATABASE_HOST:-/mnt/database/dohub.db} &&
       cd /app &&
       python3 manage.py migrate --noinput &&
-      gunicorn DeepOpsBackend.wsgi:application --bind 0.0.0.0:5000 --workers 2 --timeout 120
+      uvicorn DeepOpsBackend.asgi:application --host 0.0.0.0 --port 5000 --workers 1 --timeout-keep-alive 300
 
 extraEnv:
   - name: CODEHUB_CHART_PATH
