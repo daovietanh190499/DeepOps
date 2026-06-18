@@ -338,6 +338,61 @@ function formatCommand(parts) {
     }).filter(Boolean).join(' ')
 }
 
+const SSH_TUNNEL_PORTS = new Set([22, 2222])
+
+function isSshTunnelPort(port) {
+    return SSH_TUNNEL_PORTS.has(Number(port))
+}
+
+function hubWssBaseFromTunnelUrl(wssUrl) {
+    const m = String(wssUrl || '').match(/^(wss:\/\/[^/]+)/)
+    return m ? m[1] : 'wss://<domain>'
+}
+
+function hubHostFromTunnelUrl(wssUrl) {
+    const m = String(wssUrl || '').match(/^wss:\/\/([^/]+)/)
+    return m ? m[1] : '<domain>'
+}
+
+function portTunnelStdioProxyCommand(tunnelInfo, port) {
+    const prefix = tunnelInfo.path_prefix || 'port-tunnel'
+    const hub = hubWssBaseFromTunnelUrl(tunnelInfo.wss_url)
+    return `wstunnel client --log-lvl=warn -P ${prefix} -L stdio://127.0.0.1:${port} ${hub}`
+}
+
+function portTunnelSshHostAlias(slug, port) {
+    return `dohub-${slug}-p${port}`
+}
+
+function portTunnelSshConfig(tunnelInfo, slug, port) {
+    const host = hubHostFromTunnelUrl(tunnelInfo.wss_url)
+    const alias = portTunnelSshHostAlias(slug, port)
+    const proxy = portTunnelStdioProxyCommand(tunnelInfo, port)
+    return [
+        `Host ${alias}`,
+        `    HostName ${host}`,
+        '    User your-user',
+        `    ProxyCommand ${proxy}`,
+        '    StrictHostKeyChecking accept-new',
+    ].join('\n')
+}
+
+function enrichTunnelPortCommands(tunnelInfo, slug) {
+    const workspaceSlug = slug || 'workspace'
+    return (tunnelInfo.port_commands || []).map((entry) => {
+        if (!isSshTunnelPort(entry.port)) {
+            return { ...entry, is_ssh_port: false }
+        }
+        return {
+            ...entry,
+            is_ssh_port: true,
+            proxy_command: portTunnelStdioProxyCommand(tunnelInfo, entry.port),
+            ssh_config: portTunnelSshConfig(tunnelInfo, workspaceSlug, entry.port),
+            ssh_command: `ssh ${portTunnelSshHostAlias(workspaceSlug, entry.port)}`,
+        }
+    })
+}
+
 function resolveEnvDefaults(envDefaults) {
     const out = {}
     if (!envDefaults) return out
@@ -846,6 +901,13 @@ const appVue = new Vue({
             const svc = this.modalWorkspace && this.modalWorkspace.k8s_status
                 && this.modalWorkspace.k8s_status.service
             return (svc && svc.cluster_dns) || '—'
+        },
+        tunnelPortCommandsDisplay() {
+            const slug = (this.modalWorkspace && this.modalWorkspace.slug) || 'workspace'
+            return enrichTunnelPortCommands(this.tunnelInfo, slug)
+        },
+        tunnelSshPorts() {
+            return (this.tunnelInfo.ports || []).filter((p) => isSshTunnelPort(p))
         },
         filteredPlanTemplates() {
             if (!this.resourceLimits.limited) return this.planTemplates
@@ -1528,21 +1590,6 @@ const appVue = new Vue({
             this.toastMessage = msg
             if (this.toastTimer) clearTimeout(this.toastTimer)
             this.toastTimer = setTimeout(() => { this.toastMessage = '' }, 2200)
-        },
-        async copyWorkspaceUrl(ws) {
-            const url = this.workspaceUrl(ws)
-            try {
-                await navigator.clipboard.writeText(url)
-                this.showToast('Service URL copied')
-            } catch {
-                const ta = document.createElement('textarea')
-                ta.value = url
-                document.body.appendChild(ta)
-                ta.select()
-                document.execCommand('copy')
-                document.body.removeChild(ta)
-                this.showToast('Service URL copied')
-            }
         },
         async copyWorkspaceDomain(ws) {
             const domain = (ws && ws.hostname) || ''
