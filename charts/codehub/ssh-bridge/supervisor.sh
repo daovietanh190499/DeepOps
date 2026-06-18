@@ -7,13 +7,16 @@ WS_PORT="${WS_PORT:-8022}"
 WS_PATH_PREFIX="${WS_PATH_PREFIX:-ssh-tunnel}"
 SSH_PORT="${SSH_PORT:-2222}"
 WSTUNNEL_LOG="${WSTUNNEL_LOG:-info}"
-AUTHORIZED_KEYS="${AUTHORIZED_KEYS:-/ssh/authorized_keys}"
-HOST_KEY="${HOST_KEY:-/ssh-data/host_key}"
+AUTHORIZED_KEYS="${AUTHORIZED_KEYS:-/ssh-secrets/authorized_keys}"
+HOST_KEY="${HOST_KEY:-/ssh-secrets/host_key}"
+RUNTIME_AUTH="/tmp/sidecar/ssh/authorized_keys"
+RUNTIME_HOST="/tmp/sidecar/ssh/host_key"
 
 SSH_PID=""
 WSTUNNEL_PID=""
 ACTIVE=""
 RUNNING_SHELL=""
+RUNNING_KEYS_FP=""
 
 stop_stack() {
   if [[ -n "${WSTUNNEL_PID}" ]] && kill -0 "${WSTUNNEL_PID}" 2>/dev/null; then
@@ -30,17 +33,47 @@ stop_stack() {
   RUNNING_SHELL=""
 }
 
+_effective_auth_keys() {
+  if [[ -f "${RUNTIME_AUTH}" ]]; then
+    echo "${RUNTIME_AUTH}"
+  else
+    echo "${AUTHORIZED_KEYS}"
+  fi
+}
+
+_effective_host_key() {
+  if [[ -f "${RUNTIME_HOST}" ]]; then
+    echo "${RUNTIME_HOST}"
+  else
+    echo "${HOST_KEY}"
+  fi
+}
+
+_keys_fingerprint() {
+  local ak hk
+  ak="$(_effective_auth_keys)"
+  hk="$(_effective_host_key)"
+  if [[ -f "${ak}" && -f "${hk}" ]]; then
+    md5sum "${ak}" "${hk}" 2>/dev/null | md5sum | awk '{print $1}'
+  fi
+}
+
 keys_ready() {
-  [[ -f "${AUTHORIZED_KEYS}" ]] || return 1
-  [[ -f "${HOST_KEY}" ]] || return 1
-  grep -qE '^(ssh-ed25519|ssh-rsa|ecdsa-sha2-)' "${AUTHORIZED_KEYS}" || return 1
-  grep -q 'BEGIN OPENSSH PRIVATE KEY' "${HOST_KEY}" || return 1
+  local ak hk
+  ak="$(_effective_auth_keys)"
+  hk="$(_effective_host_key)"
+  [[ -f "${ak}" ]] || return 1
+  [[ -f "${hk}" ]] || return 1
+  grep -qE '^(ssh-ed25519|ssh-rsa|ecdsa-sha2-)' "${ak}" || return 1
+  grep -q 'BEGIN OPENSSH PRIVATE KEY' "${hk}" || return 1
   return 0
 }
 
 start_stack() {
   stop_stack
   export EXEC_SHELL="${DESIRED_SHELL:-bash}"
+  export AUTHORIZED_KEYS="$(_effective_auth_keys)"
+  export HOST_KEY="$(_effective_host_key)"
   python /app/server.py &
   SSH_PID=$!
 
@@ -73,6 +106,7 @@ start_stack() {
   WSTUNNEL_PID=$!
   ACTIVE=1
   RUNNING_SHELL="${EXEC_SHELL}"
+  RUNNING_KEYS_FP="$(_keys_fingerprint)"
   echo "ssh-bridge: active on ws :${WS_PORT} (shell=${EXEC_SHELL})"
 }
 
@@ -89,9 +123,14 @@ apply_config() {
   esac
 
   if [[ "${enabled}" == "true" ]] && keys_ready; then
+    local fp
+    fp="$(_keys_fingerprint)"
     if [[ "${ACTIVE}" != "1" ]]; then
       start_stack || true
     elif [[ "${RUNNING_SHELL}" != "${DESIRED_SHELL}" ]]; then
+      start_stack || true
+    elif [[ -n "${fp}" && "${fp}" != "${RUNNING_KEYS_FP}" ]]; then
+      echo "ssh-bridge: keys changed, restarting stack"
       start_stack || true
     elif ! kill -0 "${SSH_PID}" 2>/dev/null || ! kill -0 "${WSTUNNEL_PID}" 2>/dev/null; then
       start_stack || true
@@ -99,6 +138,7 @@ apply_config() {
   else
     if [[ "${ACTIVE}" == "1" ]]; then
       stop_stack
+      RUNNING_KEYS_FP=""
       echo "ssh-bridge: idle"
     fi
   fi

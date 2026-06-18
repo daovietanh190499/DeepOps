@@ -10,7 +10,13 @@ from backend.models import Workspace
 from backend.services.backup_config import parse_backup_mount_selection
 from backend.services.k8s_env import NAMESPACE
 from backend.services.k8s_status import live_workspace_state, workspace_is_active
-from backend.services.ssh_keys import get_or_none, ssh_keys_ready
+from backend.services.ssh_keys import (
+    ensure_host_key_material,
+    get_or_none,
+    is_valid_openssh_private_key,
+    is_valid_openssh_public_key,
+    ssh_keys_ready,
+)
 from backend.services.tunnel_ports import parse_tunnel_ports
 
 
@@ -122,15 +128,67 @@ def push_port_tunnel_runtime_config(workspace: Workspace, pod: str) -> tuple[str
     return logs, result.returncode
 
 
+def push_ssh_bridge_runtime_keys(
+    workspace: Workspace,
+    pod: str,
+    *,
+    public_key: str,
+    host_key: str,
+) -> tuple[str, int]:
+    """Push SSH keys into ssh-bridge immediately (secret volume mounts can lag)."""
+    if not is_valid_openssh_public_key(public_key):
+        return 'invalid authorized_keys public key', 1
+    if not is_valid_openssh_private_key(host_key):
+        return 'invalid ssh host private key', 1
+
+    auth_content = public_key.strip() + '\n'
+    host_content = host_key.strip() + '\n'
+    shell_cmd = '; '.join([
+        'mkdir -p /tmp/sidecar/ssh',
+        f'printf %s {shlex.quote(auth_content)} > /tmp/sidecar/ssh/authorized_keys',
+        f'printf %s {shlex.quote(host_content)} > /tmp/sidecar/ssh/host_key',
+        'chmod 600 /tmp/sidecar/ssh/authorized_keys /tmp/sidecar/ssh/host_key',
+        'kill -HUP 1',
+    ])
+    result = subprocess.run(
+        [
+            'kubectl', 'exec', pod,
+            '-n', NAMESPACE,
+            '-c', 'ssh-bridge',
+            '--', 'sh', '-c', shell_cmd,
+        ],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    logs = ((result.stdout or '') + (result.stderr or '')).strip()
+    return logs, result.returncode
+
+
 def reload_sidecar_supervisors(workspace: Workspace) -> dict:
     """Signal sidecar supervisors to reload ConfigMap state immediately."""
     pod = _resolve_workspace_pod(workspace)
     if not pod:
         return {'ok': False, 'error': 'no running pod found'}
 
-    containers = ('backup-sidecar', 'ssh-bridge', 'monitor-sidecar')
     logs: list[str] = []
     failures = 0
+
+    ssh_record = get_or_none(workspace)
+    if ssh_record and ssh_keys_ready(ssh_record):
+        host_key = ensure_host_key_material(ssh_record)
+        ssh_logs, ssh_code = push_ssh_bridge_runtime_keys(
+            workspace,
+            pod,
+            public_key=ssh_record.public_key,
+            host_key=host_key,
+        )
+        if ssh_logs:
+            logs.append(f'ssh-bridge: {ssh_logs}')
+        if ssh_code != 0:
+            failures += 1
+
+    containers = ('backup-sidecar', 'ssh-bridge', 'monitor-sidecar')
     for container in containers:
         # Minimal images lack /bin/kill; use shell builtin instead.
         result = subprocess.run(

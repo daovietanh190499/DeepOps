@@ -671,6 +671,7 @@
                      @contextmenu.prevent="onBulkContextMenu('servers', myWorkspaces, idx, $event)">
                     <workspace-card :ws="ws"
                                     :disabled="statusPending.myWorkspaces"
+                                    :action-loading="workspaceActionLoading[ws.id] || ''"
                                     @detail="openWorkspaceModal"
                                     @start="startWorkspace" @stop="stopWorkspace" @open="openWorkspace"
                                     @export="exportWorkspace" @delete="ws => openDeleteModal(ws, false)"></workspace-card>
@@ -846,6 +847,7 @@
                          @contextmenu.prevent="onBulkContextMenu('servers', adminWorkspaces, idx, $event)">
                         <workspace-card :ws="ws" :show-owner="true"
                                     :disabled="statusPending.adminWorkspaces"
+                                    :action-loading="workspaceActionLoading[ws.id] || ''"
                                     @detail="openWorkspaceModal"
                                     @start="startWorkspace" @stop="stopWorkspace" @open="openWorkspace"
                                     @export="exportWorkspace" @delete="ws => openDeleteModal(ws, true)"></workspace-card>

@@ -19,7 +19,7 @@ from pathlib import Path
 import asyncssh
 
 LOG = logging.getLogger('ssh_bridge')
-BUILD_ID = 'ssh-bridge-2026-06-11-pty-close'
+BUILD_ID = 'ssh-bridge-2026-06-17-port-forward'
 
 SSH_BIND_HOST = os.environ.get('SSH_BIND_HOST', '127.0.0.1')
 SSH_PORT = int(os.environ.get('SSH_PORT', '2222'))
@@ -32,9 +32,16 @@ TARGET_CONTAINER = os.environ.get('TARGET_CONTAINER', 'codehub')
 EXEC_SHELL = os.environ.get('EXEC_SHELL', 'bash').strip().lower()
 if EXEC_SHELL not in ('bash', 'sh'):
     EXEC_SHELL = 'bash'
+SSH_PORT_FORWARD = os.environ.get('SSH_PORT_FORWARD', 'true').strip().lower() not in (
+    '0', 'false', 'no', 'off',
+)
+SSH_FORWARD_LOCAL_ONLY = os.environ.get('SSH_FORWARD_LOCAL_ONLY', 'true').strip().lower() not in (
+    '0', 'false', 'no', 'off',
+)
 READ_CHUNK = 65536
 SESSION_MARKER = b'___DOHUB_SSH_EOF___'
 LOGOUT_RE = re.compile(br'logout\r?\n')
+_LOOPBACK_HOSTS = frozenset({'127.0.0.1', 'localhost', '::1'})
 
 
 def _shell_binary() -> str:
@@ -60,7 +67,24 @@ def _shell_invocation(command: str) -> list[str]:
     return [binary, '-c', command]
 
 
+def _is_loopback_host(host: str) -> bool:
+    """True when dest is reachable inside the pod network namespace."""
+    normalized = (host or '').strip().lower()
+    if not normalized or normalized in _LOOPBACK_HOSTS:
+        return True
+    if normalized.startswith('127.'):
+        return True
+    return False
+
+
 class DohubSSHServer(asyncssh.SSHServer):
+    def connection_made(self, conn) -> None:
+        self._conn = conn
+        LOG.info('SSH connection from %s', conn.get_extra_info('peername'))
+
+    def auth_completed(self) -> None:
+        LOG.info('SSH authentication successful')
+
     def begin_auth(self, username: str) -> bool:
         return username == SSH_USER
 
@@ -81,6 +105,43 @@ class DohubSSHServer(asyncssh.SSHServer):
             if allowed == key:
                 return True
         return False
+
+    def connection_requested(
+        self,
+        dest_host: str,
+        dest_port: int,
+        orig_host: str,
+        orig_port: int,
+    ):
+        """Allow SSH local port forwarding (-L) into the pod network."""
+        if not SSH_PORT_FORWARD:
+            LOG.warning(
+                'local forward denied (disabled): %s:%s -> %s:%s',
+                orig_host, orig_port, dest_host, dest_port,
+            )
+            return False
+        if SSH_FORWARD_LOCAL_ONLY and not _is_loopback_host(dest_host):
+            LOG.warning(
+                'local forward denied (non-loopback dest): %s:%s -> %s:%s',
+                orig_host, orig_port, dest_host, dest_port,
+            )
+            return False
+        LOG.info(
+            'local forward (-L) %s:%s -> %s:%s',
+            orig_host, orig_port, dest_host, dest_port,
+        )
+        return True
+
+    def server_requested(self, listen_host: str, listen_port: int):
+        """Allow SSH remote port forwarding (-R) on the pod network."""
+        if not SSH_PORT_FORWARD:
+            LOG.warning(
+                'remote forward denied (disabled): listen %s:%s',
+                listen_host, listen_port,
+            )
+            return False
+        LOG.info('remote forward (-R) listen on %s:%s', listen_host, listen_port)
+        return True
 
 
 def _kubectl_exec_base() -> list[str]:
@@ -364,12 +425,13 @@ async def main() -> None:
         encoding=None,
     )
     LOG.info(
-        '%s asyncssh listening on %s:%s user=%s shell=%s kubectl=%s/%s container=%s',
+        '%s asyncssh listening on %s:%s user=%s shell=%s forward=%s kubectl=%s/%s container=%s',
         BUILD_ID,
         SSH_BIND_HOST,
         SSH_PORT,
         SSH_USER,
         EXEC_SHELL,
+        SSH_PORT_FORWARD,
         POD_NAMESPACE,
         POD_NAME,
         TARGET_CONTAINER,

@@ -88,27 +88,8 @@ def sync_ssh_secret_for_workspace(workspace: Workspace) -> tuple[str, int]:
     )
 
 
-def restart_workspace_deployment(workspace: Workspace) -> tuple[str, int]:
-    """Restart the workspace pod so secret volume mounts are rebound."""
-    release = (workspace.release_name or '').strip()
-    if not release:
-        return 'missing release name', 1
-    result = subprocess.run(
-        [
-            'kubectl', 'rollout', 'restart', 'deployment',
-            '-n', NAMESPACE,
-            '-l', f'app.kubernetes.io/instance={release}',
-        ],
-        capture_output=True,
-        text=True,
-        check=False,
-    )
-    logs = ((result.stdout or '') + (result.stderr or '')).strip()
-    return logs, result.returncode
-
-
 def sync_workspace_ssh_to_cluster(workspace, *, public_key: str, respawn: bool = True) -> dict:
-    """Apply secret and update ssh-bridge sidecar via ConfigMap (no Helm redeploy)."""
+    """Apply secret and update ssh-bridge sidecar via ConfigMap (no pod restart)."""
     record = get_or_none(workspace)
     secret_name = ssh_secret_name(workspace)
     host_key = ensure_host_key_material(record) if record else ''
@@ -124,21 +105,12 @@ def sync_workspace_ssh_to_cluster(workspace, *, public_key: str, respawn: bool =
         out['message'] = 'SSH keys saved — start the server to enable SSH.'
         return out
 
-    sync = sync_workspace_sidecars(workspace, reload=False)
+    sync = sync_workspace_sidecars(workspace, reload=True)
     out.update(sync)
-    if not sync.get('ok'):
-        out['ok'] = False
-        out['restarted'] = False
-        out['error'] = sync.get('error') or 'failed to update ssh sidecar config'
-        return out
-
-    restart_logs, restart_code = restart_workspace_deployment(workspace)
-    out['restart_logs'] = restart_logs
-    out['restart_code'] = restart_code
-    out['restarted'] = restart_code == 0
-    out['ok'] = restart_code == 0
-    if restart_code == 0:
-        out['message'] = 'SSH enabled — workspace restarted to load SSH keys.'
+    out['ok'] = sync.get('ok', False)
+    out['restarted'] = False
+    if sync.get('ok'):
+        out['message'] = 'SSH enabled — sidecar updated without restarting the workspace.'
     else:
-        out['error'] = restart_logs or 'failed to restart workspace for SSH'
+        out['error'] = sync.get('error') or 'failed to update ssh sidecar'
     return out

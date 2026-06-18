@@ -46,7 +46,12 @@ Vue.component('user-row', {
 })
 
 Vue.component('workspace-card', {
-    props: ['ws', 'showOwner', 'disabled'],
+    props: {
+        ws: { type: Object, required: true },
+        showOwner: { type: Boolean, default: false },
+        disabled: { type: Boolean, default: false },
+        actionLoading: { type: String, default: '' },
+    },
     computed: {
         k8sDisplay() {
             if (this.disabled) return 'Loading…'
@@ -117,9 +122,17 @@ Vue.component('workspace-card', {
       </div>
       <div class="dohub-card-actions mt-auto" @click.stop>
         <button v-if="canStart" @click="$emit('start', ws)"
-                class="dohub-card-action-main dohub-card-action-main--wide rounded-lg bg-blue-600 text-white">Start</button>
+                :disabled="disabled || !!actionLoading"
+                class="dohub-card-action-main dohub-card-action-main--wide rounded-lg bg-blue-600 text-white inline-flex items-center justify-center gap-1.5 disabled:opacity-70">
+          <i v-if="actionLoading === 'start'" class="fa fa-spinner fa-spin" aria-hidden="true"></i>
+          <span v-text="actionLoading === 'start' ? 'Starting…' : 'Start'"></span>
+        </button>
         <button v-if="canStop" @click="$emit('stop', ws)"
-                class="dohub-card-action-main rounded-lg bg-rose-600 text-white">Stop</button>
+                :disabled="disabled || !!actionLoading"
+                class="dohub-card-action-main rounded-lg bg-rose-600 text-white inline-flex items-center justify-center gap-1.5 disabled:opacity-70">
+          <i v-if="actionLoading === 'stop'" class="fa fa-spinner fa-spin" aria-hidden="true"></i>
+          <span v-text="actionLoading === 'stop' ? 'Stopping…' : 'Stop'"></span>
+        </button>
         <button v-if="canOpen" @click="$emit('open', ws)"
                 class="dohub-card-action-main rounded-lg border border-blue-600 text-blue-600 bg-white">Open</button>
         <button @click="$emit('export', ws)"
@@ -793,6 +806,7 @@ const appVue = new Vue({
             images: -1,
         },
         bulkActionLoading: false,
+        workspaceActionLoading: {},
         bulkConfirmModal: null,
         toastMessage: '',
         toastTimer: null,
@@ -3659,18 +3673,30 @@ const appVue = new Vue({
             this.reloadAdminWorkspaces(1)
         },
         async startWorkspace(ws) {
-            await fetch('workspaces/' + ws.id + '/start', { method: 'POST' })
-            await this.refreshLists()
+            if (this.workspaceActionLoading[ws.id]) return
+            this.$set(this.workspaceActionLoading, ws.id, 'start')
+            try {
+                await fetch('workspaces/' + ws.id + '/start', { method: 'POST' })
+                await this.refreshLists()
+            } finally {
+                this.$delete(this.workspaceActionLoading, ws.id)
+            }
         },
         async stopWorkspace(ws) {
-            const res = await fetch('workspaces/' + ws.id + '/stop', { method: 'POST' })
-            const data = await res.json().catch(() => ({}))
-            if (res.status !== 200) {
-                this.showToast(data.message || data.error || data.logs || 'Stop failed')
-                return
+            if (this.workspaceActionLoading[ws.id]) return
+            this.$set(this.workspaceActionLoading, ws.id, 'stop')
+            try {
+                const res = await fetch('workspaces/' + ws.id + '/stop', { method: 'POST' })
+                const data = await res.json().catch(() => ({}))
+                if (res.status !== 200) {
+                    this.showToast(data.message || data.error || data.logs || 'Stop failed')
+                    return
+                }
+                this.showToast('Server stopped')
+                await this.refreshLists()
+            } finally {
+                this.$delete(this.workspaceActionLoading, ws.id)
             }
-            this.showToast('Server stopped')
-            await this.refreshLists()
         },
         openWorkspace(ws) {
             window.open(this.workspaceUrl(ws), '_blank')
