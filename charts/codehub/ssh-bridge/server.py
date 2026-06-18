@@ -18,8 +18,10 @@ from pathlib import Path
 
 import asyncssh
 
+from kubectl_sftp import KubectlSFTPServer
+
 LOG = logging.getLogger('ssh_bridge')
-BUILD_ID = 'ssh-bridge-2026-06-17-port-forward'
+BUILD_ID = 'ssh-bridge-2026-06-18-scp5'
 
 SSH_BIND_HOST = os.environ.get('SSH_BIND_HOST', '127.0.0.1')
 SSH_PORT = int(os.environ.get('SSH_PORT', '2222'))
@@ -420,12 +422,14 @@ async def main() -> None:
         SSH_PORT,
         server_factory=DohubSSHServer,
         process_factory=handle_client,
+        sftp_factory=KubectlSFTPServer,
+        allow_scp=True,
         server_host_keys=[str(HOST_KEY)],
         line_editor=False,
         encoding=None,
     )
     LOG.info(
-        '%s asyncssh listening on %s:%s user=%s shell=%s forward=%s kubectl=%s/%s container=%s',
+        '%s asyncssh listening on %s:%s user=%s shell=%s forward=%s scp=1 kubectl=%s/%s container=%s',
         BUILD_ID,
         SSH_BIND_HOST,
         SSH_PORT,

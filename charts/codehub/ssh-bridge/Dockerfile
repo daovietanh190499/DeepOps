@@ -36,7 +36,7 @@ RUN case "${TARGETARCH}" in \
 WORKDIR /app
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
-COPY server.py entrypoint.sh supervisor.sh ./
+COPY server.py kubectl_sftp.py entrypoint.sh supervisor.sh ./
 RUN chmod +x /app/entrypoint.sh /app/supervisor.sh
 
 ENV SSH_BIND_HOST=127.0.0.1
