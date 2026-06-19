@@ -85,6 +85,8 @@ def _clear_stuck_helm_release(release_name: str) -> tuple[str, int]:
 
 def build_spawn_config(workspace) -> dict:
     from .backup_config import backup_secret_name
+    from .workspace_file_mounts import build_configmap_volume_specs
+    from .workspace_files_k8s import file_mounts_configmap_name
     from .workspace_mounts import build_pvc_volume_specs, spawn_drive_mounts
 
     gpu_spec = parse_gpu_resources(workspace.gpu)
@@ -100,6 +102,9 @@ def build_spawn_config(workspace) -> dict:
     slug = workspace.slug
     mount_entries = spawn_drive_mounts(workspace)
     pvc_volumes, pvc_volume_mounts = build_pvc_volume_specs(mount_entries)
+    file_mount_rows = list(workspace.file_mounts.order_by('sort_order', 'created_at'))
+    cm_name = file_mounts_configmap_name(workspace)
+    cm_volumes, cm_volume_mounts = build_configmap_volume_specs(file_mount_rows, cm_name)
     ssh_record = get_or_none(workspace)
 
     return {
@@ -124,6 +129,9 @@ def build_spawn_config(workspace) -> dict:
         'storage_class': _storage_class(),
         'pvc_volumes': pvc_volumes,
         'pvc_volume_mounts': pvc_volume_mounts,
+        'configmap_volumes': cm_volumes,
+        'configmap_volume_mounts': cm_volume_mounts,
+        'file_mounts_configmap_name': cm_name if file_mount_rows else '',
         'secret_name': f'{user.username}-{slug}-secret',
         'ssh_enabled': ssh_keys_ready(ssh_record),
         'ssh_secret_name': ssh_secret_name(workspace),
@@ -274,8 +282,16 @@ def _helm_base_cmd(config: dict) -> list[str]:
     if command:
         cmd.extend(['--set-json', f'container.command={json.dumps(command)}'])
 
-    volumes = [{'name': 'shm-volume', 'emptyDir': {'medium': 'Memory'}}] + pvc_volumes
-    volume_mounts = [{'name': 'shm-volume', 'mountPath': '/dev/shm'}] + pvc_volume_mounts
+    volumes = (
+        [{'name': 'shm-volume', 'emptyDir': {'medium': 'Memory'}}]
+        + pvc_volumes
+        + (config.get('configmap_volumes') or [])
+    )
+    volume_mounts = (
+        [{'name': 'shm-volume', 'mountPath': '/dev/shm'}]
+        + pvc_volume_mounts
+        + (config.get('configmap_volume_mounts') or [])
+    )
     cmd.extend(['--set-json', f'volumes={json.dumps(volumes)}'])
     cmd.extend(['--set-json', f'volumeMounts={json.dumps(volume_mounts)}'])
 
@@ -337,12 +353,17 @@ def create_codehub(config: dict) -> tuple[str, str, int]:
     from .backup_k8s import apply_backup_secret
     from .sidecar_k8s import sync_workspace_sidecars
     from .ssh_k8s import sync_ssh_secret_for_workspace
+    from .workspace_files_k8s import apply_workspace_file_configmap
 
     workspace = Workspace.objects.get(id=config['workspace_id'])
 
     backup_conf = (workspace.backup_rclone_config or '').strip()
     if backup_conf:
         apply_backup_secret(backup_secret_name(workspace), backup_conf)
+
+    file_logs, file_code = apply_workspace_file_configmap(workspace)
+    if file_code != 0:
+        return '', f'file mount configmap apply failed: {file_logs}', file_code
 
     ssh_record = get_or_none(workspace)
     if ssh_keys_ready(ssh_record):

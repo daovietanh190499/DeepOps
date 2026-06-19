@@ -13,6 +13,10 @@ def _default_drive_mounts():
     return []
 
 
+def _default_file_mounts():
+    return []
+
+
 class PlatformEquipmentOption(models.Model):
     CATEGORY_CPU = 'cpu'
     CATEGORY_RAM = 'ram'
@@ -54,6 +58,11 @@ class ServerPlanTemplate(models.Model):
         default=_default_drive_mounts,
         blank=True,
         help_text='Default mount paths, e.g. [{"mount_path": "/app/data"}]',
+    )
+    file_mounts = models.JSONField(
+        default=_default_file_mounts,
+        blank=True,
+        help_text='Default text files, e.g. [{"filename": ".env", "mount_path": "/home/coder/.env", "content": "..."}]',
     )
     sort_order = models.PositiveIntegerField(default=0)
     is_active = models.BooleanField(default=True)

@@ -13,6 +13,7 @@ from backend.services.platform_catalog import (
     catalog_payload,
     parse_cpu_value,
 )
+from backend.services.workspace_file_mounts import parse_template_file_mounts
 from backend.services.workspace_mounts import normalize_mount_path
 
 
@@ -101,6 +102,17 @@ def _parse_template_drive_mounts(raw) -> list[dict]:
                 entry[key] = str(value).strip()
         mounts.append(entry)
     return mounts
+
+
+def _validate_template_mount_conflicts(
+    drive_mounts: list[dict],
+    file_mounts: list[dict],
+) -> str | None:
+    drive_paths = {row['mount_path'] for row in drive_mounts}
+    for row in file_mounts:
+        if row['mount_path'] in drive_paths:
+            return f'file mount path conflicts with drive mount: {row["mount_path"]}'
+    return None
 
 
 @auth.verify
@@ -214,6 +226,15 @@ def admin_platform_template_create(request, user):
     except ValueError as exc:
         return JsonResponse({'message': str(exc)}, status=400)
 
+    file_mounts, file_err = parse_template_file_mounts(
+        data.get('file_mounts', data.get('file_mounts_text')),
+    )
+    if file_err:
+        return JsonResponse({'message': file_err}, status=400)
+    conflict_err = _validate_template_mount_conflicts(drive_mounts, file_mounts)
+    if conflict_err:
+        return JsonResponse({'message': conflict_err}, status=400)
+
     template = ServerPlanTemplate.objects.create(
         name=name,
         image=(data.get('image') or 'logo.png').strip(),
@@ -228,6 +249,7 @@ def admin_platform_template_create(request, user):
         ),
         env_defaults=data.get('env_defaults') if isinstance(data.get('env_defaults'), dict) else {},
         drive_mounts=drive_mounts,
+        file_mounts=file_mounts,
         sort_order=int(data.get('sort_order', 0) or 0),
         is_active=data.get('is_active', True),
     )
@@ -276,11 +298,34 @@ def admin_platform_template_detail(request, user, template_id):
         template.env_defaults = data['env_defaults']
     if 'drive_mounts' in data or 'drive_mounts_text' in data:
         try:
-            template.drive_mounts = _parse_template_drive_mounts(
+            drive_mounts = _parse_template_drive_mounts(
                 data.get('drive_mounts', data.get('drive_mounts_text')),
             )
         except ValueError as exc:
             return JsonResponse({'message': str(exc)}, status=400)
+        file_mounts = template.file_mounts if isinstance(template.file_mounts, list) else []
+        conflict_err = _validate_template_mount_conflicts(drive_mounts, file_mounts)
+        if conflict_err:
+            return JsonResponse({'message': conflict_err}, status=400)
+        template.drive_mounts = drive_mounts
+    if 'file_mounts' in data or 'file_mounts_text' in data:
+        file_mounts, file_err = parse_template_file_mounts(
+            data.get('file_mounts', data.get('file_mounts_text')),
+        )
+        if file_err:
+            return JsonResponse({'message': file_err}, status=400)
+        drive_mounts = template.drive_mounts if isinstance(template.drive_mounts, list) else []
+        if 'drive_mounts' in data or 'drive_mounts_text' in data:
+            try:
+                drive_mounts = _parse_template_drive_mounts(
+                    data.get('drive_mounts', data.get('drive_mounts_text')),
+                )
+            except ValueError as exc:
+                return JsonResponse({'message': str(exc)}, status=400)
+        conflict_err = _validate_template_mount_conflicts(drive_mounts, file_mounts)
+        if conflict_err:
+            return JsonResponse({'message': conflict_err}, status=400)
+        template.file_mounts = file_mounts
     if 'sort_order' in data:
         template.sort_order = int(data['sort_order'] or 0)
     if 'is_active' in data:
@@ -323,6 +368,16 @@ def _template_fields_from_import_item(item: dict) -> tuple[dict | None, str | No
     except ValueError as exc:
         return None, str(exc)
 
+    file_mounts, file_err = parse_template_file_mounts(
+        item.get('file_mounts', item.get('file_mounts_text')),
+    )
+    if file_err:
+        return None, file_err
+
+    conflict_err = _validate_template_mount_conflicts(drive_mounts, file_mounts)
+    if conflict_err:
+        return None, conflict_err
+
     is_active = item.get('is_active', True)
     if isinstance(is_active, str):
         is_active = is_active.strip().lower() not in ('false', '0', 'no')
@@ -341,6 +396,7 @@ def _template_fields_from_import_item(item: dict) -> tuple[dict | None, str | No
         ),
         'env_defaults': env_defaults,
         'drive_mounts': drive_mounts,
+        'file_mounts': file_mounts,
         'sort_order': int(item.get('sort_order', 0) or 0),
         'is_active': bool(is_active),
     }, None

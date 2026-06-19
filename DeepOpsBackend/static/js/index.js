@@ -253,10 +253,46 @@ function defaultPlanTemplateForm() {
         ports_text: '8080',
         command_text: '',
         drive_mounts_text: '',
+        file_mounts: [],
         env_defaults_text: '{"SECRET_KEY":"secret-<<rdstring:64>>","PWA_APPNAME":"Workspace"}',
         sort_order: 0,
         is_active: true,
     }
+}
+
+function fileMountsToFormRows(file_mounts) {
+    return (file_mounts || []).map((fm) => ({
+        filename: fm.filename || '',
+        mount_path: fm.mount_path || suggestFileMountPath(fm.filename),
+        content: fm.content || '',
+        size_bytes: fm.size_bytes || utf8ByteLength(fm.content || ''),
+        file_error: '',
+    }))
+}
+
+function validatePlanTemplateFileMounts(form) {
+    const rows = (form.file_mounts || []).filter((fm) => fm.filename && fm.content)
+    let total = 0
+    const paths = new Set()
+    const mountsParsed = parsePlanTemplateDriveMountsText(form.drive_mounts_text || '')
+    const drivePaths = (mountsParsed.drive_mounts || []).map((m) => (m.mount_path || '').trim())
+    for (const fm of rows) {
+        const size = fm.size_bytes || utf8ByteLength(fm.content)
+        if (size > FILE_MOUNT_MAX_BYTES) {
+            return fm.filename + ' exceeds 1 MiB limit'
+        }
+        total += size
+        const mp = (fm.mount_path || suggestFileMountPath(fm.filename)).trim()
+        if (paths.has(mp)) return 'Duplicate file mount path: ' + mp
+        paths.add(mp)
+        if (drivePaths.includes(mp)) {
+            return 'File mount path conflicts with drive mount: ' + mp
+        }
+    }
+    if (total > CONFIGMAP_TOTAL_MAX_BYTES) {
+        return 'Total file mount size exceeds ConfigMap limit (1 MiB)'
+    }
+    return ''
 }
 
 function planTemplatePayloadFromForm(form) {
@@ -268,6 +304,15 @@ function planTemplatePayloadFromForm(form) {
     }
     const mountsParsed = parsePlanTemplateDriveMountsText(form.drive_mounts_text)
     if (mountsParsed.error) return { error: mountsParsed.error }
+    const fileErr = validatePlanTemplateFileMounts(form)
+    if (fileErr) return { error: fileErr }
+    const file_mounts = (form.file_mounts || [])
+        .filter((fm) => fm.filename && fm.content)
+        .map((fm) => ({
+            filename: fm.filename,
+            mount_path: fm.mount_path || suggestFileMountPath(fm.filename),
+            content: fm.content,
+        }))
     return {
         payload: {
             name: form.name,
@@ -281,10 +326,16 @@ function planTemplatePayloadFromForm(form) {
             container_command: parseCommand(form.command_text),
             env_defaults,
             drive_mounts: mountsParsed.drive_mounts,
+            file_mounts,
             sort_order: form.sort_order,
             is_active: form.is_active,
         },
     }
+}
+
+function suggestFileMountPath(filename) {
+    const base = String(filename || '').split(/[/\\]/).pop() || 'file.txt'
+    return '/home/coder/' + base
 }
 
 function defaultForm() {
@@ -293,6 +344,7 @@ function defaultForm() {
         cpu: 2,
         ram: '4G',
         drive_mounts: [],
+        file_mounts: [],
         gpu: 'none',
         node_hostname: 'auto',
         docker_image_id: '',
@@ -416,9 +468,67 @@ function resolveEnvDefaults(envDefaults) {
     return out
 }
 
+const FILE_MOUNT_MAX_BYTES = 1024 * 1024
+const CONFIGMAP_TOTAL_MAX_BYTES = 1024 * 1024
+const FILE_MOUNT_ALLOWED_EXTENSIONS = [
+    '.txt', '.js', '.json', '.env', '.yaml', '.yml', '.toml', '.ini', '.cfg',
+    '.conf', '.properties', '.sh', '.py', '.md', '.xml', '.csv', '.ts', '.tsx',
+    '.jsx', '.html', '.css', '.sql', '.gitignore', '.dockerignore', '.editorconfig',
+    '.npmrc', '.prettierrc', '.eslintrc', '.lock', '.log', '.jsonc', '.hcl',
+    '.tf', '.tfvars', '.pem', '.crt', '.key', '.pub', '.service', '.socket',
+    '.mod', '.sum', '.go', '.rs', '.rb', '.php', '.java', '.kt', '.swift',
+    '.c', '.cpp', '.h', '.hpp', '.vue', '.svelte', '.graphql', '.gql',
+]
+const FILE_MOUNT_ALLOWED_BASENAMES = new Set([
+    'Dockerfile', 'Makefile', 'Gemfile', 'Rakefile', 'Procfile', 'Jenkinsfile',
+    'LICENSE', 'README', 'CHANGELOG', 'AUTHORS', 'CONTRIBUTORS',
+])
+const FILE_MOUNT_ACCEPT = FILE_MOUNT_ALLOWED_EXTENSIONS.join(',')
+
+function formatFileSize(bytes) {
+    const n = Number(bytes) || 0
+    if (n < 1024) return n + ' B'
+    if (n < 1024 * 1024) return (n / 1024).toFixed(1) + ' KiB'
+    return (n / (1024 * 1024)).toFixed(2) + ' MiB'
+}
+
+function isAllowedFileMountName(filename) {
+    const base = String(filename || '').split(/[/\\]/).pop() || ''
+    if (!base) return false
+    if (FILE_MOUNT_ALLOWED_BASENAMES.has(base)) return true
+    const lower = base.toLowerCase()
+    return FILE_MOUNT_ALLOWED_EXTENSIONS.some((ext) => lower.endsWith(ext))
+}
+
+function utf8ByteLength(text) {
+    return new TextEncoder().encode(String(text || '')).length
+}
+
+function defaultFileMountRow(filename, mountPath) {
+    return {
+        id: '',
+        filename: filename || '',
+        mount_path: mountPath || '',
+        content: '',
+        size_bytes: 0,
+        file_error: '',
+    }
+}
+
 function formPayload(form) {
     const mounts = (form.drive_mounts || []).filter((m) => m.drive_id)
     const primary = mounts[0]
+    const fileMounts = (form.file_mounts || [])
+        .filter((fm) => fm.filename && (fm.content || fm.id))
+        .map((fm) => {
+            const row = {
+                filename: fm.filename,
+                mount_path: fm.mount_path || suggestFileMountPath(fm.filename),
+                content: fm.content || '',
+            }
+            if (fm.id) row.id = fm.id
+            return row
+        })
     return {
         name: form.name,
         cpu: form.cpu,
@@ -430,6 +540,7 @@ function formPayload(form) {
             drive_id: m.drive_id,
             mount_path: m.mount_path || '/home/coder',
         })),
+        file_mounts: fileMounts,
         gpu: form.gpu === 'none' ? '' : form.gpu,
         docker_repository: form.docker_repository,
         docker_tag: form.docker_tag,
@@ -550,7 +661,7 @@ function downloadJson(obj, filename) {
 
 const DOCKER_IMAGE_BULK_PLACEHOLDER_JSON = '[{"label":"Code Server","repository":"codercom/code-server","default_tag":"4.89.0-ubuntu","tags":["4.89.0-ubuntu","latest"],"is_active":true,"sort_order":0}]'
 const DOCKER_IMAGE_BULK_PLACEHOLDER_CSV = 'label,repository,default_tag,tags_text,is_active,sort_order\nCode Server,codercom/code-server,4.89.0-ubuntu,4.89.0-ubuntu;latest,true,0'
-const PLAN_TEMPLATE_BULK_PLACEHOLDER_JSON = '[{"name":"Code Server","cpu":2,"ram":"4G","gpu":"none","image":"logo.png","docker_repository":"codercom/code-server","docker_tag":"4.89.0-ubuntu","exposed_ports":[8080],"container_command":[],"env_defaults":{},"drive_mounts":[{"mount_path":"/home/coder"}],"is_active":true,"sort_order":0}]'
+const PLAN_TEMPLATE_BULK_PLACEHOLDER_JSON = '[{"name":"Code Server","cpu":2,"ram":"4G","gpu":"none","image":"logo.png","docker_repository":"codercom/code-server","docker_tag":"4.89.0-ubuntu","exposed_ports":[8080],"container_command":[],"env_defaults":{},"drive_mounts":[{"mount_path":"/home/coder"}],"file_mounts":[{"filename":"config.json","mount_path":"/home/coder/config.json","content":"{\\"hello\\":\\"world\\"}"}],"is_active":true,"sort_order":0}]'
 const PLAN_TEMPLATE_BULK_PLACEHOLDER_CSV = 'name,cpu,ram,gpu,image,docker_repository,docker_tag,exposed_ports,command_text,drive_mounts_text,env_defaults,is_active,sort_order\nCode Server,2,4G,none,logo.png,codercom/code-server,4.89.0-ubuntu,8080,,/home/coder,{},true,0'
 
 const appVue = new Vue({
@@ -594,6 +705,7 @@ const appVue = new Vue({
         deleteDriveInProgress: false,
         planTemplates: [],
         form: defaultForm(),
+        fileMountAccept: FILE_MOUNT_ACCEPT,
         envKey: '',
         envValue: '',
         bulkMode: 'json',
@@ -3185,6 +3297,7 @@ const appVue = new Vue({
                 ports_text: (template.exposed_ports || [8080]).join(', '),
                 command_text: formatCommand(template.container_command || []),
                 drive_mounts_text: formatPlanTemplateDriveMountsText(template.drive_mounts),
+                file_mounts: fileMountsToFormRows(template.file_mounts),
                 env_defaults_text: JSON.stringify(template.env_defaults || {}, null, 2),
                 sort_order: template.sort_order || 0,
                 is_active: template.is_active !== false,
@@ -3309,6 +3422,7 @@ const appVue = new Vue({
                     exposed_ports: row.exposed_ports || row.ports_text || row.ports || '8080',
                     command_text: row.command_text || row.command || '',
                     drive_mounts_text: row.drive_mounts_text || row.drive_mounts || '',
+                    file_mounts: row.file_mounts || row.file_mounts_text || [],
                     env_defaults: row.env_defaults || row.env_defaults_text || '{}',
                     is_active: (row.is_active || 'true').toString().toLowerCase() !== 'false',
                     sort_order: row.sort_order || 0,
@@ -3513,6 +3627,11 @@ const appVue = new Vue({
             } else {
                 this.form.drive_mounts = []
             }
+            if (t.file_mounts && t.file_mounts.length) {
+                this.form.file_mounts = fileMountsToFormRows(t.file_mounts)
+            } else {
+                this.form.file_mounts = []
+            }
         },
         applyTemplateDockerSettings(t) {
             if (t.exposed_ports && t.exposed_ports.length) {
@@ -3552,7 +3671,65 @@ const appVue = new Vue({
                     .join(', ')
                 if (paths) parts.push('mounts ' + paths)
             }
+            if (t.file_mounts && t.file_mounts.length) {
+                const files = t.file_mounts
+                    .map((fm) => fm.filename)
+                    .filter(Boolean)
+                    .join(', ')
+                if (files) parts.push('files ' + files)
+            }
             return parts.join(' · ')
+        },
+        addPlanTemplateFileMount(form) {
+            if (!form) return
+            if (!form.file_mounts) this.$set(form, 'file_mounts', [])
+            const idx = form.file_mounts.length
+            form.file_mounts.push(defaultFileMountRow('', `/home/coder/mount-${idx + 1}.txt`))
+        },
+        removePlanTemplateFileMount(form, index) {
+            if (!form || !form.file_mounts) return
+            form.file_mounts.splice(index, 1)
+        },
+        onPlanTemplateFileInput(event, index, form) {
+            const input = event && event.target
+            const file = input && input.files && input.files[0]
+            if (!file || !form || !form.file_mounts || !form.file_mounts[index]) return
+            const row = form.file_mounts[index]
+            row.file_error = ''
+            if (!isAllowedFileMountName(file.name)) {
+                row.file_error = 'File type not allowed: ' + file.name
+                if (input) input.value = ''
+                return
+            }
+            if (file.size > FILE_MOUNT_MAX_BYTES) {
+                row.file_error = 'File exceeds 1 MiB limit'
+                if (input) input.value = ''
+                return
+            }
+            const reader = new FileReader()
+            reader.onload = () => {
+                const text = String(reader.result || '')
+                if (text.includes('\0')) {
+                    row.file_error = 'File must be text (no binary/null bytes)'
+                    return
+                }
+                const size = utf8ByteLength(text)
+                if (size > FILE_MOUNT_MAX_BYTES) {
+                    row.file_error = 'File exceeds 1 MiB limit'
+                    return
+                }
+                row.filename = file.name
+                row.content = text
+                row.size_bytes = size
+                if (!row.mount_path || (row.mount_path.endsWith('.txt') && row.mount_path.includes('mount-'))) {
+                    row.mount_path = suggestFileMountPath(file.name)
+                }
+                row.file_error = ''
+            }
+            reader.onerror = () => {
+                row.file_error = 'Failed to read file'
+            }
+            reader.readAsText(file)
         },
         addEnv() {
             const k = (this.envKey || '').trim()
@@ -3817,6 +3994,84 @@ const appVue = new Vue({
             if (!this.form.drive_mounts) return
             this.form.drive_mounts.splice(index, 1)
         },
+        addFileMount() {
+            if (!this.form.file_mounts) this.$set(this.form, 'file_mounts', [])
+            const idx = this.form.file_mounts.length
+            this.form.file_mounts.push(defaultFileMountRow('', `/home/coder/mount-${idx + 1}.txt`))
+        },
+        removeFileMount(index) {
+            if (!this.form.file_mounts) return
+            this.form.file_mounts.splice(index, 1)
+        },
+        formatFileSize(bytes) {
+            return formatFileSize(bytes)
+        },
+        onFileMountInput(event, index) {
+            const input = event && event.target
+            const file = input && input.files && input.files[0]
+            if (!file || !this.form.file_mounts || !this.form.file_mounts[index]) return
+            const row = this.form.file_mounts[index]
+            row.file_error = ''
+            if (!isAllowedFileMountName(file.name)) {
+                row.file_error = 'File type not allowed: ' + file.name
+                if (input) input.value = ''
+                return
+            }
+            if (file.size > FILE_MOUNT_MAX_BYTES) {
+                row.file_error = 'File exceeds 1 MiB limit'
+                if (input) input.value = ''
+                return
+            }
+            const reader = new FileReader()
+            reader.onload = () => {
+                const text = String(reader.result || '')
+                if (text.includes('\0')) {
+                    row.file_error = 'File must be text (no binary/null bytes)'
+                    return
+                }
+                const size = utf8ByteLength(text)
+                if (size > FILE_MOUNT_MAX_BYTES) {
+                    row.file_error = 'File exceeds 1 MiB limit'
+                    return
+                }
+                row.filename = file.name
+                row.content = text
+                row.size_bytes = size
+                if (!row.mount_path || row.mount_path.endsWith('.txt') && row.mount_path.includes('mount-')) {
+                    row.mount_path = suggestFileMountPath(file.name)
+                }
+                row.file_error = ''
+            }
+            reader.onerror = () => {
+                row.file_error = 'Failed to read file'
+            }
+            reader.readAsText(file)
+        },
+        validateFileMounts() {
+            const rows = (this.form.file_mounts || []).filter((fm) => fm.filename && (fm.content || fm.id))
+            let total = 0
+            const paths = new Set()
+            for (const fm of rows) {
+                const size = fm.size_bytes || utf8ByteLength(fm.content)
+                if (size > FILE_MOUNT_MAX_BYTES) {
+                    return fm.filename + ' exceeds 1 MiB limit'
+                }
+                total += size
+                const mp = (fm.mount_path || suggestFileMountPath(fm.filename)).trim()
+                if (paths.has(mp)) return 'Duplicate file mount path: ' + mp
+                paths.add(mp)
+                const drivePaths = (this.form.drive_mounts || [])
+                    .filter((m) => m.drive_id)
+                    .map((m) => (m.mount_path || '/home/coder').trim())
+                if (drivePaths.includes(mp)) {
+                    return 'File mount path conflicts with drive mount: ' + mp
+                }
+            }
+            if (total > CONFIGMAP_TOTAL_MAX_BYTES) {
+                return 'Total file mount size exceeds ConfigMap limit (1 MiB)'
+            }
+            return ''
+        },
         resetCreateServerForm() {
             this.form = defaultForm()
             this.envKey = ''
@@ -3889,6 +4144,15 @@ const appVue = new Vue({
             this.form.privileged = !!ws.privileged
             const mounts = Array.isArray(ws.drive_mounts) ? ws.drive_mounts : []
             this.form.drive_mounts = mounts.map((m) => ({ drive_id: m.drive_id || '', mount_path: m.mount_path || '/home/coder' }))
+            const fileMounts = Array.isArray(ws.file_mounts) ? ws.file_mounts : []
+            this.form.file_mounts = fileMounts.map((fm) => ({
+                id: fm.id || '',
+                filename: fm.filename || '',
+                mount_path: fm.mount_path || suggestFileMountPath(fm.filename),
+                content: fm.content || '',
+                size_bytes: fm.size_bytes || utf8ByteLength(fm.content || ''),
+                file_error: '',
+            }))
             this.showCreateServerModal = true
         },
         openBulkCreateServerModal() {
@@ -3913,6 +4177,13 @@ const appVue = new Vue({
             this.runLoading = true
             this.runError = ''
             this.addEnv()
+            const fileErr = this.validateFileMounts()
+            if (fileErr) {
+                this.runLoading = false
+                this.runError = fileErr
+                this.showToast(fileErr)
+                return
+            }
             const payload = formPayload(this.form)
             const isEdit = !!this.editingWorkspace
             const res = await fetch(isEdit ? ('workspaces/' + this.editingWorkspace.id) : 'workspaces/run', {

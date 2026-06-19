@@ -153,6 +153,10 @@ def apply_drive_mounts_from_data(
             return 'duplicate mount path in mount list'
         seen_paths.add(mount_path)
 
+        file_conflict = workspace.file_mounts.filter(mount_path=mount_path).exists()
+        if file_conflict:
+            return f'drive mount path conflicts with file mount: {mount_path}'
+
         drive = resolve_user_drive_ref(owner, item['drive_ref'])
         if not drive:
             return f'drive not found: {item["drive_ref"]}'

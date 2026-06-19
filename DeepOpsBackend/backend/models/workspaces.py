@@ -82,6 +82,31 @@ class DockerImage(models.Model):
         }
 
 
+class WorkspaceFileMount(models.Model):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    workspace = models.ForeignKey(
+        'Workspace',
+        on_delete=models.CASCADE,
+        related_name='file_mounts',
+    )
+    filename = models.CharField(max_length=255)
+    configmap_key = models.CharField(max_length=253)
+    content = models.TextField()
+    mount_path = models.CharField(max_length=256)
+    sort_order = models.PositiveIntegerField(default=0)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['sort_order', 'created_at']
+        unique_together = (
+            ('workspace', 'mount_path'),
+            ('workspace', 'configmap_key'),
+        )
+
+    def __str__(self):
+        return f'{self.workspace.slug}:{self.mount_path}'
+
+
 class WorkspaceDriveMount(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     workspace = models.ForeignKey(

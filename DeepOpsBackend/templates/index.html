@@ -1042,7 +1042,7 @@
                         <div class="dohub-table-scroll -mx-1 px-1">
                         <table class="w-full min-w-[640px] text-xs">
                             <thead><tr class="border-b text-left text-slate-500">
-                                <th class="py-1 pr-2">Name</th><th>CPU</th><th>RAM</th><th>GPU</th><th>Icon</th><th>Docker</th><th>Ports</th><th>Mounts</th><th>Active</th><th></th>
+                                <th class="py-1 pr-2">Name</th><th>CPU</th><th>RAM</th><th>GPU</th><th>Icon</th><th>Docker</th><th>Ports</th><th>Mounts</th><th>Files</th><th>Active</th><th></th>
                             </tr></thead>
                             <tbody>
                                 <tr v-for="t in adminPlanTemplates" :key="t.id" class="border-b border-slate-100">
@@ -1053,6 +1053,8 @@
                                     <td class="font-mono" v-text="(t.exposed_ports || []).join(', ') || '8080'"></td>
                                     <td class="font-mono text-[10px] max-w-[8rem] truncate" :title="(t.drive_mounts || []).map(m => m.mount_path).join(', ')"
                                         v-text="(t.drive_mounts || []).map(m => m.mount_path).join(', ') || '—'"></td>
+                                    <td class="font-mono text-[10px] max-w-[8rem] truncate" :title="(t.file_mounts || []).map(fm => fm.filename + ' → ' + fm.mount_path).join(', ')"
+                                        v-text="(t.file_mounts || []).map(fm => fm.filename).join(', ') || '—'"></td>
                                     <td><button type="button" @click="togglePlanTemplate(t)" class="hover:underline" v-text="t.is_active ? 'yes' : 'no'"></button></td>
                                     <td class="space-x-2 whitespace-nowrap">
                                         <button type="button" @click="openEditPlanTemplateModal(t)" class="text-blue-600 hover:underline">Edit</button>
@@ -1078,9 +1080,29 @@
                         </div>
                         <input v-model="newPlanTemplate.drive_mounts_text" placeholder="Mount paths (/home/coder, /app/data)"
                                class="w-full rounded-lg border px-2 py-1.5 text-xs font-mono">
+                        <div class="rounded-lg border border-violet-100 bg-violet-50/40 p-3 space-y-2">
+                            <div class="flex items-center justify-between gap-2">
+                                <span class="text-xs font-semibold text-slate-600">Default file mounts</span>
+                                <button type="button" @click="addPlanTemplateFileMount(newPlanTemplate)"
+                                        class="rounded border border-violet-200 bg-violet-50 px-2 py-0.5 text-[10px] font-semibold text-violet-700 hover:bg-violet-100">+ Add file</button>
+                            </div>
+                            <p v-if="!(newPlanTemplate.file_mounts || []).length" class="text-[10px] text-slate-400 italic">No files in template.</p>
+                            <div v-for="(fm, fidx) in (newPlanTemplate.file_mounts || [])" :key="'new-tpl-file-' + fidx" class="space-y-1.5 rounded border border-violet-100 bg-white p-2">
+                                <div class="flex items-center justify-between gap-2">
+                                    <span class="text-[10px] font-semibold text-slate-500" v-text="'File ' + (fidx + 1)"></span>
+                                    <button type="button" @click="removePlanTemplateFileMount(newPlanTemplate, fidx)" class="text-[10px] text-rose-600 hover:underline">Remove</button>
+                                </div>
+                                <input type="file" :accept="fileMountAccept" @change="onPlanTemplateFileInput($event, fidx, newPlanTemplate)"
+                                       class="w-full text-[10px] file:mr-2 file:rounded file:border-0 file:bg-violet-100 file:px-2 file:py-1 file:text-[10px] file:font-semibold file:text-violet-700">
+                                <p v-if="fm.filename" class="text-[10px] text-slate-600 font-mono" v-text="fm.filename + (fm.size_bytes ? ' · ' + formatFileSize(fm.size_bytes) : '')"></p>
+                                <p v-if="fm.file_error" class="text-[10px] text-rose-600" v-text="fm.file_error"></p>
+                                <input v-model="fm.mount_path" type="text" placeholder="/home/coder/config.json"
+                                       class="w-full rounded border px-2 py-1 text-[10px] font-mono">
+                            </div>
+                        </div>
                         <textarea v-model="newPlanTemplate.env_defaults_text" rows="2" placeholder='{"SECRET_KEY":"secret-<<rdstring:64>>","PWA_APPNAME":"Workspace"}'
                                   class="w-full rounded-lg border px-2 py-1.5 text-xs font-mono"></textarea>
-                        <p class="text-[10px] text-slate-500">Mount paths are pre-filled when users pick this template (they still choose drives). Env templates: <code class="rounded bg-slate-100 px-1">&lt;&lt;rdstring:N&gt;&gt;</code> random string,
+                        <p class="text-[10px] text-slate-500">Mount paths are pre-filled when users pick this template (they still choose drives). File mounts include content and are copied as-is. Env templates: <code class="rounded bg-slate-100 px-1">&lt;&lt;rdstring:N&gt;&gt;</code> random string,
                             <code class="rounded bg-slate-100 px-1">&lt;&lt;rdnum:N&gt;&gt;</code> random digits,
                             <code class="rounded bg-slate-100 px-1">&lt;&lt;tmsp&gt;&gt;</code> UTC timestamp,
                             <code class="rounded bg-slate-100 px-1">&lt;&lt;username&gt;&gt;</code> current user (expanded when user picks template).</p>
@@ -1376,7 +1398,10 @@
                     <spec-row v-for="(m, midx) in (modalWorkspace.drive_mounts || [])" :key="m.drive_id + '-' + m.mount_path + '-' + midx"
                               :label="'Mount ' + (midx + 1)"
                               :value="(m.drive_name || '—') + ' → ' + m.mount_path + (m.sub_path ? ' (subPath: ' + m.sub_path + ')' : '')"></spec-row>
-                    <spec-row v-if="!(modalWorkspace.drive_mounts || []).length && !modalWorkspace.drive_name"
+                    <spec-row v-for="(fm, fidx) in (modalWorkspace.file_mounts || [])" :key="'fm-' + fidx + '-' + fm.mount_path"
+                              :label="'File ' + (fidx + 1)"
+                              :value="(fm.filename || '—') + ' → ' + fm.mount_path + (fm.size_bytes ? ' (' + formatFileSize(fm.size_bytes) + ')' : '')"></spec-row>
+                    <spec-row v-if="!(modalWorkspace.drive_mounts || []).length && !(modalWorkspace.file_mounts || []).length && !modalWorkspace.drive_name"
                               label="Drives" value="none (ephemeral)"></spec-row>
                     <spec-row v-else-if="!(modalWorkspace.drive_mounts || []).length"
                               label="Drive" :value="modalWorkspace.drive_name + ' → ' + (modalWorkspace.mount_path || '/home/coder')"></spec-row>
@@ -1953,6 +1978,34 @@
                                            class="w-full rounded-lg border px-3 py-2 text-sm font-mono bg-white">
                                 </div>
                             </div>
+                            <div class="sm:col-span-2 space-y-2">
+                                <div class="flex items-center justify-between gap-2">
+                                    <label class="text-sm font-medium text-slate-600">Mount files (optional)</label>
+                                    <button type="button" @click="addFileMount"
+                                            class="rounded-lg border border-violet-200 bg-violet-50 px-2.5 py-1 text-xs font-semibold text-violet-700 hover:bg-violet-100">
+                                        + Add file
+                                    </button>
+                                </div>
+                                <p class="text-xs text-slate-500">Upload text files (txt, js, json, .env, yaml, …). Each file is stored in a Kubernetes ConfigMap and mounted at the path you choose. Max 1&nbsp;MiB per file; total across all files must stay under 1&nbsp;MiB.</p>
+                                <p v-if="!form.file_mounts.length" class="text-xs text-slate-400 italic">No files mounted.</p>
+                                <div v-for="(fm, fidx) in form.file_mounts" :key="'file-mount-' + fidx"
+                                     class="rounded-lg border border-violet-100 bg-violet-50/40 p-3 space-y-2">
+                                    <div class="flex items-center justify-between gap-2">
+                                        <span class="text-xs font-semibold text-slate-500" v-text="'File ' + (fidx + 1)"></span>
+                                        <button type="button" @click="removeFileMount(fidx)"
+                                                class="text-xs text-rose-600 hover:underline">Remove</button>
+                                    </div>
+                                    <input type="file" :accept="fileMountAccept" @change="onFileMountInput($event, fidx)"
+                                           class="w-full text-sm file:mr-3 file:rounded-lg file:border-0 file:bg-violet-100 file:px-3 file:py-1.5 file:text-xs file:font-semibold file:text-violet-700">
+                                    <p v-if="fm.filename" class="text-xs text-slate-600">
+                                        <span class="font-mono" v-text="fm.filename"></span>
+                                        <span v-if="fm.size_bytes" class="text-slate-400" v-text="' · ' + formatFileSize(fm.size_bytes)"></span>
+                                    </p>
+                                    <p v-if="fm.file_error" class="text-xs text-rose-600" v-text="fm.file_error"></p>
+                                    <input v-model="fm.mount_path" type="text" placeholder="/home/coder/config.json"
+                                           class="w-full rounded-lg border px-3 py-2 text-sm font-mono bg-white">
+                                </div>
+                            </div>
                             <div class="sm:col-span-2"><label class="text-sm font-medium text-slate-600">GPU</label>
                                 <select v-model="form.gpu" class="mt-1 w-full rounded-lg border px-3 py-2 text-sm">
                                     <option v-for="g in equipmentList.gpu" :key="g" :value="g" v-text="g"></option>
@@ -2397,6 +2450,32 @@
                            placeholder="/home/coder, /app/data, /app/logs"
                            class="mt-1 w-full rounded-lg border px-3 py-2 text-sm font-mono">
                     <p class="mt-1 text-[10px] text-slate-500">Comma-separated container paths (or JSON array). Applied when users pick this quick template; they assign drives per row.</p>
+                </div>
+                <div class="space-y-2">
+                    <div class="flex items-center justify-between gap-2">
+                        <label class="block text-xs font-medium text-slate-600">File mounts</label>
+                        <button type="button" @click="addPlanTemplateFileMount(planTemplateForm)"
+                                class="rounded-lg border border-violet-200 bg-violet-50 px-2.5 py-1 text-xs font-semibold text-violet-700 hover:bg-violet-100">+ Add file</button>
+                    </div>
+                    <p class="text-[10px] text-slate-500">Text files stored in the template (max 1&nbsp;MiB each, 1&nbsp;MiB total). Pre-filled when users pick this template.</p>
+                    <p v-if="!(planTemplateForm.file_mounts || []).length" class="text-xs text-slate-400 italic">No files in template.</p>
+                    <div v-for="(fm, fidx) in (planTemplateForm.file_mounts || [])" :key="'tpl-file-' + fidx"
+                         class="rounded-lg border border-violet-100 bg-violet-50/40 p-3 space-y-2">
+                        <div class="flex items-center justify-between gap-2">
+                            <span class="text-xs font-semibold text-slate-500" v-text="'File ' + (fidx + 1)"></span>
+                            <button type="button" @click="removePlanTemplateFileMount(planTemplateForm, fidx)"
+                                    class="text-xs text-rose-600 hover:underline">Remove</button>
+                        </div>
+                        <input type="file" :accept="fileMountAccept" @change="onPlanTemplateFileInput($event, fidx, planTemplateForm)"
+                               class="w-full text-sm file:mr-3 file:rounded-lg file:border-0 file:bg-violet-100 file:px-3 file:py-1.5 file:text-xs file:font-semibold file:text-violet-700">
+                        <p v-if="fm.filename" class="text-xs text-slate-600">
+                            <span class="font-mono" v-text="fm.filename"></span>
+                            <span v-if="fm.size_bytes" class="text-slate-400" v-text="' · ' + formatFileSize(fm.size_bytes)"></span>
+                        </p>
+                        <p v-if="fm.file_error" class="text-xs text-rose-600" v-text="fm.file_error"></p>
+                        <input v-model="fm.mount_path" type="text" placeholder="/home/coder/config.json"
+                               class="w-full rounded-lg border px-3 py-2 text-sm font-mono bg-white">
+                    </div>
                 </div>
                 <div>
                     <label class="block text-xs font-medium text-slate-600">Environment defaults (JSON)</label>

@@ -5,7 +5,7 @@ from .servers import ServerOption
 from .users import User, UserServer
 from .ssh_keys import WorkspaceSSHKey
 from .ssh_nodes import SSHNode, SSHNodeManagerKey
-from .workspaces import DockerImage, Workspace, WorkspaceDriveMount
+from .workspaces import DockerImage, Workspace, WorkspaceDriveMount, WorkspaceFileMount
 
 __all__ = [
     'ServerOption',
@@ -14,6 +14,7 @@ __all__ = [
     'DockerImage',
     'Workspace',
     'WorkspaceDriveMount',
+    'WorkspaceFileMount',
     'UserDrive',
     'WorkspaceSSHKey',
     'SSHNode',

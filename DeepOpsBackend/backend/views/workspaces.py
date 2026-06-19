@@ -32,6 +32,12 @@ from backend.services.workspace_kubectl import (
     workspace_monitor_file,
     workspace_monitor_metrics,
 )
+from backend.services.workspace_file_mounts import (
+    apply_file_mounts_from_data,
+    file_mounts_payload,
+    persist_pending_file_mounts,
+)
+from backend.services.workspace_files_k8s import delete_workspace_file_configmap
 from backend.services.workspace_mounts import (
     apply_drive_mounts_from_data,
     drive_mounts_payload,
@@ -96,6 +102,7 @@ def _workspace_list_payload(ws: Workspace) -> dict:
     data['created_at'] = ws.created_at.isoformat()
     data['updated_at'] = ws.updated_at.isoformat()
     data['drive_mounts'] = drive_mounts_payload(ws)
+    data['file_mounts'] = file_mounts_payload(ws)
     return data
 
 
@@ -173,6 +180,10 @@ def _apply_workspace_fields(ws: Workspace, data: dict, owner: User | None = None
     )
     if any(key in data for key in mount_fields):
         err = apply_drive_mounts_from_data(ws, owner, data)
+        if err:
+            return err
+    if 'file_mounts' in data:
+        err = apply_file_mounts_from_data(ws, data)
         if err:
             return err
     if 'env_vars' in data and isinstance(data['env_vars'], dict):
@@ -369,6 +380,7 @@ def workspace_create(request, user):
         return JsonResponse({'message': err}, status=400)
     ws.save()
     persist_pending_drive_mounts(ws)
+    persist_pending_file_mounts(ws)
     return JsonResponse({'result': _workspace_payload(ws)}, status=201)
 
 
@@ -388,6 +400,7 @@ def workspace_detail(request, user, workspace_id):
             exit_code = remove_codehub(ws.release_name)
             if exit_code != 0:
                 return JsonResponse({'message': 'helm uninstall failed'}, status=500)
+            delete_workspace_file_configmap(ws)
         ws.delete()
         return JsonResponse({'message': 'success'})
 
@@ -578,6 +591,7 @@ def workspace_run(request, user):
         return JsonResponse({'message': err}, status=400)
     ws.save()
     persist_pending_drive_mounts(ws)
+    persist_pending_file_mounts(ws)
     return _start_workspace(ws, cleanup_on_failure=True)
 
 
@@ -618,6 +632,7 @@ def workspace_bulk_run(request, user):
 
         ws.save()
         persist_pending_drive_mounts(ws)
+        persist_pending_file_mounts(ws)
         entry = bulk_workspace_result(ws, i, auto_start=auto_start)
 
         if auto_start:
