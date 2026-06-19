@@ -1,6 +1,7 @@
 """DirectPV discover / init workflow (admin only)."""
 
 import os
+import re
 import shlex
 import shutil
 import subprocess
@@ -9,6 +10,11 @@ from pathlib import Path
 import yaml
 
 DRIVES_YAML_PATH = os.environ.get('DIRECTPV_DRIVES_YAML_PATH', '/tmp/directpv-drives.yaml')
+_ANSI_RE = re.compile(r'\x1b\[[0-?]*[ -/]*[@-~]')
+
+
+def _clean_cli_output(text: str) -> str:
+    return _ANSI_RE.sub('', text or '').strip()
 
 
 def _run_cli(cmd: list[str], timeout: int = 280) -> subprocess.CompletedProcess:
@@ -137,8 +143,8 @@ def discover_drives() -> dict:
         ['kubectl', 'directpv', 'discover', '--output-file', str(path)],
         timeout=280,
     )
-    stdout = (result.stdout or '').strip()
-    stderr = (result.stderr or '').strip()
+    stdout = _clean_cli_output(result.stdout or '')
+    stderr = _clean_cli_output(result.stderr or '')
     raw = '\n'.join(part for part in (stdout, stderr) if part).strip()
 
     if result.returncode != 0:
@@ -226,8 +232,8 @@ def init_drives() -> dict:
         ['kubectl', 'directpv', 'init', str(path), '--dangerous'],
         timeout=280,
     )
-    stdout = (result.stdout or '').strip()
-    stderr = (result.stderr or '').strip()
+    stdout = _clean_cli_output(result.stdout or '')
+    stderr = _clean_cli_output(result.stderr or '')
     raw = '\n'.join(part for part in (stdout, stderr) if part).strip()
 
     if result.returncode != 0:
