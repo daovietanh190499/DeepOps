@@ -24,7 +24,6 @@ from backend.services.platform_catalog import parse_cpu_value
 from backend.services.command_parse import parse_container_command
 from backend.services.env_templates import expand_env_vars
 from backend.services.resource_limits import can_change_privileged, validate_image_count, validate_server_count, validate_workspace_resources
-from backend.services.ssh_keys import ssh_info_payload
 from backend.services.workspace_kubectl import (
     MONITOR_DEFAULT_WINDOW_MINUTES,
     workspace_describe,
@@ -135,7 +134,6 @@ def _workspace_payload(ws: Workspace, include_log: bool = False) -> dict:
     data.update(_workspace_status_payload(ws))
     if include_log:
         data['pod_status'] = get_codehub_workspace(ws)
-    data.update(ssh_info_payload(ws))
     return data
 
 

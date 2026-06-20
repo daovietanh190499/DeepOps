@@ -66,13 +66,6 @@ Create the name of the service account to use
 {{- end }}
 
 {{/*
-Legacy alias for ssh-bridge RBAC templates.
-*/}}
-{{- define "codehub.sshBridgeServiceAccountName" -}}
-{{- include "codehub.sidecarServiceAccountName" . }}
-{{- end }}
-
-{{/*
 Ingress controller mode: auto | nginx | traefik | both
 - auto: Traefik when traefik.io Middleware CRD exists, else nginx
 - both: Traefik path + middleware when CRD exists, else nginx regex + rewrite

@@ -419,29 +419,6 @@ function hubHostFromTunnelUrl(wssUrl) {
     return m ? m[1] : '<domain>'
 }
 
-function portTunnelStdioProxyCommand(tunnelInfo, port) {
-    const prefix = tunnelInfo.path_prefix || 'port-tunnel'
-    const hub = hubWssBaseFromTunnelUrl(tunnelInfo.wss_url)
-    return `wstunnel client --log-lvl=warn -P ${prefix} -L stdio://127.0.0.1:${port} ${hub}`
-}
-
-function portTunnelSshHostAlias(slug, port) {
-    return `dohub-${slug}-p${port}`
-}
-
-function portTunnelSshConfig(tunnelInfo, slug, port) {
-    const host = hubHostFromTunnelUrl(tunnelInfo.wss_url)
-    const alias = portTunnelSshHostAlias(slug, port)
-    const proxy = portTunnelStdioProxyCommand(tunnelInfo, port)
-    return [
-        `Host ${alias}`,
-        `    HostName ${host}`,
-        '    User your-user',
-        `    ProxyCommand ${proxy}`,
-        '    StrictHostKeyChecking accept-new',
-    ].join('\n')
-}
-
 function enrichTunnelPortCommands(tunnelInfo, slug) {
     const workspaceSlug = slug || 'workspace'
     return (tunnelInfo.port_commands || []).map((entry) => {
@@ -451,9 +428,6 @@ function enrichTunnelPortCommands(tunnelInfo, slug) {
         return {
             ...entry,
             is_ssh_port: true,
-            proxy_command: portTunnelStdioProxyCommand(tunnelInfo, entry.port),
-            ssh_config: portTunnelSshConfig(tunnelInfo, workspaceSlug, entry.port),
-            ssh_command: `ssh ${portTunnelSshHostAlias(workspaceSlug, entry.port)}`,
         }
     })
 }
@@ -786,11 +760,6 @@ const appVue = new Vue({
         sshNodeTerminalPasteHandler: null,
         sshNodeTerminalClickTarget: null,
         sshNodeTerminalClickHandler: null,
-        sshGenerateLoading: false,
-        sshExecShell: 'bash',
-        sshPrivateKeyOnce: '',
-        sshSyncMessage: '',
-        sshSyncError: '',
         tunnelPortsText: '',
         tunnelExposeLoading: false,
         tunnelSyncMessage: '',
@@ -839,6 +808,19 @@ const appVue = new Vue({
         },
         workspaceLogsTimer: null,
         workspaceMonitorTimer: null,
+        workspaceTerminalShell: 'bash',
+        workspaceTerminal: {
+            pods: [],
+            selectedPod: '',
+            error: '',
+        },
+        workspaceTerminalInstance: null,
+        workspaceTerminalFit: null,
+        workspaceTerminalWs: null,
+        workspaceTerminalPasteTarget: null,
+        workspaceTerminalPasteHandler: null,
+        workspaceTerminalClickTarget: null,
+        workspaceTerminalClickHandler: null,
         workspaceBackupTimer: null,
         workspaceBackup: {
             loading: false,
@@ -2059,10 +2041,9 @@ const appVue = new Vue({
             this.destroyMonitorCharts()
             this.workspaceLogsAutoScroll = true
             this.modalWorkspace = { ...ws, env_vars: { ...(ws.env_vars || {}) } }
-            this.sshExecShell = (ws.exec_shell === 'sh') ? 'sh' : 'bash'
-            this.sshPrivateKeyOnce = ''
-            this.sshSyncMessage = ''
-            this.sshSyncError = ''
+            this.workspaceTerminalShell = (ws.exec_shell === 'sh') ? 'sh' : 'bash'
+            this.workspaceTerminal = { pods: [], selectedPod: '', error: '' }
+            this.destroyWorkspaceTerminal()
             this.tunnelPortsText = ''
             this.tunnelExposeLoading = false
             this.tunnelSyncMessage = ''
@@ -2077,7 +2058,6 @@ const appVue = new Vue({
                 port_commands: [],
                 curl_example: '',
             }
-            this.loadWorkspaceSsh(ws)
             this.loadWorkspaceTunnel(ws)
             this.workspaceBackup = {
                 loading: false,
@@ -2111,12 +2091,10 @@ const appVue = new Vue({
             this.stopWorkspaceLogsPoll()
             this.stopWorkspaceMonitorPoll()
             this.stopWorkspaceBackupPoll()
+            this.destroyWorkspaceTerminal()
             this.destroyMonitorCharts()
             this.modalTab = 'general'
             this.modalWorkspace = null
-            this.sshPrivateKeyOnce = ''
-            this.sshSyncMessage = ''
-            this.sshSyncError = ''
             this.tunnelSyncMessage = ''
             this.tunnelSyncError = ''
         },
@@ -2127,17 +2105,28 @@ const appVue = new Vue({
             this.stopWorkspaceBackupPoll()
             if (tab === 'logs') {
                 this.destroyMonitorCharts()
+                this.destroyWorkspaceTerminal()
                 this.fetchWorkspaceLogs()
                 this.startWorkspaceLogsPoll()
                 return
             }
             if (tab === 'monitor') {
+                this.destroyWorkspaceTerminal()
                 this.fetchWorkspaceMonitor()
                 this.startWorkspaceMonitorPoll()
                 return
             }
+            if (tab === 'terminal') {
+                this.destroyMonitorCharts()
+                this.fetchWorkspaceTerminalPods().then(() => {
+                    this.$nextTick(() => this.initWorkspaceTerminal())
+                })
+                return
+            }
+            this.destroyWorkspaceTerminal()
             if (tab === 'backup') {
                 this.destroyMonitorCharts()
+                this.destroyWorkspaceTerminal()
                 this.workspaceBackup.formDirty = false
                 this.fetchWorkspaceBackup()
                 this.startWorkspaceBackupPoll()
@@ -2207,6 +2196,175 @@ const appVue = new Vue({
                     })
                 }
             }
+        },
+        destroyWorkspaceTerminal() {
+            if (this.workspaceTerminalPasteTarget && this.workspaceTerminalPasteHandler) {
+                this.workspaceTerminalPasteTarget.removeEventListener('paste', this.workspaceTerminalPasteHandler)
+            }
+            if (this.workspaceTerminalClickTarget && this.workspaceTerminalClickHandler) {
+                this.workspaceTerminalClickTarget.removeEventListener('click', this.workspaceTerminalClickHandler)
+            }
+            this.workspaceTerminalPasteTarget = null
+            this.workspaceTerminalPasteHandler = null
+            this.workspaceTerminalClickTarget = null
+            this.workspaceTerminalClickHandler = null
+            if (this.workspaceTerminalWs) {
+                try { this.workspaceTerminalWs.close() } catch (e) { /* ignore */ }
+                this.workspaceTerminalWs = null
+            }
+            if (this.workspaceTerminalInstance) {
+                try { this.workspaceTerminalInstance.dispose() } catch (e) { /* ignore */ }
+                this.workspaceTerminalInstance = null
+            }
+            this.workspaceTerminalFit = null
+        },
+        workspaceTerminalSendInput(ws, text) {
+            if (!text || !ws || ws.readyState !== WebSocket.OPEN) return
+            ws.send(JSON.stringify({ t: 'i', d: String(text || '').replace(/\r?\n/g, '\r') }))
+        },
+        workspaceTerminalPasteFromClipboard(ws) {
+            if (!navigator.clipboard || !navigator.clipboard.readText) return
+            navigator.clipboard.readText().then((text) => {
+                this.workspaceTerminalSendInput(ws, text)
+            }).catch(() => {})
+        },
+        async fetchWorkspaceTerminalPods() {
+            if (!this.modalWorkspace) return
+            const ws = this.modalWorkspace
+            this.workspaceTerminal.error = ''
+            try {
+                const res = await fetch('workspaces/' + ws.id + '/logs?tail=1')
+                if (!this.modalWorkspace || this.modalWorkspace.id !== ws.id) return
+                const data = await res.json().catch(() => ({}))
+                if (res.status !== 200) {
+                    this.workspaceTerminal.error = data.message || 'Failed to load pods'
+                    this.workspaceTerminal.pods = []
+                    return
+                }
+                const result = data.result || {}
+                this.workspaceTerminal.pods = result.pods || []
+                if (result.error && !this.workspaceTerminal.pods.length) {
+                    this.workspaceTerminal.error = result.error
+                }
+                if (result.selected_pod) {
+                    this.workspaceTerminal.selectedPod = result.selected_pod
+                } else if (!this.workspaceTerminal.selectedPod && this.workspaceTerminal.pods.length) {
+                    this.workspaceTerminal.selectedPod = this.workspaceTerminal.pods[0].name
+                }
+            } catch (e) {
+                if (this.modalWorkspace && this.modalWorkspace.id === ws.id) {
+                    this.workspaceTerminal.error = e.message || 'Failed to load pods'
+                }
+            }
+        },
+        onWorkspaceTerminalPodChange() {
+            this.reconnectWorkspaceTerminal()
+        },
+        onWorkspaceTerminalShellChange() {
+            this.reconnectWorkspaceTerminal()
+        },
+        reconnectWorkspaceTerminal() {
+            if (this.modalTab !== 'terminal' || !this.modalWorkspace) return
+            this.destroyWorkspaceTerminal()
+            this.$nextTick(() => this.initWorkspaceTerminal())
+        },
+        initWorkspaceTerminal() {
+            if (!this.modalWorkspace || typeof Terminal === 'undefined') return
+            const el = this.$refs.workspaceTerminalEl
+            if (!el) return
+            this.destroyWorkspaceTerminal()
+            if (!this.workspaceTerminal.selectedPod && this.workspaceTerminal.pods.length) {
+                this.workspaceTerminal.selectedPod = this.workspaceTerminal.pods[0].name
+            }
+            if (!this.workspaceTerminal.selectedPod) {
+                this.workspaceTerminal.error = this.workspaceTerminal.error || 'No running pod. Start the server first.'
+                return
+            }
+            const term = new Terminal({
+                cursorBlink: true,
+                fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace',
+                fontSize: 13,
+                theme: { background: '#0f172a' },
+                allowProposedApi: true,
+            })
+            let fitAddon = null
+            if (typeof FitAddon !== 'undefined' && FitAddon.FitAddon) {
+                fitAddon = new FitAddon.FitAddon()
+                term.loadAddon(fitAddon)
+            }
+            term.open(el)
+            if (fitAddon) fitAddon.fit()
+            term.focus()
+            const proto = window.location.protocol === 'https:' ? 'wss:' : 'ws:'
+            const params = new URLSearchParams()
+            params.set('shell', this.workspaceTerminalShell === 'sh' ? 'sh' : 'bash')
+            if (this.workspaceTerminal.selectedPod) params.set('pod', this.workspaceTerminal.selectedPod)
+            const wsUrl = proto + '//' + window.location.host + '/ws/workspaces/' + this.modalWorkspace.id + '/terminal?' + params.toString()
+            const ws = new WebSocket(wsUrl)
+            ws.binaryType = 'arraybuffer'
+            const sendInput = (text) => this.workspaceTerminalSendInput(ws, text)
+            ws.onopen = () => {
+                term.writeln('Connecting to ' + this.workspaceTerminal.selectedPod + ' (' + this.workspaceTerminalShell + ')…')
+                if (fitAddon) {
+                    fitAddon.fit()
+                    ws.send(JSON.stringify({ t: 'r', c: term.cols, r: term.rows }))
+                }
+                term.focus()
+            }
+            ws.onmessage = (ev) => {
+                if (typeof ev.data === 'string') term.write(ev.data)
+                else term.write(new Uint8Array(ev.data))
+            }
+            ws.onclose = () => term.writeln('\r\n\x1b[33m[disconnected]\x1b[0m')
+            ws.onerror = () => term.writeln('\r\n\x1b[31m[connection error]\x1b[0m')
+            term.onData((data) => sendInput(data))
+            term.onResize((size) => {
+                if (ws.readyState === WebSocket.OPEN) {
+                    ws.send(JSON.stringify({ t: 'r', c: size.cols, r: size.rows }))
+                }
+            })
+            term.attachCustomKeyEventHandler((ev) => {
+                if (ev.type !== 'keydown') return true
+                const key = (ev.key || '').toLowerCase()
+                const mod = ev.ctrlKey || ev.metaKey
+                if (!mod) return true
+                if (key === 'v' && !ev.shiftKey && !ev.altKey) {
+                    ev.preventDefault()
+                    this.workspaceTerminalPasteFromClipboard(ws)
+                    return false
+                }
+                if (key === 'c' && !ev.shiftKey && !ev.altKey) {
+                    if (term.hasSelection()) {
+                        ev.preventDefault()
+                        const selected = term.getSelection()
+                        if (selected && navigator.clipboard && navigator.clipboard.writeText) {
+                            navigator.clipboard.writeText(selected).catch(() => {})
+                        }
+                        return false
+                    }
+                    ev.preventDefault()
+                    sendInput('\x03')
+                    return false
+                }
+                return true
+            })
+            const pasteHandler = (ev) => {
+                const text = ev.clipboardData && ev.clipboardData.getData('text')
+                if (!text) return
+                ev.preventDefault()
+                sendInput(text)
+            }
+            const pasteTarget = term.textarea || el
+            pasteTarget.addEventListener('paste', pasteHandler)
+            this.workspaceTerminalPasteTarget = pasteTarget
+            this.workspaceTerminalPasteHandler = pasteHandler
+            const clickHandler = () => term.focus()
+            el.addEventListener('click', clickHandler)
+            this.workspaceTerminalClickTarget = el
+            this.workspaceTerminalClickHandler = clickHandler
+            this.workspaceTerminalInstance = term
+            this.workspaceTerminalFit = fitAddon
+            this.workspaceTerminalWs = ws
         },
         async fetchWorkspaceDescribe() {
             if (!this.modalWorkspace) return
@@ -2494,22 +2652,6 @@ const appVue = new Vue({
                 }
             }
         },
-        applySshModalFields(result) {
-            if (!this.modalWorkspace || !result) return
-            Object.keys(result).forEach((k) => {
-                if (k === 'private_key' || k === 'sync') return
-                this.$set(this.modalWorkspace, k, result[k])
-            })
-            if (result.exec_shell) {
-                this.sshExecShell = result.exec_shell === 'sh' ? 'sh' : 'bash'
-            }
-        },
-        async loadWorkspaceSsh(ws) {
-            const res = await fetch('workspaces/' + ws.id + '/ssh')
-            if (res.status !== 200 || !this.modalWorkspace || this.modalWorkspace.id !== ws.id) return
-            const data = await res.json()
-            this.applySshModalFields(data.result || {})
-        },
         applyTunnelInfo(result) {
             if (!result) return
             this.tunnelInfo = {
@@ -2561,46 +2703,6 @@ const appVue = new Vue({
             } finally {
                 this.tunnelExposeLoading = false
             }
-        },
-        async generateSshKeys(ws) {
-            this.sshGenerateLoading = true
-            this.sshPrivateKeyOnce = ''
-            this.sshSyncMessage = ''
-            this.sshSyncError = ''
-            try {
-                const res = await fetch('workspaces/' + ws.id + '/ssh/generate', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ exec_shell: this.sshExecShell === 'sh' ? 'sh' : 'bash' }),
-                })
-                const data = await res.json().catch(() => ({}))
-                const result = data.result || {}
-                this.applySshModalFields(result)
-                if (result.private_key) this.sshPrivateKeyOnce = result.private_key
-
-                const sync = result.sync || {}
-                if (sync.message) this.sshSyncMessage = sync.message
-                const syncErr = (sync.error || '').trim()
-                    || (sync.ok === false ? (sync.helm_logs || sync.apply_logs || '').trim() : '')
-                if (syncErr) this.sshSyncError = syncErr
-
-                if (res.status !== 200 || !result.has_key) {
-                    this.showToast(data.message || syncErr || 'SSH key generation failed')
-                    return
-                }
-                this.showToast(
-                    sync.message
-                    || (sync.ok === false ? (data.message || 'Keys saved — check sync status below') : 'SSH keys ready — save the private key')
-                )
-                await this.refreshLists()
-            } catch (e) {
-                this.showToast(e.message || 'SSH key generation failed')
-            } finally {
-                this.sshGenerateLoading = false
-            }
-        },
-        downloadSshKey(ws) {
-            window.location = 'workspaces/' + ws.id + '/ssh/download'
         },
         downloadMonitorFile(ws) {
             if (!ws) return

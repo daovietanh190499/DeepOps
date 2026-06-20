@@ -11,12 +11,6 @@ spec:
       targetPort: http
       protocol: TCP
       name: http
-    {{- if or .Values.sidecars.always .Values.sshBridge.enabled }}
-    - port: {{ .Values.sshBridge.wsPort }}
-      targetPort: ssh-ws
-      protocol: TCP
-      name: ssh-ws
-    {{- end }}
     {{- if or .Values.sidecars.always .Values.portTunnel.enabled }}
     - port: {{ .Values.portTunnel.wsPort }}
       targetPort: port-ws

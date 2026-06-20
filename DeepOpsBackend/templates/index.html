@@ -1318,6 +1318,9 @@
                 <button type="button" @click="switchModalTab('describe')"
                         :class="modalTab==='describe' ? 'border-blue-600 text-blue-700 bg-white' : 'border-transparent text-slate-500 hover:text-slate-700'"
                         class="rounded-t-lg border-b-2 px-4 py-2 text-xs font-semibold">Describe</button>
+                <button type="button" @click="switchModalTab('terminal')"
+                        :class="modalTab==='terminal' ? 'border-blue-600 text-blue-700 bg-white' : 'border-transparent text-slate-500 hover:text-slate-700'"
+                        class="rounded-t-lg border-b-2 px-4 py-2 text-xs font-semibold">Terminal</button>
                 <button type="button" @click="switchModalTab('monitor')"
                         :class="modalTab==='monitor' ? 'border-blue-600 text-blue-700 bg-white' : 'border-transparent text-slate-500 hover:text-slate-700'"
                         class="rounded-t-lg border-b-2 px-4 py-2 text-xs font-semibold">Monitor</button>
@@ -1419,66 +1422,6 @@
                     </ul>
                 </div>
 
-                <div class="rounded-xl border border-indigo-100 bg-indigo-50/50 p-4 space-y-3">
-                    <div class="flex flex-wrap items-center justify-between gap-2">
-                        <p class="font-semibold text-slate-800">SSH over HTTPS</p>
-                        <button type="button" @click="generateSshKeys(modalWorkspace)" :disabled="sshGenerateLoading"
-                                class="rounded-lg bg-indigo-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-indigo-700 disabled:opacity-50">
-                            <span v-if="sshGenerateLoading">Generating…</span>
-                            <span v-else v-text="modalWorkspace.has_key ? 'Regenerate key pair' : 'Generate key pair'"></span>
-                        </button>
-                    </div>
-                    <div>
-                        <label class="text-xs font-medium text-slate-600">Container shell for SSH</label>
-                        <select v-model="sshExecShell" class="mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-sm">
-                            <option value="bash">bash (default)</option>
-                            <option value="sh">sh (minimal images without bash)</option>
-                        </select>
-                        <p class="mt-1 text-xs text-slate-500">Used by the SSH bridge for <code class="rounded bg-white px-1">kubectl exec</code>. Choose <strong>sh</strong> for Alpine or distroless images. Applied when you generate or regenerate keys.</p>
-                    </div>
-                    <p class="text-xs text-slate-600">Tunnel SSH through <code class="rounded bg-white px-1">wss://&lt;domain&gt;/&lt;user&gt;/&lt;slug&gt;/ssh-tunnel</code> on the hub domain (port 443). The workspace subdomain is only for the main app.</p>
-                    <div class="rounded-lg border border-slate-200 bg-white p-3 text-xs text-slate-600 space-y-1">
-                        <p class="font-semibold text-slate-700">Install wstunnel (client)</p>
-                        <p>SSH uses <code class="rounded bg-slate-100 px-1">wstunnel</code> as <code class="rounded bg-slate-100 px-1">ProxyCommand</code>. Download the binary for your OS from
-                            <a href="https://github.com/erebe/wstunnel/releases" target="_blank" rel="noopener noreferrer"
-                               class="font-semibold text-indigo-600 hover:underline">wstunnel releases</a>
-                            (e.g. <code class="rounded bg-slate-100 px-1">wstunnel_*_windows_amd64.zip</code>,
-                            <code class="rounded bg-slate-100 px-1">darwin_arm64</code>,
-                            <code class="rounded bg-slate-100 px-1">linux_amd64</code>), extract it, and add the folder to your <code class="rounded bg-slate-100 px-1">PATH</code>.
-                        </p>
-                    </div>
-                    <p v-if="sshSyncMessage && !sshSyncError" class="text-xs text-emerald-700" v-text="sshSyncMessage"></p>
-                    <p v-if="sshSyncError" class="text-xs text-rose-600 whitespace-pre-wrap" v-text="sshSyncError"></p>
-                    <div v-if="modalWorkspace.has_key" class="space-y-2 text-xs">
-                        <div class="flex items-center gap-2">
-                            <span class="font-medium text-slate-500 shrink-0">WSS URL</span>
-                            <span class="font-mono text-slate-800 truncate flex-1" v-text="modalWorkspace.wss_url"></span>
-                            <button type="button" @click="copyText(modalWorkspace.wss_url, 'WSS URL copied')" class="shrink-0 rounded border bg-white px-2 py-0.5 hover:bg-slate-50"><i class="fa fa-copy"></i></button>
-                        </div>
-                        <div class="flex items-center gap-2">
-                            <span class="font-medium text-slate-500 shrink-0">SSH</span>
-                            <span class="font-mono text-slate-800" v-text="modalWorkspace.ssh_command"></span>
-                            <button type="button" @click="copyText(modalWorkspace.ssh_command, 'SSH command copied')" class="shrink-0 rounded border bg-white px-2 py-0.5 hover:bg-slate-50"><i class="fa fa-copy"></i></button>
-                        </div>
-                        <p class="text-slate-500" v-text="'Client key: ' + (modalWorkspace.fingerprint || '—')"></p>
-                        <p class="text-slate-500" v-text="'Host key (stable across restarts): ' + (modalWorkspace.host_key_fingerprint || '—')"></p>
-                        <pre class="overflow-x-auto rounded-lg bg-slate-900 p-3 text-[10px] text-slate-100 whitespace-pre-wrap" v-text="modalWorkspace.ssh_config"></pre>
-                        <div class="flex flex-wrap gap-2">
-                            <button type="button" @click="copyText(modalWorkspace.ssh_config, 'SSH config copied')"
-                                    class="rounded-lg border bg-white px-3 py-1.5 text-xs font-semibold hover:bg-slate-50">Copy ~/.ssh/config block</button>
-                            <button type="button" @click="downloadSshKey(modalWorkspace)"
-                                    class="rounded-lg border bg-white px-3 py-1.5 text-xs font-semibold hover:bg-slate-50">Download private key</button>
-                        </div>
-                    </div>
-                    <p v-else class="text-xs text-slate-500">Generate a key pair to enable SSH. Restart or start the server after generating.</p>
-                    <div v-if="sshPrivateKeyOnce" class="rounded-lg border border-amber-200 bg-amber-50 p-3 space-y-2">
-                        <p class="text-xs font-semibold text-amber-800">Save this private key now — shown once after generate:</p>
-                        <pre class="max-h-32 overflow-auto rounded bg-slate-900 p-2 text-[10px] text-emerald-200 whitespace-pre-wrap" v-text="sshPrivateKeyOnce"></pre>
-                        <button type="button" @click="copyText(sshPrivateKeyOnce, 'Private key copied')"
-                                class="rounded-lg border border-amber-300 bg-white px-3 py-1 text-xs font-semibold">Copy private key</button>
-                    </div>
-                </div>
-
                 <div class="rounded-xl border border-teal-100 bg-teal-50/50 p-4 space-y-3">
                     <div class="flex flex-wrap items-center justify-between gap-2">
                         <p class="font-semibold text-slate-800">Exposing port through websocket tunnel</p>
@@ -1533,24 +1476,8 @@
                             </div>
                             <p v-if="!entry.is_ssh_port && entry.port === (tunnelInfo.ports[0] || 0)" class="text-slate-500" v-text="'Example: curl http://localhost:' + entry.local_port + '/'"></p>
                             <div v-if="entry.is_ssh_port" class="rounded-lg border border-indigo-200 bg-indigo-50/60 p-2 space-y-2 mt-1">
-                                <p class="font-semibold text-indigo-900 text-[11px]">SSH via ProxyCommand (stdio)</p>
-                                <p class="text-[10px] text-slate-600">For container SSH on port <span v-text="entry.port"></span>, use <code class="rounded bg-white px-1">wstunnel</code> as <code class="rounded bg-white px-1">ProxyCommand</code> (same pattern as the built-in SSH bridge). No local TCP listener — avoids binding port <span v-text="entry.port"></span> on your machine.</p>
-                                <div class="flex items-start gap-2">
-                                    <span class="font-medium text-slate-500 shrink-0 pt-1 text-[10px]">ProxyCommand</span>
-                                    <pre class="flex-1 overflow-x-auto rounded bg-slate-900 p-2 text-[10px] text-slate-100 whitespace-pre-wrap" v-text="entry.proxy_command"></pre>
-                                    <button type="button" @click="copyText(entry.proxy_command, 'ProxyCommand copied')" class="shrink-0 rounded border px-2 py-0.5 hover:bg-slate-50"><i class="fa fa-copy"></i></button>
-                                </div>
-                                <div class="flex items-start gap-2">
-                                    <span class="font-medium text-slate-500 shrink-0 pt-1 text-[10px]">~/.ssh/config</span>
-                                    <pre class="flex-1 overflow-x-auto rounded bg-slate-900 p-2 text-[10px] text-slate-100 whitespace-pre-wrap" v-text="entry.ssh_config"></pre>
-                                    <button type="button" @click="copyText(entry.ssh_config, 'SSH config copied')" class="shrink-0 rounded border px-2 py-0.5 hover:bg-slate-50"><i class="fa fa-copy"></i></button>
-                                </div>
-                                <div class="flex items-center gap-2">
-                                    <span class="font-medium text-slate-500 shrink-0 text-[10px]">Connect</span>
-                                    <code class="font-mono text-slate-800 text-[11px]" v-text="entry.ssh_command"></code>
-                                    <button type="button" @click="copyText(entry.ssh_command, 'SSH command copied')" class="shrink-0 rounded border px-2 py-0.5 hover:bg-slate-50"><i class="fa fa-copy"></i></button>
-                                </div>
-                                <p class="text-[10px] text-slate-500">Set <code class="rounded bg-white px-1">User</code> (and <code class="rounded bg-white px-1">IdentityFile</code> if needed) in the config snippet for your container account.</p>
+                                <p class="font-semibold text-indigo-900 text-[11px]">SSH note</p>
+                                <p class="text-[10px] text-slate-600">SSH bridge was removed. Use the <strong>Terminal</strong> tab for interactive access instead.</p>
                             </div>
                         </div>
                     </div>
@@ -1605,6 +1532,33 @@
                 <p v-if="workspaceDescribe.error" class="text-xs text-rose-600 whitespace-pre-wrap" v-text="workspaceDescribe.error"></p>
                 <pre class="flex-1 min-h-[40vh] max-h-[60vh] overflow-auto rounded-lg bg-slate-900 p-4 font-mono text-[11px] leading-relaxed text-slate-100 whitespace-pre-wrap"
                      v-text="workspaceDescribe.text || (workspaceDescribe.loading ? 'Loading describe output…' : 'Click Refresh to load kubectl describe output.')"></pre>
+            </div>
+
+            <!-- Terminal tab -->
+            <div v-show="modalTab==='terminal'" class="space-y-3 flex flex-col min-h-[50vh]">
+                <div class="flex flex-wrap items-center gap-2">
+                    <label class="text-xs text-slate-500">Pod</label>
+                    <select v-model="workspaceTerminal.selectedPod" @change="onWorkspaceTerminalPodChange"
+                            class="rounded-lg border px-2 py-1 text-xs font-mono min-w-[10rem]">
+                        <option v-if="!workspaceTerminal.pods.length" value="">No pods</option>
+                        <option v-for="p in workspaceTerminal.pods" :key="p.name" :value="p.name" v-text="p.name + ' (' + p.display + ')'"></option>
+                    </select>
+                    <label class="text-xs text-slate-500 ml-1">Shell</label>
+                    <select v-model="workspaceTerminalShell" @change="onWorkspaceTerminalShellChange"
+                            class="rounded-lg border px-2 py-1 text-xs font-mono">
+                        <option value="bash">bash</option>
+                        <option value="sh">sh</option>
+                    </select>
+                    <button type="button" @click="reconnectWorkspaceTerminal()"
+                            class="ml-auto rounded-lg border px-3 py-1 text-xs font-semibold hover:bg-slate-50">
+                        Reconnect
+                    </button>
+                </div>
+                <p class="text-xs text-slate-500">Interactive shell in the main container via <code class="rounded bg-slate-100 px-1">kubectl exec -it</code>. Server must be running.</p>
+                <p v-if="workspaceTerminal.error" class="text-xs text-rose-600 whitespace-pre-wrap" v-text="workspaceTerminal.error"></p>
+                <div class="flex-1 min-h-[40vh] max-h-[60vh] rounded-lg overflow-hidden border border-slate-800">
+                    <div ref="workspaceTerminalEl" class="h-full w-full min-h-[40vh]"></div>
+                </div>
             </div>
 
             <!-- Monitor tab -->

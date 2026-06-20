@@ -5,7 +5,6 @@ import subprocess
 from .config import get_hub_config
 from .gpu_resources import parse_gpu_resources
 from .k8s_env import CODEHUB_CHART_PATH, DEFAULT_PORT, DOMAIN_NAME, NAMESPACE
-from .ssh_keys import get_or_none, ssh_keys_ready, ssh_secret_name
 
 
 def _storage_class() -> str:
@@ -105,7 +104,6 @@ def build_spawn_config(workspace) -> dict:
     file_mount_rows = list(workspace.file_mounts.order_by('sort_order', 'created_at'))
     cm_name = file_mounts_configmap_name(workspace)
     cm_volumes, cm_volume_mounts = build_configmap_volume_specs(file_mount_rows, cm_name)
-    ssh_record = get_or_none(workspace)
 
     return {
         'workspace_id': str(workspace.id),
@@ -133,9 +131,6 @@ def build_spawn_config(workspace) -> dict:
         'configmap_volume_mounts': cm_volume_mounts,
         'file_mounts_configmap_name': cm_name if file_mount_rows else '',
         'secret_name': f'{user.username}-{slug}-secret',
-        'ssh_enabled': ssh_keys_ready(ssh_record),
-        'ssh_secret_name': ssh_secret_name(workspace),
-        'ssh_public_key': ssh_record.public_key if ssh_record else '',
         'ws_tunnel_ports': list(workspace.ws_tunnel_ports or []) if isinstance(workspace.ws_tunnel_ports, list) else [],
         'privileged': workspace.privileged,
         'exec_shell': workspace.exec_shell or 'bash',
@@ -159,14 +154,13 @@ def _security_context_helm_flags(privileged: bool) -> list[str]:
 
 
 def _sidecar_ingress_flags(config: dict) -> list[str]:
-    """Path-based SSH / port-tunnel routes on the hub domain (always provisioned)."""
+    """Path-based sidecar routes on the hub domain (always provisioned)."""
     username = config['username']
     slug = config['slug']
     return [
         '--set', 'sidecarIngress.enabled=true',
         '--set-string', f'sidecarIngress.host={DOMAIN_NAME}',
         '--set-string', f'sidecarIngress.tlsSecretName=tls-{NAMESPACE}-secret',
-        '--set-string', f'sshBridge.ingressPath=/{username}/{slug}/ssh-tunnel',
         '--set-string', f'portTunnel.ingressPath=/{username}/{slug}/port-tunnel',
     ]
 
@@ -295,16 +289,8 @@ def _helm_base_cmd(config: dict) -> list[str]:
     cmd.extend(['--set-json', f'volumes={json.dumps(volumes)}'])
     cmd.extend(['--set-json', f'volumeMounts={json.dumps(volume_mounts)}'])
 
-    bridge_image = os.environ.get('SSH_BRIDGE_IMAGE', 'localhost:32000/ssh-bridge')
-    bridge_tag = os.environ.get('SSH_BRIDGE_TAG', 'latest')
     cmd.extend([
         '--set', 'sidecars.always=true',
-        '--set', 'sshBridge.enabled=true',
-        '--set', 'sshBridge.rbac.create=true',
-        '--set-string', f'sshBridge.secretName={config.get("ssh_secret_name") or "placeholder-ssh-secret"}',
-        '--set-string', f'sshBridge.execShell={config.get("exec_shell") or "bash"}',
-        '--set-string', f'sshBridge.image.repository={bridge_image}',
-        '--set-string', f'sshBridge.image.tag={bridge_tag}',
     ])
 
     monitor_image = os.environ.get('MONITOR_SIDECAR_IMAGE', 'localhost:32000/monitor-sidecar')
@@ -352,7 +338,6 @@ def create_codehub(config: dict) -> tuple[str, str, int]:
     from .backup_config import backup_secret_name
     from .backup_k8s import apply_backup_secret
     from .sidecar_k8s import sync_workspace_sidecars
-    from .ssh_k8s import sync_ssh_secret_for_workspace
     from .workspace_files_k8s import apply_workspace_file_configmap
 
     workspace = Workspace.objects.get(id=config['workspace_id'])
@@ -364,12 +349,6 @@ def create_codehub(config: dict) -> tuple[str, str, int]:
     file_logs, file_code = apply_workspace_file_configmap(workspace)
     if file_code != 0:
         return '', f'file mount configmap apply failed: {file_logs}', file_code
-
-    ssh_record = get_or_none(workspace)
-    if ssh_keys_ready(ssh_record):
-        logs, code = sync_ssh_secret_for_workspace(workspace)
-        if code != 0:
-            return '', f'ssh secret apply failed: {logs}', code
 
     prep_logs, prep_code = _clear_stuck_helm_release(config['release_name'])
     if prep_code != 0:

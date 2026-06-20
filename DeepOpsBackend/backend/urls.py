@@ -6,7 +6,6 @@ from backend.views import catalog as catalog_views
 from backend.views import cluster as cluster_views
 from backend.views import drives as drive_views
 from backend.views import groups as group_views
-from backend.views import ssh as ssh_views
 from backend.views import ssh_nodes as ssh_nodes_views
 from backend.views import tunnel as tunnel_views
 from backend.views import workspaces as ws_views
@@ -68,9 +67,6 @@ urlpatterns = [
     path('workspaces/run', ws_views.workspace_run, name='workspace-run'),
     path('workspaces/bulk_run', ws_views.workspace_bulk_run, name='workspace-bulk-run'),
     path('workspaces/create', ws_views.workspace_create, name='workspace-create'),
-    path('workspaces/<uuid:workspace_id>/ssh/generate', ssh_views.workspace_ssh_generate, name='workspace-ssh-generate'),
-    path('workspaces/<uuid:workspace_id>/ssh/download', ssh_views.workspace_ssh_download_key, name='workspace-ssh-download'),
-    path('workspaces/<uuid:workspace_id>/ssh', ssh_views.workspace_ssh_info, name='workspace-ssh-info'),
     path('workspaces/<uuid:workspace_id>/tunnel/expose', tunnel_views.workspace_tunnel_expose, name='workspace-tunnel-expose'),
     path('workspaces/<uuid:workspace_id>/tunnel', tunnel_views.workspace_tunnel_info, name='workspace-tunnel-info'),
     path('workspaces/<uuid:workspace_id>/logs', ws_views.workspace_logs_view, name='workspace-logs'),

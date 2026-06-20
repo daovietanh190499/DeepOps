@@ -15,7 +15,7 @@ from django.utils import timezone as dj_timezone
 
 from backend.models import SSHNode, SSHNodeManagerKey
 
-from .ssh_keys import decrypt_private_key, encrypt_private_key, generate_keypair
+from .ssh_nodes_crypto import decrypt_private_key, encrypt_private_key, generate_keypair
 
 # Run via bash: zsh misparses nested "..." / $(...) / awk "$5" in a plain -c string.
 _HEALTH_SCRIPT = (

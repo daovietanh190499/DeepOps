@@ -25,8 +25,8 @@ spec:
       imagePullSecrets:
         {{- toYaml . | nindent 8 }}
       {{- end }}
-      serviceAccountName: {{- if or .Values.sidecars.always .Values.sshBridge.enabled .Values.monitor.enabled }} {{ include "codehub.sidecarServiceAccountName" . }}{{- else }} {{ include "codehub.serviceAccountName" . }}{{- end }}
-      {{- if or .Values.sidecars.always .Values.sshBridge.enabled .Values.monitor.enabled }}
+      serviceAccountName: {{- if or .Values.sidecars.always .Values.monitor.enabled }} {{ include "codehub.sidecarServiceAccountName" . }}{{- else }} {{ include "codehub.serviceAccountName" . }}{{- end }}
+      {{- if or .Values.sidecars.always .Values.monitor.enabled }}
       automountServiceAccountToken: false
       {{- end }}
       terminationGracePeriodSeconds: 30
@@ -117,59 +117,6 @@ spec:
             {{- with .Values.volumeMounts }}
             {{- toYaml . | nindent 12 }}
             {{- end }}
-        {{- if or .Values.sidecars.always .Values.sshBridge.enabled }}
-        - name: ssh-bridge
-          image: "{{ .Values.sshBridge.image.repository }}:{{ .Values.sshBridge.image.tag }}"
-          imagePullPolicy: {{ .Values.sshBridge.image.pullPolicy }}
-          ports:
-            - name: ssh-ws
-              containerPort: {{ .Values.sshBridge.wsPort }}
-              protocol: TCP
-          env:
-            - name: SSH_USER
-              value: {{ .Values.sshBridge.sshUser | quote }}
-            - name: SSH_PORT
-              value: {{ .Values.sshBridge.sshPort | quote }}
-            - name: WS_PORT
-              value: {{ .Values.sshBridge.wsPort | quote }}
-            - name: WS_PATH_PREFIX
-              value: {{ .Values.sshBridge.pathPrefix | default "ssh-tunnel" | quote }}
-            - name: AUTHORIZED_KEYS
-              value: /ssh-secrets/authorized_keys
-            - name: HOST_KEY
-              value: /ssh-secrets/host_key
-            - name: POD_NAME
-              valueFrom:
-                fieldRef:
-                  fieldPath: metadata.name
-            - name: POD_NAMESPACE
-              valueFrom:
-                fieldRef:
-                  fieldPath: metadata.namespace
-            - name: TARGET_CONTAINER
-              value: {{ .Values.sshBridge.targetContainer | default .Chart.Name | quote }}
-            - name: EXEC_SHELL
-              value: {{ .Values.sshBridge.execShell | default "bash" | quote }}
-          resources:
-            requests:
-              cpu: 50m
-              memory: 64Mi
-            limits:
-              cpu: 200m
-              memory: 256Mi
-          volumeMounts:
-            # Mount the whole secret directory (not subPath files) so keys created
-            # after the pod starts are visible without restarting the workspace.
-            - name: ssh-authorized-keys
-              mountPath: /ssh-secrets
-              readOnly: true
-            - name: k8s-token
-              mountPath: /var/run/secrets/kubernetes.io/serviceaccount
-              readOnly: true
-            - name: sidecar-config
-              mountPath: /config/sidecar
-              readOnly: true
-        {{- end }}
         {{- if or .Values.sidecars.always .Values.portTunnel.enabled }}
         - name: port-tunnel
           image: "{{ .Values.portTunnel.image.repository }}:{{ .Values.portTunnel.image.tag }}"
@@ -286,13 +233,7 @@ spec:
             claimName: {{ $claimName }}
         {{- end }}
         {{- end }}
-        {{- if or .Values.sidecars.always .Values.sshBridge.enabled }}
-        - name: ssh-authorized-keys
-          secret:
-            secretName: {{ .Values.sshBridge.secretName | default "placeholder-ssh-secret" }}
-            optional: true
-        {{- end }}
-        {{- if or .Values.sidecars.always .Values.sshBridge.enabled .Values.monitor.enabled }}
+        {{- if or .Values.sidecars.always .Values.monitor.enabled }}
         - name: k8s-token
           projected:
             sources:
