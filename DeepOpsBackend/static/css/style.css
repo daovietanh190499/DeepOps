@@ -127,6 +127,15 @@ input[type="range"].dohub-range:disabled::-webkit-slider-thumb {
   min-width: 0;
 }
 
+.dohub-combobox-list {
+  overscroll-behavior: contain;
+}
+
+.dohub-combobox-option:focus-visible {
+  outline: 2px solid #3b82f6;
+  outline-offset: -2px;
+}
+
 @media (min-width: 640px) {
   .dohub-filter-input {
     width: auto;

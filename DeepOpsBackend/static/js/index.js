@@ -694,6 +694,9 @@ const appVue = new Vue({
         driveBulkLoading: false,
         driveBulkSummary: '',
         dockerImages: [],
+        dockerImageSearchQuery: '',
+        dockerImageDropdownOpen: false,
+        dockerImageHighlightIndex: -1,
         myWorkspaces: [],
         myServerFilter: '',
         myServerPagination: { page: 1, pages: 1, total: 0, per_page: 12 },
@@ -756,8 +759,6 @@ const appVue = new Vue({
         sshNodeTerminal: null,
         sshNodeTerminalFit: null,
         sshNodeTerminalWs: null,
-        sshNodeTerminalPasteTarget: null,
-        sshNodeTerminalPasteHandler: null,
         sshNodeTerminalClickTarget: null,
         sshNodeTerminalClickHandler: null,
         tunnelPortsText: '',
@@ -817,8 +818,6 @@ const appVue = new Vue({
         workspaceTerminalInstance: null,
         workspaceTerminalFit: null,
         workspaceTerminalWs: null,
-        workspaceTerminalPasteTarget: null,
-        workspaceTerminalPasteHandler: null,
         workspaceTerminalClickTarget: null,
         workspaceTerminalClickHandler: null,
         workspaceBackupTimer: null,
@@ -951,6 +950,16 @@ const appVue = new Vue({
             if (!img) return []
             if (img.tags && img.tags.length) return img.tags
             return [img.default_tag || 'latest']
+        },
+        filteredDockerImages() {
+            const q = (this.dockerImageSearchQuery || '').trim().toLowerCase()
+            const list = this.dockerImages || []
+            if (!q) return list
+            return list.filter((img) => {
+                const label = (img.label || '').toLowerCase()
+                const repo = (img.repository || '').toLowerCase()
+                return label.includes(q) || repo.includes(q)
+            })
         },
         selectedDrivesLabel() {
             const mounts = (this.form.drive_mounts || []).filter((m) => m.drive_id)
@@ -1670,14 +1679,9 @@ const appVue = new Vue({
             }
         },
         destroySshNodeTerminal() {
-            if (this.sshNodeTerminalPasteTarget && this.sshNodeTerminalPasteHandler) {
-                this.sshNodeTerminalPasteTarget.removeEventListener('paste', this.sshNodeTerminalPasteHandler)
-            }
             if (this.sshNodeTerminalClickTarget && this.sshNodeTerminalClickHandler) {
                 this.sshNodeTerminalClickTarget.removeEventListener('click', this.sshNodeTerminalClickHandler)
             }
-            this.sshNodeTerminalPasteTarget = null
-            this.sshNodeTerminalPasteHandler = null
             this.sshNodeTerminalClickTarget = null
             this.sshNodeTerminalClickHandler = null
             if (this.sshNodeTerminalWs) {
@@ -1773,16 +1777,6 @@ const appVue = new Vue({
                 }
                 return true
             })
-            const pasteHandler = (ev) => {
-                const text = ev.clipboardData && ev.clipboardData.getData('text')
-                if (!text) return
-                ev.preventDefault()
-                sendInput(text)
-            }
-            const pasteTarget = term.textarea || el
-            pasteTarget.addEventListener('paste', pasteHandler)
-            this.sshNodeTerminalPasteTarget = pasteTarget
-            this.sshNodeTerminalPasteHandler = pasteHandler
             const clickHandler = () => term.focus()
             el.addEventListener('click', clickHandler)
             this.sshNodeTerminalClickTarget = el
@@ -2198,14 +2192,9 @@ const appVue = new Vue({
             }
         },
         destroyWorkspaceTerminal() {
-            if (this.workspaceTerminalPasteTarget && this.workspaceTerminalPasteHandler) {
-                this.workspaceTerminalPasteTarget.removeEventListener('paste', this.workspaceTerminalPasteHandler)
-            }
             if (this.workspaceTerminalClickTarget && this.workspaceTerminalClickHandler) {
                 this.workspaceTerminalClickTarget.removeEventListener('click', this.workspaceTerminalClickHandler)
             }
-            this.workspaceTerminalPasteTarget = null
-            this.workspaceTerminalPasteHandler = null
             this.workspaceTerminalClickTarget = null
             this.workspaceTerminalClickHandler = null
             if (this.workspaceTerminalWs) {
@@ -2348,16 +2337,6 @@ const appVue = new Vue({
                 }
                 return true
             })
-            const pasteHandler = (ev) => {
-                const text = ev.clipboardData && ev.clipboardData.getData('text')
-                if (!text) return
-                ev.preventDefault()
-                sendInput(text)
-            }
-            const pasteTarget = term.textarea || el
-            pasteTarget.addEventListener('paste', pasteHandler)
-            this.workspaceTerminalPasteTarget = pasteTarget
-            this.workspaceTerminalPasteHandler = pasteHandler
             const clickHandler = () => term.focus()
             el.addEventListener('click', clickHandler)
             this.workspaceTerminalClickTarget = el
@@ -3644,6 +3623,7 @@ const appVue = new Vue({
                 const tags = (first.tags && first.tags.length) ? first.tags : [first.default_tag || 'latest']
                 this.form.docker_tag = tags.includes(first.default_tag) ? first.default_tag : tags[0]
             }
+            this.syncDockerImageSearchQuery()
         },
         async loadMyDockerImages(page) {
             this.clearBulkSelection('images')
@@ -3698,6 +3678,65 @@ const appVue = new Vue({
                 const tags = (img.tags && img.tags.length) ? img.tags : [img.default_tag || 'latest']
                 this.form.docker_tag = tags.includes(img.default_tag) ? img.default_tag : tags[0]
             }
+            this.syncDockerImageSearchQuery()
+        },
+        dockerImageDisplayLabel(img) {
+            if (!img) return ''
+            const label = (img.label || '').trim()
+            const repo = (img.repository || '').trim()
+            if (repo && repo !== label) return label + ' · ' + repo
+            return label || repo
+        },
+        syncDockerImageSearchQuery() {
+            const img = this.dockerImages.find((i) => i.id === this.form.docker_image_id)
+            if (img) {
+                this.dockerImageSearchQuery = this.dockerImageDisplayLabel(img)
+            } else if (this.form.docker_repository) {
+                this.dockerImageSearchQuery = this.form.docker_repository
+            } else {
+                this.dockerImageSearchQuery = ''
+            }
+        },
+        onDockerImageSearchFocus(ev) {
+            this.dockerImageDropdownOpen = true
+            this.dockerImageHighlightIndex = -1
+            this.$nextTick(() => {
+                if (ev && ev.target && ev.target.select) ev.target.select()
+            })
+        },
+        onDockerImageSearchInput() {
+            this.dockerImageDropdownOpen = true
+            this.dockerImageHighlightIndex = -1
+        },
+        onDockerImageSearchBlur() {
+            window.setTimeout(() => {
+                this.dockerImageDropdownOpen = false
+                this.dockerImageHighlightIndex = -1
+                this.syncDockerImageSearchQuery()
+            }, 150)
+        },
+        selectDockerImage(img) {
+            if (!img) return
+            this.form.docker_image_id = img.id
+            this.onDockerImageChange()
+            this.dockerImageSearchQuery = this.dockerImageDisplayLabel(img)
+            this.dockerImageDropdownOpen = false
+            this.dockerImageHighlightIndex = -1
+        },
+        dockerImageHighlightNext() {
+            const n = this.filteredDockerImages.length
+            if (!n) return
+            this.dockerImageHighlightIndex = (this.dockerImageHighlightIndex + 1) % n
+        },
+        dockerImageHighlightPrev() {
+            const n = this.filteredDockerImages.length
+            if (!n) return
+            this.dockerImageHighlightIndex = this.dockerImageHighlightIndex <= 0 ? n - 1 : this.dockerImageHighlightIndex - 1
+        },
+        dockerImageSelectHighlighted() {
+            const idx = this.dockerImageHighlightIndex
+            if (idx < 0 || idx >= this.filteredDockerImages.length) return
+            this.selectDockerImage(this.filteredDockerImages[idx])
         },
         applyTemplate(t) {
             const gpu = normalizeGpuValue(t.gpu)
@@ -3748,11 +3787,12 @@ const appVue = new Vue({
                 const tags = (img.tags && img.tags.length) ? img.tags : [img.default_tag || 'latest']
                 const wanted = (t.docker_tag || img.default_tag || tags[0] || 'latest').trim()
                 this.form.docker_tag = tags.includes(wanted) ? wanted : tags[0]
-                return
+            } else {
+                this.form.docker_image_id = ''
+                this.form.docker_repository = repository
+                this.form.docker_tag = (t.docker_tag || 'latest').trim()
             }
-            this.form.docker_image_id = ''
-            this.form.docker_repository = repository
-            this.form.docker_tag = (t.docker_tag || 'latest').trim()
+            this.syncDockerImageSearchQuery()
         },
         templateSummaryLine(t) {
             const parts = [t.cpu + ' vCPU', t.gpu || 'no GPU']
@@ -4179,6 +4219,9 @@ const appVue = new Vue({
             this.envKey = ''
             this.envValue = ''
             this.runError = ''
+            this.dockerImageSearchQuery = ''
+            this.dockerImageDropdownOpen = false
+            this.dockerImageHighlightIndex = -1
         },
         async openCreateServerModal() {
             this.mobileNavOpen = false
@@ -4255,6 +4298,7 @@ const appVue = new Vue({
                 size_bytes: fm.size_bytes || utf8ByteLength(fm.content || ''),
                 file_error: '',
             }))
+            this.syncDockerImageSearchQuery()
             this.showCreateServerModal = true
         },
         openBulkCreateServerModal() {

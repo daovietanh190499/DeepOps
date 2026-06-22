@@ -1976,10 +1976,37 @@
                         </div>
                         <div class="grid gap-4 sm:grid-cols-2">
                             <div><label class="text-sm font-medium text-slate-600">Docker image</label>
-                                <select v-model="form.docker_image_id" @change="onDockerImageChange"
-                                        class="mt-1 w-full rounded-lg border px-3 py-2 text-sm">
-                                    <option v-for="img in dockerImages" :key="img.id" :value="img.id" v-text="img.label"></option>
-                                </select></div>
+                                <div class="relative mt-1">
+                                    <input v-model="dockerImageSearchQuery" type="text"
+                                           placeholder="Type to search images…"
+                                           autocomplete="off"
+                                           spellcheck="false"
+                                           class="w-full rounded-lg border px-3 py-2 text-sm"
+                                           @focus="onDockerImageSearchFocus($event)"
+                                           @input="onDockerImageSearchInput"
+                                           @blur="onDockerImageSearchBlur"
+                                           @keydown.down.prevent="dockerImageHighlightNext"
+                                           @keydown.up.prevent="dockerImageHighlightPrev"
+                                           @keydown.enter.prevent="dockerImageSelectHighlighted"
+                                           @keydown.escape="dockerImageDropdownOpen = false">
+                                    <ul v-if="dockerImageDropdownOpen"
+                                        class="dohub-combobox-list absolute z-20 mt-1 max-h-48 w-full overflow-y-auto rounded-lg border border-slate-200 bg-white py-1 shadow-lg">
+                                        <li v-if="!filteredDockerImages.length"
+                                            class="px-3 py-2 text-sm text-slate-500">No matching images</li>
+                                        <li v-for="(img, idx) in filteredDockerImages" :key="img.id">
+                                            <button type="button"
+                                                    class="dohub-combobox-option w-full px-3 py-2 text-left text-sm hover:bg-slate-50"
+                                                    :class="[
+                                                        form.docker_image_id === img.id ? 'bg-blue-50 text-blue-900' : 'text-slate-800',
+                                                        dockerImageHighlightIndex === idx ? 'bg-slate-100' : '',
+                                                    ]"
+                                                    @mousedown.prevent="selectDockerImage(img)">
+                                                <span class="font-medium" v-text="img.label"></span>
+                                                <span class="block truncate font-mono text-xs text-slate-500" v-text="img.repository"></span>
+                                            </button>
+                                        </li>
+                                    </ul>
+                                </div></div>
                             <div><label class="text-sm font-medium text-slate-600">Version (tag)</label>
                                 <select v-model="form.docker_tag" class="mt-1 w-full rounded-lg border px-3 py-2 text-sm font-mono">
                                     <option v-for="tag in selectedDockerTags" :key="tag" :value="tag" v-text="tag"></option>
