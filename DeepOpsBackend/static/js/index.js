@@ -633,6 +633,7 @@ function downloadJson(obj, filename) {
     URL.revokeObjectURL(a.href)
 }
 
+const DOCKER_IMAGE_COMBOBOX_PAGE_SIZE = 10
 const DOCKER_IMAGE_BULK_PLACEHOLDER_JSON = '[{"label":"Code Server","repository":"codercom/code-server","default_tag":"4.89.0-ubuntu","tags":["4.89.0-ubuntu","latest"],"is_active":true,"sort_order":0}]'
 const DOCKER_IMAGE_BULK_PLACEHOLDER_CSV = 'label,repository,default_tag,tags_text,is_active,sort_order\nCode Server,codercom/code-server,4.89.0-ubuntu,4.89.0-ubuntu;latest,true,0'
 const PLAN_TEMPLATE_BULK_PLACEHOLDER_JSON = '[{"name":"Code Server","cpu":2,"ram":"4G","gpu":"none","image":"logo.png","docker_repository":"codercom/code-server","docker_tag":"4.89.0-ubuntu","exposed_ports":[8080],"container_command":[],"env_defaults":{},"drive_mounts":[{"mount_path":"/home/coder"}],"file_mounts":[{"filename":"config.json","mount_path":"/home/coder/config.json","content":"{\\"hello\\":\\"world\\"}"}],"is_active":true,"sort_order":0}]'
@@ -696,6 +697,7 @@ const appVue = new Vue({
         dockerImages: [],
         dockerImageSearchQuery: '',
         dockerImageDropdownOpen: false,
+        dockerImageDropdownPage: 1,
         dockerImageHighlightIndex: -1,
         myWorkspaces: [],
         myServerFilter: '',
@@ -960,6 +962,29 @@ const appVue = new Vue({
                 const repo = (img.repository || '').toLowerCase()
                 return label.includes(q) || repo.includes(q)
             })
+        },
+        dockerImageDropdownPages() {
+            const total = this.filteredDockerImages.length
+            return Math.max(1, Math.ceil(total / DOCKER_IMAGE_COMBOBOX_PAGE_SIZE))
+        },
+        paginatedDockerImages() {
+            const list = this.filteredDockerImages
+            const page = Math.min(Math.max(1, this.dockerImageDropdownPage), this.dockerImageDropdownPages)
+            const start = (page - 1) * DOCKER_IMAGE_COMBOBOX_PAGE_SIZE
+            return list.slice(start, start + DOCKER_IMAGE_COMBOBOX_PAGE_SIZE)
+        },
+        dockerImageDropdownPageInfo() {
+            const total = this.filteredDockerImages.length
+            if (total <= DOCKER_IMAGE_COMBOBOX_PAGE_SIZE) return null
+            const page = Math.min(Math.max(1, this.dockerImageDropdownPage), this.dockerImageDropdownPages)
+            const from = (page - 1) * DOCKER_IMAGE_COMBOBOX_PAGE_SIZE + 1
+            return {
+                page,
+                pages: this.dockerImageDropdownPages,
+                total,
+                from,
+                to: Math.min(page * DOCKER_IMAGE_COMBOBOX_PAGE_SIZE, total),
+            }
         },
         selectedDrivesLabel() {
             const mounts = (this.form.drive_mounts || []).filter((m) => m.drive_id)
@@ -3700,12 +3725,14 @@ const appVue = new Vue({
         onDockerImageSearchFocus(ev) {
             this.dockerImageDropdownOpen = true
             this.dockerImageHighlightIndex = -1
+            this.ensureDockerImagePageForSelection()
             this.$nextTick(() => {
                 if (ev && ev.target && ev.target.select) ev.target.select()
             })
         },
         onDockerImageSearchInput() {
             this.dockerImageDropdownOpen = true
+            this.dockerImageDropdownPage = 1
             this.dockerImageHighlightIndex = -1
         },
         onDockerImageSearchBlur() {
@@ -3723,20 +3750,62 @@ const appVue = new Vue({
             this.dockerImageDropdownOpen = false
             this.dockerImageHighlightIndex = -1
         },
+        ensureDockerImagePageForSelection() {
+            const id = this.form.docker_image_id
+            if (!id) {
+                this.dockerImageDropdownPage = 1
+                return
+            }
+            const idx = this.filteredDockerImages.findIndex((img) => img.id === id)
+            if (idx < 0) {
+                this.dockerImageDropdownPage = 1
+                return
+            }
+            this.dockerImageDropdownPage = Math.floor(idx / DOCKER_IMAGE_COMBOBOX_PAGE_SIZE) + 1
+        },
+        dockerImageGlobalHighlightIndex() {
+            if (this.dockerImageHighlightIndex < 0) return -1
+            const page = Math.min(Math.max(1, this.dockerImageDropdownPage), this.dockerImageDropdownPages)
+            return (page - 1) * DOCKER_IMAGE_COMBOBOX_PAGE_SIZE + this.dockerImageHighlightIndex
+        },
+        setDockerImageHighlightGlobal(global) {
+            if (global < 0) {
+                this.dockerImageHighlightIndex = -1
+                return
+            }
+            this.dockerImageDropdownPage = Math.floor(global / DOCKER_IMAGE_COMBOBOX_PAGE_SIZE) + 1
+            this.dockerImageHighlightIndex = global % DOCKER_IMAGE_COMBOBOX_PAGE_SIZE
+        },
+        dockerImageDropdownPrevPage() {
+            if (this.dockerImageDropdownPage > 1) {
+                this.dockerImageDropdownPage--
+                this.dockerImageHighlightIndex = -1
+            }
+        },
+        dockerImageDropdownNextPage() {
+            if (this.dockerImageDropdownPage < this.dockerImageDropdownPages) {
+                this.dockerImageDropdownPage++
+                this.dockerImageHighlightIndex = -1
+            }
+        },
         dockerImageHighlightNext() {
-            const n = this.filteredDockerImages.length
-            if (!n) return
-            this.dockerImageHighlightIndex = (this.dockerImageHighlightIndex + 1) % n
+            const total = this.filteredDockerImages.length
+            if (!total) return
+            let global = this.dockerImageGlobalHighlightIndex()
+            global = global < 0 ? 0 : (global + 1) % total
+            this.setDockerImageHighlightGlobal(global)
         },
         dockerImageHighlightPrev() {
-            const n = this.filteredDockerImages.length
-            if (!n) return
-            this.dockerImageHighlightIndex = this.dockerImageHighlightIndex <= 0 ? n - 1 : this.dockerImageHighlightIndex - 1
+            const total = this.filteredDockerImages.length
+            if (!total) return
+            let global = this.dockerImageGlobalHighlightIndex()
+            global = global <= 0 ? total - 1 : global - 1
+            this.setDockerImageHighlightGlobal(global)
         },
         dockerImageSelectHighlighted() {
             const idx = this.dockerImageHighlightIndex
-            if (idx < 0 || idx >= this.filteredDockerImages.length) return
-            this.selectDockerImage(this.filteredDockerImages[idx])
+            if (idx < 0 || idx >= this.paginatedDockerImages.length) return
+            this.selectDockerImage(this.paginatedDockerImages[idx])
         },
         applyTemplate(t) {
             const gpu = normalizeGpuValue(t.gpu)
@@ -4221,6 +4290,7 @@ const appVue = new Vue({
             this.runError = ''
             this.dockerImageSearchQuery = ''
             this.dockerImageDropdownOpen = false
+            this.dockerImageDropdownPage = 1
             this.dockerImageHighlightIndex = -1
         },
         async openCreateServerModal() {
