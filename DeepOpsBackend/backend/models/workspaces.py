@@ -216,6 +216,11 @@ class Workspace(models.Model):
             self.slug = self._make_unique_slug(self.name)
         super().save(*args, **kwargs)
 
+    def delete(self, *args, **kwargs):
+        from backend.services.workspace_db import purge_legacy_workspace_rows
+        purge_legacy_workspace_rows(self.pk)
+        super().delete(*args, **kwargs)
+
     def _make_unique_slug(self, base: str) -> str:
         raw = slugify(base) or 'workspace'
         raw = re.sub(r'[^a-z0-9-]', '', raw.lower())[:40] or 'workspace'
