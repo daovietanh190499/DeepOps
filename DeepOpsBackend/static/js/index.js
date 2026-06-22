@@ -419,17 +419,49 @@ function hubHostFromTunnelUrl(wssUrl) {
     return m ? m[1] : '<domain>'
 }
 
+function parseTunnelPortsText(text) {
+    const raw = String(text || '').trim()
+    if (!raw) return []
+    const ports = []
+    const seen = new Set()
+    for (const part of raw.replace(/;/g, ',').split(',')) {
+        const p = parseInt(part.trim(), 10)
+        if (!Number.isNaN(p) && p >= 1 && p <= 65535 && !seen.has(p)) {
+            seen.add(p)
+            ports.push(p)
+        }
+    }
+    return ports.sort((a, b) => a - b)
+}
+
+function buildSshStdioProxyCommand(tunnelInfo) {
+    const prefix = tunnelInfo.path_prefix || 'port-tunnel'
+    const wss = hubWssBaseFromTunnelUrl(tunnelInfo.wss_url)
+    return `wstunnel client --log-lvl=warn -P ${prefix} -L stdio://%h:%p ${wss}`
+}
+
+function buildSshStdioExampleCommand(tunnelInfo, port, user) {
+    const proxy = buildSshStdioProxyCommand(tunnelInfo)
+    return `ssh -o ProxyCommand="${proxy}" -p ${port} ${user || 'coder'}@127.0.0.1`
+}
+
+function buildSshStdioConfigSnippet(tunnelInfo, port, slug, user) {
+    const alias = `${slug || 'workspace'}-ssh-${port}`
+    const proxy = buildSshStdioProxyCommand(tunnelInfo)
+    return [
+        `Host ${alias}`,
+        '  HostName 127.0.0.1',
+        `  Port ${port}`,
+        `  User ${user || 'coder'}`,
+        `  ProxyCommand ${proxy}`,
+    ].join('\n')
+}
+
 function enrichTunnelPortCommands(tunnelInfo, slug) {
-    const workspaceSlug = slug || 'workspace'
-    return (tunnelInfo.port_commands || []).map((entry) => {
-        if (!isSshTunnelPort(entry.port)) {
-            return { ...entry, is_ssh_port: false }
-        }
-        return {
-            ...entry,
-            is_ssh_port: true,
-        }
-    })
+    return (tunnelInfo.port_commands || []).map((entry) => ({
+        ...entry,
+        is_ssh_port: isSshTunnelPort(entry.port),
+    }))
 }
 
 function resolveEnvDefaults(envDefaults) {
@@ -1066,8 +1098,31 @@ const appVue = new Vue({
             const slug = (this.modalWorkspace && this.modalWorkspace.slug) || 'workspace'
             return enrichTunnelPortCommands(this.tunnelInfo, slug)
         },
+        tunnelTcpPortCommandsDisplay() {
+            return this.tunnelPortCommandsDisplay.filter((entry) => !entry.is_ssh_port)
+        },
         tunnelSshPorts() {
-            return (this.tunnelInfo.ports || []).filter((p) => isSshTunnelPort(p))
+            const seen = new Set()
+            const out = []
+            for (const p of [
+                ...(this.tunnelInfo.ports || []),
+                ...parseTunnelPortsText(this.tunnelPortsText),
+            ]) {
+                if (isSshTunnelPort(p) && !seen.has(p)) {
+                    seen.add(p)
+                    out.push(p)
+                }
+            }
+            return out.sort((a, b) => a - b)
+        },
+        tunnelSshGuidance() {
+            const slug = (this.modalWorkspace && this.modalWorkspace.slug) || 'workspace'
+            return this.tunnelSshPorts.map((port) => ({
+                port,
+                ssh_proxy_command: buildSshStdioProxyCommand(this.tunnelInfo),
+                ssh_command: buildSshStdioExampleCommand(this.tunnelInfo, port),
+                ssh_config: buildSshStdioConfigSnippet(this.tunnelInfo, port, slug),
+            }))
         },
         filteredPlanTemplates() {
             if (!this.resourceLimits.limited) return this.planTemplates

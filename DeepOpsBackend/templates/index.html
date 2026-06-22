@@ -1440,6 +1440,44 @@
                         </label>
                     </div>
                     <p class="text-[10px] text-slate-500">Comma-separated TCP ports on the main container (127.0.0.1 inside the pod). Clear the field and click Expose to disable the tunnel sidecar.</p>
+                    <div v-if="tunnelSshPorts.length"
+                         class="rounded-lg border border-indigo-200 bg-indigo-50/60 p-3 text-xs text-slate-600 space-y-3">
+                        <div>
+                            <p class="font-semibold text-indigo-900">SSH via stdio tunnel (ports 22 / 2222)</p>
+                            <p class="mt-1 text-[10px] text-slate-600">
+                                Use <code class="rounded bg-white px-1">wstunnel</code> in <strong>stdio</strong> mode with OpenSSH <code class="rounded bg-white px-1">ProxyCommand</code>.
+                                SSH traffic is proxied through the same WebSocket tunnel — no local TCP listener and no ssh-bridge sidecar.
+                            </p>
+                        </div>
+                        <div v-for="guide in tunnelSshGuidance" :key="'ssh-guide-' + guide.port" class="space-y-2">
+                            <p class="font-medium text-slate-700" v-text="'Container port ' + guide.port"></p>
+                            <div>
+                                <p class="text-[10px] font-medium text-slate-500">ProxyCommand (wstunnel stdio)</p>
+                                <div class="flex items-start gap-2 mt-1">
+                                    <pre class="flex-1 overflow-x-auto rounded bg-slate-900 p-2 text-[10px] text-slate-100 whitespace-pre-wrap" v-text="guide.ssh_proxy_command"></pre>
+                                    <button type="button" @click="copyText(guide.ssh_proxy_command, 'ProxyCommand copied')" class="shrink-0 rounded border bg-white px-2 py-0.5 hover:bg-slate-50"><i class="fa fa-copy"></i></button>
+                                </div>
+                            </div>
+                            <div>
+                                <p class="text-[10px] font-medium text-slate-500">One-shot SSH</p>
+                                <div class="flex items-start gap-2 mt-1">
+                                    <pre class="flex-1 overflow-x-auto rounded bg-slate-900 p-2 text-[10px] text-slate-100 whitespace-pre-wrap" v-text="guide.ssh_command"></pre>
+                                    <button type="button" @click="copyText(guide.ssh_command, 'SSH command copied')" class="shrink-0 rounded border bg-white px-2 py-0.5 hover:bg-slate-50"><i class="fa fa-copy"></i></button>
+                                </div>
+                            </div>
+                            <div>
+                                <p class="text-[10px] font-medium text-slate-500"><code class="rounded bg-white px-1">~/.ssh/config</code> snippet — then <code class="rounded bg-white px-1">ssh &lt;Host&gt;</code></p>
+                                <div class="flex items-start gap-2 mt-1">
+                                    <pre class="flex-1 overflow-x-auto rounded bg-slate-900 p-2 text-[10px] text-slate-100 whitespace-pre-wrap" v-text="guide.ssh_config"></pre>
+                                    <button type="button" @click="copyText(guide.ssh_config, 'SSH config copied')" class="shrink-0 rounded border bg-white px-2 py-0.5 hover:bg-slate-50"><i class="fa fa-copy"></i></button>
+                                </div>
+                            </div>
+                            <p class="text-[10px] text-slate-500">
+                                Replace <code class="rounded bg-white px-1">coder</code> with the SSH user inside the container if different.
+                                <code class="rounded bg-white px-1">%h</code> and <code class="rounded bg-white px-1">%p</code> are expanded by SSH to reach <code class="rounded bg-white px-1">127.0.0.1:&lt;port&gt;</code> in the pod.
+                            </p>
+                        </div>
+                    </div>
                     <div class="rounded-lg border border-slate-200 bg-white p-3 text-xs text-slate-600 space-y-2">
                         <p class="font-semibold text-slate-700">How to connect (wstunnel client)</p>
                         <ol class="list-decimal list-inside space-y-1">
@@ -1450,7 +1488,7 @@
                             <li>Click <strong>Expose</strong> above while the server is running (or start it after saving ports).</li>
                             <li>Run the client command below — it listens on your machine and forwards through the WebSocket tunnel to the container port.</li>
                             <li>Open <code class="rounded bg-slate-100 px-1">http://localhost:&lt;port&gt;</code> (or your DB/client tool) on the local port shown.</li>
-                            <li v-if="tunnelSshPorts.length">For ports <strong>22</strong> or <strong>2222</strong>, use the <strong>SSH via ProxyCommand</strong> guide below (stdio) instead of binding those ports locally.</li>
+                            <li v-if="tunnelSshPorts.length">For ports <strong>22</strong> or <strong>2222</strong>, use the <strong>SSH via ProxyCommand</strong> guide above (stdio) instead of binding those ports locally.</li>
                         </ol>
                         <p class="text-slate-500">Path prefix <code class="rounded bg-slate-100 px-1" v-text="tunnelInfo.path_prefix || '…'"></code> must match the server sidecar (<code class="rounded bg-slate-100 px-1">-P</code> on the client, <code class="rounded bg-slate-100 px-1">-r</code> on the server).</p>
                     </div>
@@ -1462,23 +1500,19 @@
                             <span class="font-mono text-slate-800 truncate flex-1" v-text="tunnelInfo.wss_url"></span>
                             <button type="button" @click="copyText(tunnelInfo.wss_url, 'WSS URL copied')" class="shrink-0 rounded border bg-white px-2 py-0.5 hover:bg-slate-50"><i class="fa fa-copy"></i></button>
                         </div>
-                        <div class="flex items-start gap-2">
+                        <div class="flex items-start gap-2" v-if="tunnelInfo.client_command">
                             <span class="font-medium text-slate-500 shrink-0 pt-1">All ports</span>
                             <pre class="flex-1 overflow-x-auto rounded-lg bg-slate-900 p-3 text-[10px] text-slate-100 whitespace-pre-wrap" v-text="tunnelInfo.client_command"></pre>
                             <button type="button" @click="copyText(tunnelInfo.client_command, 'Command copied')" class="shrink-0 rounded border bg-white px-2 py-0.5 hover:bg-slate-50"><i class="fa fa-copy"></i></button>
                         </div>
-                        <div v-for="entry in tunnelPortCommandsDisplay" :key="'tunnel-port-' + entry.port" class="rounded-lg border border-slate-200 bg-white p-2 space-y-1">
+                        <div v-for="entry in tunnelTcpPortCommandsDisplay" :key="'tunnel-port-' + entry.port" class="rounded-lg border border-slate-200 bg-white p-2 space-y-1">
                             <p class="font-medium text-slate-700" v-text="'Port ' + entry.port + ' → localhost:' + entry.local_port"></p>
                             <div class="flex items-start gap-2">
                                 <span class="font-medium text-slate-500 shrink-0 pt-1 text-[10px]">TCP</span>
                                 <pre class="flex-1 overflow-x-auto rounded bg-slate-900 p-2 text-[10px] text-slate-100 whitespace-pre-wrap" v-text="entry.command"></pre>
                                 <button type="button" @click="copyText(entry.command, 'Command copied')" class="shrink-0 rounded border px-2 py-0.5 hover:bg-slate-50"><i class="fa fa-copy"></i></button>
                             </div>
-                            <p v-if="!entry.is_ssh_port && entry.port === (tunnelInfo.ports[0] || 0)" class="text-slate-500" v-text="'Example: curl http://localhost:' + entry.local_port + '/'"></p>
-                            <div v-if="entry.is_ssh_port" class="rounded-lg border border-indigo-200 bg-indigo-50/60 p-2 space-y-2 mt-1">
-                                <p class="font-semibold text-indigo-900 text-[11px]">SSH note</p>
-                                <p class="text-[10px] text-slate-600">SSH bridge was removed. Use the <strong>Terminal</strong> tab for interactive access instead.</p>
-                            </div>
+                            <p v-if="entry.port === (tunnelInfo.ports[0] || 0)" class="text-slate-500" v-text="'Example: curl http://localhost:' + entry.local_port + '/'"></p>
                         </div>
                     </div>
                     <p v-else class="text-xs text-slate-500">Enter container ports and click Expose. The server must be running for the sidecar to start immediately.</p>
