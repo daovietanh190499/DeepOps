@@ -181,6 +181,13 @@ class Workspace(models.Model):
         default=False,
         help_text='Run code-server container with securityContext.privileged=true',
     )
+    custom_hostname = models.CharField(
+        max_length=253,
+        blank=True,
+        null=True,
+        unique=True,
+        help_text='Optional ingress hostname override; empty uses default slug-user.domain',
+    )
     EXEC_SHELL_BASH = 'bash'
     EXEC_SHELL_SH = 'sh'
     EXEC_SHELL_CHOICES = (
@@ -225,9 +232,16 @@ class Workspace(models.Model):
         return f'{ns}-{self.user.username}-{self.slug}'
 
     @property
-    def hostname(self) -> str:
+    def default_hostname(self) -> str:
         domain = __import__('os').environ.get('DOMAIN_NAME', 'dohub.com')
         return f'{self.slug}-{self.user.username}.{domain}'
+
+    @property
+    def hostname(self) -> str:
+        custom = (self.custom_hostname or '').strip().lower().rstrip('.')
+        if custom:
+            return custom
+        return self.default_hostname
 
     def to_config_dict(self) -> dict:
         return {
@@ -250,6 +264,8 @@ class Workspace(models.Model):
             'ws_tunnel_ports': self.ws_tunnel_ports if isinstance(self.ws_tunnel_ports, list) else [],
             'container_command': self.container_command or [],
             'privileged': self.privileged,
+            'custom_hostname': (self.custom_hostname or '').strip(),
+            'default_hostname': self.default_hostname,
             'exec_shell': self.exec_shell or self.EXEC_SHELL_BASH,
             'state': self.state,
             'hostname': self.hostname,

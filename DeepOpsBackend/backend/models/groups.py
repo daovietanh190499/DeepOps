@@ -31,6 +31,10 @@ class ResourceGroup(models.Model):
         default=False,
         help_text='Members may enable privileged (root) pods when creating servers',
     )
+    can_change_domain = models.BooleanField(
+        default=False,
+        help_text='Members may set a custom ingress hostname when creating or editing servers',
+    )
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 

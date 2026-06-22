@@ -23,7 +23,18 @@ from backend.services.gpu_resources import normalize_gpu_value
 from backend.services.platform_catalog import parse_cpu_value
 from backend.services.command_parse import parse_container_command
 from backend.services.env_templates import expand_env_vars
-from backend.services.resource_limits import can_change_privileged, validate_image_count, validate_server_count, validate_workspace_resources
+from backend.services.resource_limits import (
+    can_change_domain,
+    can_change_privileged,
+    validate_image_count,
+    validate_server_count,
+    validate_workspace_resources,
+)
+from backend.services.workspace_hostname import (
+    normalize_custom_hostname,
+    validate_custom_hostname,
+    validate_custom_hostname_unique,
+)
 from backend.services.workspace_kubectl import (
     MONITOR_DEFAULT_WINDOW_MINUTES,
     workspace_describe,
@@ -159,8 +170,9 @@ def _validate_workspace_limits(user: User, data: dict, ws: Workspace | None = No
     return validate_workspace_resources(user, cpu=cpu, ram=ram, gpu=gpu)
 
 
-def _apply_workspace_fields(ws: Workspace, data: dict, owner: User | None = None) -> str | None:
+def _apply_workspace_fields(ws: Workspace, data: dict, owner: User | None = None, actor: User | None = None) -> str | None:
     owner = owner or ws.user
+    actor = actor or owner
     for field in ('name', 'ram', 'docker_repository', 'docker_tag'):
         if field in data and data[field] is not None:
             setattr(ws, field, data[field])
@@ -195,6 +207,21 @@ def _apply_workspace_fields(ws: Workspace, data: dict, owner: User | None = None
         if requested and not can_change_privileged(owner):
             return 'privileged mode not allowed for your group'
         ws.privileged = requested if can_change_privileged(owner) else False
+    if 'custom_hostname' in data:
+        if not can_change_domain(actor):
+            return 'custom domain not allowed for your group'
+        raw = data.get('custom_hostname')
+        host = normalize_custom_hostname(raw)
+        if host:
+            fmt_err = validate_custom_hostname(host)
+            if fmt_err:
+                return fmt_err
+            unique_err = validate_custom_hostname_unique(host, ws.pk)
+            if unique_err:
+                return unique_err
+            ws.custom_hostname = host
+        else:
+            ws.custom_hostname = None
     return None
 
 
@@ -373,7 +400,7 @@ def workspace_create(request, user):
         return JsonResponse({'message': limit_err}, status=400)
 
     ws = Workspace(user=user, name=name)
-    err = _apply_workspace_fields(ws, data, owner=user)
+    err = _apply_workspace_fields(ws, data, owner=user, actor=user)
     if err:
         return JsonResponse({'message': err}, status=400)
     ws.save()
@@ -411,13 +438,28 @@ def workspace_detail(request, user, workspace_id):
     limit_err = _validate_workspace_limits(ws.user, data, ws=ws)
     if limit_err:
         return JsonResponse({'message': limit_err}, status=400)
-    err = _apply_workspace_fields(ws, data)
+    prev_hostname = ws.hostname
+    err = _apply_workspace_fields(ws, data, actor=user)
     if err:
         return JsonResponse({'message': err}, status=400)
     if data.get('name'):
         ws.name = data['name'].strip()[:128]
     ws.save()
-    return JsonResponse({'result': _workspace_payload(ws)})
+    ingress_sync = None
+    if settings.DEFAULT_SPAWNER == 'k8s' and ws.hostname != prev_hostname:
+        from backend.services.k8s import sync_workspace_ingress_host
+        logs, code = sync_workspace_ingress_host(ws)
+        if code != 0:
+            return JsonResponse({
+                'message': 'saved but ingress update failed',
+                'logs': logs,
+                'result': _workspace_payload(ws),
+            }, status=500)
+        ingress_sync = logs or 'ingress updated'
+    payload = _workspace_payload(ws)
+    if ingress_sync:
+        payload['ingress_sync'] = ingress_sync
+    return JsonResponse({'result': payload})
 
 
 @auth.verify
@@ -584,7 +626,7 @@ def workspace_run(request, user):
     if limit_err:
         return JsonResponse({'message': limit_err}, status=400)
     ws = Workspace(user=user, name=name)
-    err = _apply_workspace_fields(ws, data, owner=user)
+    err = _apply_workspace_fields(ws, data, owner=user, actor=user)
     if err:
         return JsonResponse({'message': err}, status=400)
     ws.save()
@@ -623,7 +665,7 @@ def workspace_bulk_run(request, user):
             results.append({'index': i, 'ok': False, 'error': limit_err, 'name': name})
             continue
         ws = Workspace(user=user, name=name)
-        err = _apply_workspace_fields(ws, item, owner=user)
+        err = _apply_workspace_fields(ws, item, owner=user, actor=user)
         if err:
             results.append({'index': i, 'ok': False, 'error': err, 'name': name})
             continue

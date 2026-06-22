@@ -414,6 +414,20 @@ def scale_codehub(release_name: str, replicas: int) -> tuple[str, int]:
     return '\n'.join(logs_parts) or 'ok', exit_code
 
 
+def sync_workspace_ingress_host(workspace) -> tuple[str, int]:
+    """Helm upgrade to refresh ingress host while preserving replica count."""
+    if _helm_release_status(workspace.release_name) is None:
+        return '', 0
+    from backend.models import Workspace as WorkspaceModel
+    from backend.services.k8s_status import live_workspace_state
+
+    config = build_spawn_config(workspace)
+    state = live_workspace_state(workspace)
+    config['replica_count'] = 0 if state == WorkspaceModel.STATE_OFFLINE else 1
+    _, logs, code = create_codehub(config)
+    return logs, code
+
+
 def stop_codehub(release_name: str) -> tuple[str, int]:
     return scale_codehub(release_name, 0)
 

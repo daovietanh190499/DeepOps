@@ -50,6 +50,7 @@ def _group_payload(group: ResourceGroup, *, include_members: bool = False) -> di
         'max_drives': group.max_drives,
         'max_images': group.max_images,
         'can_change_privileged': group.can_change_privileged,
+        'can_change_domain': group.can_change_domain,
         'member_count': member_count,
         'equipment': allowed_equipment(group),
     }
@@ -71,6 +72,7 @@ def _parse_group_fields(data: dict) -> tuple[dict | None, str | None]:
             'max_drives': int(data.get('max_drives', 0)),
             'max_images': int(data.get('max_images', 0)),
             'can_change_privileged': bool(data.get('can_change_privileged', False)),
+            'can_change_domain': bool(data.get('can_change_domain', False)),
         }
     except (TypeError, ValueError):
         return None, 'invalid limit values'

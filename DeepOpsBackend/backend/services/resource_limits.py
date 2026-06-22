@@ -86,6 +86,7 @@ def limits_payload(group: ResourceGroup | None, user: User | None = None) -> dic
         'max_drives': group.max_drives,
         'max_images': group.max_images,
         'can_change_privileged': group.can_change_privileged,
+        'can_change_domain': group.can_change_domain,
     }
     if user is not None:
         payload['server_count'] = user_server_count(user)
@@ -123,6 +124,15 @@ def can_change_privileged(user: User) -> bool:
     return group.can_change_privileged
 
 
+def can_change_domain(user: User) -> bool:
+    if user.role == User.ROLE_ADMIN:
+        return True
+    group = get_user_group(user)
+    if group is None:
+        return False
+    return group.can_change_domain
+
+
 def resource_limits_for_user(user: User) -> dict:
     group = get_user_group(user)
     limits = limits_payload(group, user=user)
@@ -132,6 +142,7 @@ def resource_limits_for_user(user: User) -> dict:
         'limits': limits,
         'equipment': equipment,
         'can_change_privileged': can_change_privileged(user),
+        'can_change_domain': can_change_domain(user),
     }
 
 

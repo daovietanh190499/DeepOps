@@ -354,6 +354,7 @@ function defaultForm() {
         command_text: '',
         env_vars: {},
         privileged: false,
+        custom_hostname: '',
     }
 }
 
@@ -554,6 +555,7 @@ function formPayload(form) {
         exposed_ports: parsePorts(form.ports_text),
         container_command: parseCommand(form.command_text),
         privileged: !!form.privileged,
+        custom_hostname: (form.custom_hostname || '').trim(),
     }
 }
 
@@ -895,7 +897,7 @@ const appVue = new Vue({
         resourceGroups: [],
         showGroupFormModal: false,
         editingGroup: null,
-        groupForm: { name: '', max_cpu: 4, max_ram_g: 8, max_drive_size_gi: 50, max_gpu_vram_g: 10, max_servers: 5, max_drives: 3, max_images: 10, can_change_privileged: false },
+        groupForm: { name: '', max_cpu: 4, max_ram_g: 8, max_drive_size_gi: 50, max_gpu_vram_g: 10, max_servers: 5, max_drives: 3, max_images: 10, can_change_privileged: false, can_change_domain: false },
         groupFormLoading: false,
         groupMembersModal: null,
         memberSearchQuery: '',
@@ -978,6 +980,9 @@ const appVue = new Vue({
         },
         canChangePrivileged() {
             return this.is_admin || !!(this.resourceLimits && this.resourceLimits.can_change_privileged)
+        },
+        canChangeDomain() {
+            return this.is_admin || !!(this.resourceLimits && this.resourceLimits.can_change_domain)
         },
         selectedDockerTags() {
             const img = this.dockerImages.find((i) => i.id === this.form.docker_image_id)
@@ -1123,6 +1128,14 @@ const appVue = new Vue({
                 ssh_command: buildSshStdioExampleCommand(this.tunnelInfo, port),
                 ssh_config: buildSshStdioConfigSnippet(this.tunnelInfo, port, slug),
             }))
+        },
+        formEffectiveHostname() {
+            const custom = (this.form.custom_hostname || '').trim().toLowerCase()
+            if (custom) return custom
+            if (this.editingWorkspace && this.editingWorkspace.default_hostname) {
+                return this.editingWorkspace.default_hostname
+            }
+            return '(default on save)'
         },
         filteredPlanTemplates() {
             if (!this.resourceLimits.limited) return this.planTemplates
@@ -3318,7 +3331,7 @@ const appVue = new Vue({
             const u = data.result
             this.current_user = u.username
             this.is_admin = u.role === 'admin'
-            this.resourceLimits = u.resource_limits || { limited: false, limits: null, equipment: null, can_change_privileged: false }
+            this.resourceLimits = u.resource_limits || { limited: false, limits: null, equipment: null, can_change_privileged: false, can_change_domain: false }
             this.refreshEquipmentFromLimits()
         },
         applyPlatformCatalog(catalog) {
@@ -4412,6 +4425,7 @@ const appVue = new Vue({
                 : ''
             this.form.env_vars = { ...(ws.env_vars || {}) }
             this.form.privileged = !!ws.privileged
+            this.form.custom_hostname = ws.custom_hostname || ''
             const mounts = Array.isArray(ws.drive_mounts) ? ws.drive_mounts : []
             this.form.drive_mounts = mounts.map((m) => ({ drive_id: m.drive_id || '', mount_path: m.mount_path || '/home/coder' }))
             const fileMounts = Array.isArray(ws.file_mounts) ? ws.file_mounts : []
@@ -4456,6 +4470,7 @@ const appVue = new Vue({
                 return
             }
             const payload = formPayload(this.form)
+            if (!this.canChangeDomain) delete payload.custom_hostname
             const isEdit = !!this.editingWorkspace
             const res = await fetch(isEdit ? ('workspaces/' + this.editingWorkspace.id) : 'workspaces/run', {
                 method: isEdit ? 'PUT' : 'POST',
@@ -4464,14 +4479,19 @@ const appVue = new Vue({
             })
             const data = await res.json().catch(() => ({}))
             this.runLoading = false
-            if (res.status !== 200) {
+            if (res.status !== 200 && res.status !== 201) {
                 this.runError = data.logs || data.message || 'Start failed'
                 this.showToast(data.message || 'Start failed')
                 return
             }
             await this.reloadServerLists()
             this.closeCreateServerModal()
-            this.showToast(isEdit ? 'Server updated' : 'Server created')
+            const result = data.result || {}
+            if (isEdit && result.ingress_sync) {
+                this.showToast('Server updated — ingress hostname applied')
+            } else {
+                this.showToast(isEdit ? 'Server updated' : 'Server created')
+            }
         },
         async loadMyWorkspaces(page) {
             this.clearBulkSelection('servers')
@@ -4621,7 +4641,7 @@ const appVue = new Vue({
         },
         openCreateGroupModal() {
             this.editingGroup = null
-            this.groupForm = { name: '', max_cpu: 4, max_ram_g: 8, max_drive_size_gi: 50, max_gpu_vram_g: 10, max_servers: 5, max_drives: 3, max_images: 10, can_change_privileged: false }
+            this.groupForm = { name: '', max_cpu: 4, max_ram_g: 8, max_drive_size_gi: 50, max_gpu_vram_g: 10, max_servers: 5, max_drives: 3, max_images: 10, can_change_privileged: false, can_change_domain: false }
             this.showGroupFormModal = true
         },
         openEditGroupModal(g) {
@@ -4636,6 +4656,7 @@ const appVue = new Vue({
                 max_drives: g.max_drives,
                 max_images: g.max_images,
                 can_change_privileged: !!g.can_change_privileged,
+                can_change_domain: !!g.can_change_domain,
             }
             this.showGroupFormModal = true
         },

@@ -944,6 +944,7 @@
                             <span v-text="'Drives ≤ ' + (g.max_drives || '∞')"></span>
                             <span v-text="'Images ≤ ' + (g.max_images || '∞')"></span>
                             <span class="sm:col-span-2" v-text="g.can_change_privileged ? 'Privileged pods: allowed' : 'Privileged pods: denied'"></span>
+                            <span class="sm:col-span-2" v-text="g.can_change_domain ? 'Custom domain: allowed' : 'Custom domain: denied'"></span>
                         </div>
                     </div>
                 </div>
@@ -1350,6 +1351,12 @@
                             <i class="fa fa-copy"></i>
                         </button>
                     </div>
+                    <p v-if="modalWorkspace.custom_hostname && modalWorkspace.default_hostname"
+                       class="text-[10px] text-slate-500">
+                        Custom ingress host. Default would be
+                        <code class="rounded bg-white px-1" v-text="modalWorkspace.default_hostname"></code>.
+                        <span v-if="canChangeDomain && modalWorkspace.state==='offline'"> Use <strong>Edit</strong> to change.</span>
+                    </p>
                     <div class="flex items-center gap-2">
                         <span class="font-medium text-slate-500 shrink-0 text-xs w-28">Service DNS</span>
                         <span class="font-mono text-slate-800 truncate flex-1 text-xs" v-text="modalServiceDns"></span>
@@ -1918,6 +1925,18 @@
                             <input v-model="form.name" type="text" placeholder="My workspace"
                                    class="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm">
                         </div>
+                        <div v-if="canChangeDomain">
+                            <label class="text-sm font-medium text-slate-600">Service domain (ingress host)</label>
+                            <input v-model="form.custom_hostname" type="text"
+                                   :placeholder="editingWorkspace && editingWorkspace.default_hostname ? editingWorkspace.default_hostname : 'my-server.example.com'"
+                                   class="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm font-mono">
+                            <p class="mt-1 text-xs text-slate-500">
+                                Optional custom hostname for nginx/traefik ingress. Leave empty to use the default
+                                <code class="rounded bg-slate-100 px-1" v-if="editingWorkspace && editingWorkspace.default_hostname" v-text="editingWorkspace.default_hostname"></code>
+                                <span v-else>auto-generated subdomain</span>.
+                                Applied on save (and on next start if the release already exists).
+                            </p>
+                        </div>
                         <div class="grid gap-4 sm:grid-cols-2">
                             <div><label class="text-sm font-medium text-slate-600">CPU (vCPU)</label>
                                 <select v-model.number="form.cpu" class="mt-1 w-full rounded-lg border px-3 py-2 text-sm">
@@ -2101,6 +2120,7 @@
                         </div>
                         <div class="rounded-xl bg-slate-50 px-4 py-2 text-sm">
                             <spec-row label="Name" :value="form.name"></spec-row>
+                            <spec-row v-if="canChangeDomain" label="Domain" :value="formEffectiveHostname"></spec-row>
                             <spec-row label="CPU" :value="form.cpu + ' vCPU'"></spec-row>
                             <spec-row label="RAM" :value="form.ram"></spec-row>
                             <spec-row label="Node" :value="form.node_hostname || 'auto'"></spec-row>
@@ -2528,8 +2548,8 @@
 
     <!-- Create / edit resource group -->
     <div v-if="showGroupFormModal" class="dohub-modal-backdrop fixed inset-0 z-[55] flex justify-center bg-slate-900/50">
-        <div class="dohub-modal-panel w-full max-w-md border border-slate-200 bg-white shadow-xl sm:mx-auto">
-            <div class="flex items-center justify-between border-b border-slate-100 px-5 py-4">
+        <div class="dohub-modal-panel w-full max-w-md border border-slate-200 bg-white shadow-xl max-h-[90vh] overflow-y-auto sm:mx-auto">
+            <div class="flex items-center justify-between border-b border-slate-100 px-5 py-4 sticky top-0 bg-white z-10">
                 <h3 class="text-lg font-bold text-slate-900" v-text="editingGroup ? 'Edit group' : 'Create group'"></h3>
                 <button type="button" @click="closeGroupFormModal" class="text-slate-400 hover:text-slate-700"><i class="fa fa-times text-xl"></i></button>
             </div>
@@ -2574,6 +2594,13 @@
                     <span>
                         <span class="text-sm font-medium text-slate-700">Allow privileged pods</span>
                         <span class="block text-xs text-slate-500 mt-0.5">Members can enable privileged (root) containers when creating servers.</span>
+                    </span>
+                </label>
+                <label class="flex items-start gap-3 rounded-lg border border-slate-200 bg-slate-50/60 p-3 cursor-pointer">
+                    <input v-model="groupForm.can_change_domain" type="checkbox" class="mt-0.5 rounded border-slate-300">
+                    <span>
+                        <span class="text-sm font-medium text-slate-700">Allow custom service domain</span>
+                        <span class="block text-xs text-slate-500 mt-0.5">Members can set a custom ingress hostname when creating or editing servers (offline).</span>
                     </span>
                 </label>
                 <div class="flex justify-end gap-2">
