@@ -11,7 +11,12 @@ from django.views.decorators.http import require_http_methods
 
 from backend.models import DockerImage, User, UserDrive, Workspace
 from backend.services.github_auth import auth
-from backend.services.k8s import get_codehub_workspace, remove_codehub, stop_codehub
+from backend.services.k8s import (
+    _helm_release_status,
+    get_codehub_workspace,
+    remove_codehub,
+    stop_codehub,
+)
 from backend.services.bulk import bulk_workspace_result, spawn_workspace
 from backend.services.k8s_status import (
     derive_workspace_state,
@@ -445,6 +450,18 @@ def workspace_detail(request, user, workspace_id):
     if data.get('name'):
         ws.name = data['name'].strip()[:128]
     ws.save()
+    persist_pending_drive_mounts(ws)
+    persist_pending_file_mounts(ws)
+    if settings.DEFAULT_SPAWNER == 'k8s' and 'file_mounts' in data:
+        from backend.services.workspace_files_k8s import apply_workspace_file_configmap
+        if _helm_release_status(ws.release_name) is not None:
+            file_logs, file_code = apply_workspace_file_configmap(ws)
+            if file_code != 0:
+                return JsonResponse({
+                    'message': 'saved but file mount sync failed',
+                    'logs': file_logs,
+                    'result': _workspace_payload(ws),
+                }, status=500)
     ingress_sync = None
     if settings.DEFAULT_SPAWNER == 'k8s' and ws.hostname != prev_hostname:
         from backend.services.k8s import sync_workspace_ingress_host

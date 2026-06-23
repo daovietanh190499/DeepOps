@@ -1972,7 +1972,7 @@
                                 <p class="text-xs text-slate-500">Leave empty for ephemeral storage. The same drive may be mounted at multiple paths — each path uses a matching PVC <code class="text-[10px]">subPath</code>.</p>
                                 <p v-if="!myDrivesAll.length && form.drive_mounts.length" class="text-xs text-amber-700">No drives yet. Create one in the <strong>Drives</strong> tab or remove mount rows.</p>
                                 <p v-if="!form.drive_mounts.length" class="text-xs text-slate-400 italic">No drives mounted.</p>
-                                <div v-for="(mount, idx) in form.drive_mounts" :key="'mount-' + idx"
+                                <div v-for="(mount, idx) in form.drive_mounts" :key="mount._rowKey"
                                      class="rounded-lg border border-slate-200 bg-slate-50/60 p-3 space-y-2">
                                     <div class="flex items-center justify-between gap-2">
                                         <span class="text-xs font-semibold text-slate-500" v-text="'Drive ' + (idx + 1)"></span>
@@ -1998,7 +1998,7 @@
                                 </div>
                                 <p class="text-xs text-slate-500">Upload text files (txt, js, json, .env, yaml, …). Each file is stored in a Kubernetes ConfigMap and mounted at the path you choose. Max 1&nbsp;MiB per file; total across all files must stay under 1&nbsp;MiB.</p>
                                 <p v-if="!form.file_mounts.length" class="text-xs text-slate-400 italic">No files mounted.</p>
-                                <div v-for="(fm, fidx) in form.file_mounts" :key="'file-mount-' + fidx"
+                                <div v-for="(fm, fidx) in form.file_mounts" :key="fm._rowKey || ('file-mount-' + fidx)"
                                      class="rounded-lg border border-violet-100 bg-violet-50/40 p-3 space-y-2">
                                     <div class="flex items-center justify-between gap-2">
                                         <span class="text-xs font-semibold text-slate-500" v-text="'File ' + (fidx + 1)"></span>
@@ -2102,8 +2102,10 @@
                             <div class="mt-2 rounded-lg border border-slate-200 bg-white p-3 space-y-3">
                                 <div class="grid gap-2 sm:grid-cols-[minmax(7rem,1fr)_minmax(0,2fr)_auto] sm:items-start">
                                     <input v-model="envKey" placeholder="KEY"
+                                           @blur="flushEnvDraft"
                                            class="w-full rounded-lg border px-3 py-2 text-sm font-mono">
                                     <textarea v-model="envValue" placeholder="value" rows="2"
+                                              @blur="flushEnvDraft"
                                               class="w-full min-h-[2.75rem] resize-y rounded-lg border px-3 py-2 text-sm font-mono"></textarea>
                                     <button type="button" @click="addEnv"
                                             class="h-fit rounded-lg bg-slate-200 px-4 py-2 text-sm font-semibold hover:bg-slate-300">

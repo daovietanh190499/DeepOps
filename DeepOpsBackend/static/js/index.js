@@ -262,6 +262,8 @@ function defaultPlanTemplateForm() {
 
 function fileMountsToFormRows(file_mounts) {
     return (file_mounts || []).map((fm) => ({
+        _rowKey: fm.id || nextFormRowKey('file'),
+        id: fm.id || '',
         filename: fm.filename || '',
         mount_path: fm.mount_path || suggestFileMountPath(fm.filename),
         content: fm.content || '',
@@ -511,14 +513,27 @@ function utf8ByteLength(text) {
     return new TextEncoder().encode(String(text || '')).length
 }
 
+function nextFormRowKey(prefix) {
+    return (prefix || 'row') + '-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 9)
+}
+
 function defaultFileMountRow(filename, mountPath) {
     return {
+        _rowKey: nextFormRowKey('file'),
         id: '',
         filename: filename || '',
         mount_path: mountPath || '',
         content: '',
         size_bytes: 0,
         file_error: '',
+    }
+}
+
+function defaultDriveMountRow(driveId, mountPath) {
+    return {
+        _rowKey: nextFormRowKey('drive'),
+        drive_id: driveId || '',
+        mount_path: mountPath || '/home/coder',
     }
 }
 
@@ -3360,7 +3375,9 @@ const appVue = new Vue({
                 }
                 this.driveSizeOptions = eq.drive_sizes || base.drive_sizes || []
             }
-            this.clampFormToLimits()
+            if (!this.showCreateServerModal) {
+                this.clampFormToLimits()
+            }
             if (this.driveSizeOptions.length && !this.driveSizeOptions.includes(this.newDrive.size)) {
                 this.newDrive.size = this.driveSizeOptions[0]
             }
@@ -3898,10 +3915,10 @@ const appVue = new Vue({
             this.envKey = firstKey
             this.envValue = this.form.env_vars[firstKey] || ''
             if (t.drive_mounts && t.drive_mounts.length) {
-                this.form.drive_mounts = t.drive_mounts.map((m) => ({
-                    drive_id: '',
-                    mount_path: m.mount_path || m.path || '/home/coder',
-                }))
+                this.form.drive_mounts = t.drive_mounts.map((m) => defaultDriveMountRow(
+                    '',
+                    m.mount_path || m.path || '/home/coder',
+                ))
             } else {
                 this.form.drive_mounts = []
             }
@@ -4010,12 +4027,16 @@ const appVue = new Vue({
             }
             reader.readAsText(file)
         },
-        addEnv() {
+        flushEnvDraft() {
             const k = (this.envKey || '').trim()
             if (!k) return
             this.$set(this.form.env_vars, k, this.envValue || '')
         },
+        addEnv() {
+            this.flushEnvDraft()
+        },
         editEnv(key) {
+            this.flushEnvDraft()
             this.envKey = key
             this.envValue = this.form.env_vars[key] || ''
         },
@@ -4252,11 +4273,10 @@ const appVue = new Vue({
             if (!this.form.drive_mounts) this.$set(this.form, 'drive_mounts', [])
             const idx = this.form.drive_mounts.length
             const prev = this.form.drive_mounts[idx - 1]
-            const mountPath = this.suggestMountPath(idx)
-            this.form.drive_mounts.push({
-                drive_id: prev && prev.drive_id ? prev.drive_id : '',
-                mount_path: mountPath,
-            })
+            this.form.drive_mounts.push(defaultDriveMountRow(
+                prev && prev.drive_id ? prev.drive_id : '',
+                this.suggestMountPath(idx),
+            ))
         },
         driveMountSummary(m) {
             if (!m || !m.drive_id) return '—'
@@ -4427,9 +4447,13 @@ const appVue = new Vue({
             this.form.privileged = !!ws.privileged
             this.form.custom_hostname = ws.custom_hostname || ''
             const mounts = Array.isArray(ws.drive_mounts) ? ws.drive_mounts : []
-            this.form.drive_mounts = mounts.map((m) => ({ drive_id: m.drive_id || '', mount_path: m.mount_path || '/home/coder' }))
+            this.form.drive_mounts = mounts.map((m) => defaultDriveMountRow(
+                m.drive_id || '',
+                m.mount_path || '/home/coder',
+            ))
             const fileMounts = Array.isArray(ws.file_mounts) ? ws.file_mounts : []
             this.form.file_mounts = fileMounts.map((fm) => ({
+                _rowKey: fm.id || nextFormRowKey('file'),
                 id: fm.id || '',
                 filename: fm.filename || '',
                 mount_path: fm.mount_path || suggestFileMountPath(fm.filename),
@@ -4461,7 +4485,7 @@ const appVue = new Vue({
             }
             this.runLoading = true
             this.runError = ''
-            this.addEnv()
+            this.flushEnvDraft()
             const fileErr = this.validateFileMounts()
             if (fileErr) {
                 this.runLoading = false
