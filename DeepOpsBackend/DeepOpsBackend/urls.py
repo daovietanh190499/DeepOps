@@ -6,5 +6,7 @@ urlpatterns = [
     path('', include('backend.urls')),
 ]
 
+handler404 = 'backend.views.hub.page_not_found'
+
 if settings.DEBUG:
     urlpatterns += static(settings.STATIC_URL, document_root=settings.STATICFILES_DIRS[0])

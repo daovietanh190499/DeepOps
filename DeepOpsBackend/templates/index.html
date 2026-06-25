@@ -1418,6 +1418,7 @@
                     <spec-row label="GPU" :value="modalWorkspace.gpu || 'none'"></spec-row>
                     <spec-row label="Privileged" :value="modalWorkspace.privileged ? 'yes' : 'no'"></spec-row>
                     <spec-row label="Image" :value="modalWorkspace.docker_repository + ':' + modalWorkspace.docker_tag"></spec-row>
+                    <spec-row label="Pull policy" :value="modalWorkspace.image_pull_policy || 'IfNotPresent'"></spec-row>
                     <spec-row label="Ports" :value="(modalWorkspace.exposed_ports || []).join(', ') || '8080'"></spec-row>
                     <spec-row label="Command" :value="formatContainerCommand(modalWorkspace.container_command)"></spec-row>
                 </div>
@@ -2085,6 +2086,12 @@
                                 <select v-model="form.docker_tag" class="mt-1 w-full rounded-lg border px-3 py-2 text-sm font-mono">
                                     <option v-for="tag in selectedDockerTags" :key="tag" :value="tag" v-text="tag"></option>
                                 </select></div>
+                            <div><label class="text-sm font-medium text-slate-600">Image pull policy</label>
+                                <select v-model="form.image_pull_policy" class="mt-1 w-full rounded-lg border px-3 py-2 text-sm">
+                                    <option v-for="p in imagePullPolicies" :key="p" :value="p" v-text="p"></option>
+                                </select>
+                                <p class="mt-1 text-xs text-slate-500">Kubernetes imagePullPolicy when the pod starts.</p>
+                            </div>
                         </div>
                         <div>
                             <label class="text-sm font-medium text-slate-600">Exposed ports (comma-separated)</label>
@@ -2153,6 +2160,7 @@
                             <spec-row label="GPU" :value="form.gpu || 'none'"></spec-row>
                             <spec-row v-if="canChangePrivileged" label="Privileged" :value="form.privileged ? 'yes' : 'no'"></spec-row>
                             <spec-row label="Image" :value="form.docker_repository + ':' + form.docker_tag"></spec-row>
+                            <spec-row label="Pull policy" :value="form.image_pull_policy || 'IfNotPresent'"></spec-row>
                             <spec-row label="Ports" :value="form.ports_text || '8080'"></spec-row>
                             <spec-row label="Command" :value="form.command_text || '(default)'"></spec-row>
                             <spec-row label="ENV" :value="Object.keys(form.env_vars).length + ' variable(s)'"></spec-row>

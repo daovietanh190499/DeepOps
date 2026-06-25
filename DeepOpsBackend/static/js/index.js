@@ -340,6 +340,8 @@ function suggestFileMountPath(filename) {
     return '/home/coder/' + base
 }
 
+const IMAGE_PULL_POLICIES = ['IfNotPresent', 'Always', 'Never']
+
 function defaultForm() {
     return {
         name: 'My workspace',
@@ -352,6 +354,7 @@ function defaultForm() {
         docker_image_id: '',
         docker_repository: 'codercom/code-server',
         docker_tag: '4.89.0-ubuntu',
+        image_pull_policy: 'IfNotPresent',
         ports_text: '8080',
         command_text: '',
         env_vars: {},
@@ -566,6 +569,7 @@ function formPayload(form) {
         gpu: form.gpu === 'none' ? '' : form.gpu,
         docker_repository: form.docker_repository,
         docker_tag: form.docker_tag,
+        image_pull_policy: form.image_pull_policy || 'IfNotPresent',
         env_vars: { ...form.env_vars },
         exposed_ports: parsePorts(form.ports_text),
         container_command: parseCommand(form.command_text),
@@ -744,6 +748,7 @@ const appVue = new Vue({
         driveBulkLoading: false,
         driveBulkSummary: '',
         dockerImages: [],
+        imagePullPolicies: IMAGE_PULL_POLICIES,
         dockerImageSearchQuery: '',
         dockerImageDropdownOpen: false,
         dockerImageDropdownPage: 1,
@@ -4439,6 +4444,7 @@ const appVue = new Vue({
                 docker_tag: ws.docker_tag,
                 exposed_ports: ws.exposed_ports,
             })
+            this.form.image_pull_policy = ws.image_pull_policy || 'IfNotPresent'
             this.form.ports_text = (ws.exposed_ports && ws.exposed_ports.length) ? ws.exposed_ports.join(', ') : '8080'
             this.form.command_text = (ws.container_command && ws.container_command.length)
                 ? formatCommand(ws.container_command)

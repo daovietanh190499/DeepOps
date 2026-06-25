@@ -77,6 +77,12 @@ def page_error(request, code, error):
     return render(request, 'page-error.html', {'code': code, 'error': error}, status=code)
 
 
+def page_not_found(request, exception=None):
+    return render(request, 'page-404.html', {
+        'request_path': request.path,
+    }, status=404)
+
+
 @auth.verify
 @require_http_methods(['GET'])
 def user_state(request, user):

@@ -1,4 +1,4 @@
-from django.urls import path
+from django.urls import path, re_path
 
 from backend import views
 from backend.views import backup as backup_views
@@ -93,4 +93,7 @@ urlpatterns = [
     path('admin/docker_images/<int:image_id>', ws_views.admin_docker_image_detail, name='admin-docker-image-detail'),
     path('admin/docker_images/export', ws_views.admin_docker_images_export, name='admin-docker-images-export'),
     path('admin/docker_images/import', ws_views.admin_docker_images_import, name='admin-docker-images-import'),
+
+    # Unknown paths → custom 404 (must stay last; excludes /static/ and /ws/)
+    re_path(r'^(?!static/|ws/).*$', views.page_not_found, name='page-not-found'),
 ]

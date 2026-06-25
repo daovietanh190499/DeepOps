@@ -158,6 +158,20 @@ class Workspace(models.Model):
     gpu = models.CharField(max_length=255, blank=True, default='')
     docker_repository = models.CharField(max_length=512, default='codercom/code-server')
     docker_tag = models.CharField(max_length=128, default='4.89.0-ubuntu')
+    PULL_ALWAYS = 'Always'
+    PULL_IF_NOT_PRESENT = 'IfNotPresent'
+    PULL_NEVER = 'Never'
+    PULL_POLICY_CHOICES = (
+        (PULL_ALWAYS, 'Always'),
+        (PULL_IF_NOT_PRESENT, 'IfNotPresent'),
+        (PULL_NEVER, 'Never'),
+    )
+    image_pull_policy = models.CharField(
+        max_length=32,
+        choices=PULL_POLICY_CHOICES,
+        default=PULL_IF_NOT_PRESENT,
+        help_text='Kubernetes imagePullPolicy for the main workspace container',
+    )
     node_hostname = models.CharField(
         max_length=255,
         blank=True,
@@ -264,6 +278,7 @@ class Workspace(models.Model):
             'gpu': self.gpu or 'none',
             'docker_repository': self.docker_repository,
             'docker_tag': self.docker_tag,
+            'image_pull_policy': self.image_pull_policy or self.PULL_IF_NOT_PRESENT,
             'env_vars': self.env_vars or {},
             'exposed_ports': self.exposed_ports or [],
             'ws_tunnel_ports': self.ws_tunnel_ports if isinstance(self.ws_tunnel_ports, list) else [],

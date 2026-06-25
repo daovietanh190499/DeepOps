@@ -8,6 +8,7 @@ from .hub import (
     login,
     logout,
     page_error,
+    page_not_found,
     touch_activity,
     user_state,
 )
@@ -23,5 +24,6 @@ __all__ = [
     'delete_user',
     'change_role',
     'page_error',
+    'page_not_found',
     'touch_activity',
 ]

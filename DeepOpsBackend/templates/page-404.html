@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>404 — Page not found · Dohub</title>
+    <link rel="icon" href="/static/img/logo.png">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,600;0,9..40,700;0,9..40,800&display=swap" rel="stylesheet">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = { theme: { extend: { fontFamily: { sans: ['DM Sans', 'system-ui', 'sans-serif'] } } } }
+    </script>
+</head>
+<body class="min-h-screen overflow-x-hidden bg-gradient-to-br from-slate-50 via-blue-50/30 to-slate-100 font-sans text-slate-800 antialiased">
+    <main class="flex min-h-screen items-center justify-center p-6">
+        <div class="w-full max-w-lg text-center">
+            <a href="/" class="inline-flex items-center justify-center gap-2.5 no-underline">
+                <img src="/static/img/logo.png" alt="Dohub" class="h-14 w-14 object-contain drop-shadow-md">
+            </a>
+            <p class="mt-4 text-sm font-bold uppercase tracking-widest text-slate-500">Dohub</p>
+            <p class="mt-6 text-8xl font-extrabold leading-none tracking-tight text-slate-200 sm:text-9xl">404</p>
+            <h1 class="mt-4 text-2xl font-bold text-slate-900 sm:text-3xl">Page not found</h1>
+            <p class="mt-3 text-base text-slate-600">
+                The page you are looking for does not exist or may have been moved.
+            </p>
+            {% if request_path %}
+            <p class="mt-4 break-all rounded-xl border border-slate-200 bg-white/80 px-4 py-2 font-mono text-xs text-slate-500">
+                {{ request_path }}
+            </p>
+            {% endif %}
+            <a href="/"
+               class="mt-8 inline-flex items-center gap-2 rounded-xl bg-blue-600 px-6 py-3 text-sm font-semibold text-white shadow-lg shadow-blue-600/20 transition hover:bg-blue-700">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                    <path d="M10.707 2.293a1 1 0 00-1.414 0l-7 7a1 1 0 001.414 1.414L4 10.414V17a1 1 0 001 1h2a1 1 0 001-1v-2a1 1 0 011-1h2a1 1 0 011 1v2a1 1 0 001 1h2a1 1 0 001-1v-6.586l.293.293a1 1 0 001.414-1.414l-7-7z"/>
+                </svg>
+                Go home
+            </a>
+        </div>
+    </main>
+</body>
+</html>

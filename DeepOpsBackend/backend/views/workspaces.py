@@ -190,6 +190,12 @@ def _apply_workspace_fields(ws: Workspace, data: dict, owner: User | None = None
             return 'invalid cpu'
     if 'gpu' in data:
         ws.gpu = normalize_gpu_value(data.get('gpu'))
+    if 'image_pull_policy' in data:
+        policy = (data.get('image_pull_policy') or Workspace.PULL_IF_NOT_PRESENT).strip()
+        allowed = {c[0] for c in Workspace.PULL_POLICY_CHOICES}
+        if policy not in allowed:
+            return 'invalid image_pull_policy'
+        ws.image_pull_policy = policy
     mount_fields = (
         'drive_mounts', 'drive_id', 'user_drive_id', 'drive_name', 'drive_slug', 'drive', 'mount_path',
     )
