@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import uuid
-from urllib.parse import unquote
+from urllib.parse import parse_qs, unquote
 
 from asgiref.sync import sync_to_async
 from django.http import parse_cookie
@@ -33,6 +33,20 @@ async def _admin_from_scope(scope) -> User | None:
     if not access_key:
         return None
     return await sync_to_async(User.objects.filter(access_key=access_key).first)()
+
+
+def _parse_positive_int(value: str | None, default: int) -> int:
+    try:
+        return max(int(value), 1)
+    except (TypeError, ValueError):
+        return default
+
+
+def _query_params(scope) -> dict[str, list[str]]:
+    raw = scope.get('query_string', b'')
+    if isinstance(raw, bytes):
+        raw = raw.decode('utf-8', errors='replace')
+    return parse_qs(raw)
 
 
 def _parse_node_id(path: str) -> uuid.UUID | None:
@@ -65,6 +79,10 @@ async def ssh_node_terminal(scope, receive, send) -> None:
 
     await send({'type': 'websocket.accept'})
 
+    query = _query_params(scope)
+    init_cols = _parse_positive_int((query.get('cols') or [''])[0], 80)
+    init_rows = _parse_positive_int((query.get('rows') or [''])[0], 24)
+
     loop = asyncio.get_running_loop()
     outbound: asyncio.Queue[bytes | None] = asyncio.Queue()
     client = None
@@ -77,7 +95,9 @@ async def ssh_node_terminal(scope, receive, send) -> None:
         loop.call_soon_threadsafe(outbound.put_nowait, None)
 
     try:
-        client, channel = await sync_to_async(open_shell_channel)(node)
+        client, channel = await sync_to_async(open_shell_channel)(
+            node, cols=init_cols, rows=init_rows,
+        )
         bridge_ssh_channel(channel, _push_output, _on_reader_close)
 
         async def _forward_output() -> None:

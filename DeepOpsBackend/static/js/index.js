@@ -692,6 +692,58 @@ const DOCKER_IMAGE_BULK_PLACEHOLDER_CSV = 'label,repository,default_tag,tags_tex
 const PLAN_TEMPLATE_BULK_PLACEHOLDER_JSON = '[{"name":"Code Server","cpu":2,"ram":"4G","gpu":"none","image":"logo.png","docker_repository":"codercom/code-server","docker_tag":"4.89.0-ubuntu","exposed_ports":[8080],"container_command":[],"env_defaults":{},"drive_mounts":[{"mount_path":"/home/coder"}],"file_mounts":[{"filename":"config.json","mount_path":"/home/coder/config.json","content":"{\\"hello\\":\\"world\\"}"}],"is_active":true,"sort_order":0}]'
 const PLAN_TEMPLATE_BULK_PLACEHOLDER_CSV = 'name,cpu,ram,gpu,image,docker_repository,docker_tag,exposed_ports,command_text,drive_mounts_text,env_defaults,is_active,sort_order\nCode Server,2,4G,none,logo.png,codercom/code-server,4.89.0-ubuntu,8080,,/home/coder,{},true,0'
 
+function createDohubTerminal(el) {
+    const term = new Terminal({
+        cursorBlink: true,
+        convertEol: true,
+        fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace',
+        fontSize: 13,
+        theme: { background: '#0f172a' },
+        allowProposedApi: true,
+    })
+    let fitAddon = null
+    if (typeof FitAddon !== 'undefined' && FitAddon.FitAddon) {
+        fitAddon = new FitAddon.FitAddon()
+        term.loadAddon(fitAddon)
+    }
+    term.open(el)
+    if (fitAddon) fitAddon.fit()
+    return { term, fitAddon }
+}
+
+function terminalWebSocketUrl(path, cols, rows, extraParams) {
+    const params = new URLSearchParams(extraParams || {})
+    params.set('cols', String(cols))
+    params.set('rows', String(rows))
+    const proto = window.location.protocol === 'https:' ? 'wss:' : 'ws:'
+    return proto + '//' + window.location.host + path + '?' + params.toString()
+}
+
+function bindShellTerminalWebSocket(term, ws, handlers) {
+    let shellStarted = false
+    ws.binaryType = 'arraybuffer'
+    ws.onopen = () => {
+        if (handlers.onOpen) handlers.onOpen()
+        ws.send(JSON.stringify({ t: 'r', c: term.cols, r: term.rows }))
+        term.focus()
+    }
+    ws.onmessage = (ev) => {
+        if (!shellStarted) {
+            shellStarted = true
+            if (handlers.onShellStart) handlers.onShellStart()
+            term.reset()
+        }
+        if (typeof ev.data === 'string') term.write(ev.data)
+        else term.write(new Uint8Array(ev.data))
+    }
+    ws.onclose = () => {
+        if (handlers.onClose) handlers.onClose()
+    }
+    ws.onerror = () => {
+        if (handlers.onError) handlers.onError()
+    }
+}
+
 const appVue = new Vue({
     el: '#root',
     mounted() {
@@ -813,6 +865,7 @@ const appVue = new Vue({
         modalSshNode: null,
         sshNodeModalTab: 'info',
         sshNodeTerminal: null,
+        sshNodeTerminalStatus: '',
         sshNodeTerminalFit: null,
         sshNodeTerminalWs: null,
         sshNodeTerminalClickTarget: null,
@@ -870,6 +923,7 @@ const appVue = new Vue({
             pods: [],
             selectedPod: '',
             error: '',
+            status: '',
         },
         workspaceTerminalInstance: null,
         workspaceTerminalFit: null,
@@ -1806,6 +1860,7 @@ const appVue = new Vue({
                 this.sshNodeTerminal = null
             }
             this.sshNodeTerminalFit = null
+            this.sshNodeTerminalStatus = ''
         },
         sshNodeNormalizeInput(text) {
             return String(text || '').replace(/\r?\n/g, '\r')
@@ -1825,40 +1880,33 @@ const appVue = new Vue({
             const el = this.$refs.sshNodeTerminalEl
             if (!el) return
             this.destroySshNodeTerminal()
-            const term = new Terminal({
-                cursorBlink: true,
-                fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace',
-                fontSize: 13,
-                theme: { background: '#0f172a' },
-                allowProposedApi: true,
-            })
-            let fitAddon = null
-            if (typeof FitAddon !== 'undefined' && FitAddon.FitAddon) {
-                fitAddon = new FitAddon.FitAddon()
-                term.loadAddon(fitAddon)
-            }
-            term.open(el)
-            if (fitAddon) fitAddon.fit()
+            const { term, fitAddon } = createDohubTerminal(el)
             term.focus()
-            const proto = window.location.protocol === 'https:' ? 'wss:' : 'ws:'
-            const wsUrl = proto + '//' + window.location.host + '/ws/admin/ssh-nodes/' + this.modalSshNode.id + '/terminal'
+            const wsUrl = terminalWebSocketUrl(
+                '/ws/admin/ssh-nodes/' + this.modalSshNode.id + '/terminal',
+                term.cols,
+                term.rows,
+            )
             const ws = new WebSocket(wsUrl)
-            ws.binaryType = 'arraybuffer'
             const sendInput = (text) => this.sshNodeSendInput(ws, text)
-            ws.onopen = () => {
-                term.writeln('Connecting to ' + this.modalSshNode.username + '@' + this.modalSshNode.host + '…')
-                if (fitAddon) {
-                    fitAddon.fit()
-                    ws.send(JSON.stringify({ t: 'r', c: term.cols, r: term.rows }))
-                }
-                term.focus()
-            }
-            ws.onmessage = (ev) => {
-                if (typeof ev.data === 'string') term.write(ev.data)
-                else term.write(new Uint8Array(ev.data))
-            }
-            ws.onclose = () => term.writeln('\r\n\x1b[33m[disconnected]\x1b[0m')
-            ws.onerror = () => term.writeln('\r\n\x1b[31m[connection error]\x1b[0m')
+            const node = this.modalSshNode
+            bindShellTerminalWebSocket(term, ws, {
+                onOpen: () => {
+                    this.sshNodeTerminalStatus = 'Connecting to ' + node.username + '@' + node.host + '…'
+                    if (fitAddon) fitAddon.fit()
+                },
+                onShellStart: () => {
+                    this.sshNodeTerminalStatus = ''
+                },
+                onClose: () => {
+                    this.sshNodeTerminalStatus = 'Disconnected'
+                    term.writeln('\r\n\x1b[33m[disconnected]\x1b[0m')
+                },
+                onError: () => {
+                    this.sshNodeTerminalStatus = 'Connection error'
+                    term.writeln('\r\n\x1b[31m[connection error]\x1b[0m')
+                },
+            })
             term.onData((data) => sendInput(data))
             term.onResize((size) => {
                 if (ws.readyState === WebSocket.OPEN) {
@@ -2319,6 +2367,7 @@ const appVue = new Vue({
                 this.workspaceTerminalInstance = null
             }
             this.workspaceTerminalFit = null
+            this.workspaceTerminal.status = ''
         },
         workspaceTerminalSendInput(ws, text) {
             if (!text || !ws || ws.readyState !== WebSocket.OPEN) return
@@ -2382,43 +2431,35 @@ const appVue = new Vue({
                 this.workspaceTerminal.error = this.workspaceTerminal.error || 'No running pod. Start the server first.'
                 return
             }
-            const term = new Terminal({
-                cursorBlink: true,
-                fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace',
-                fontSize: 13,
-                theme: { background: '#0f172a' },
-                allowProposedApi: true,
-            })
-            let fitAddon = null
-            if (typeof FitAddon !== 'undefined' && FitAddon.FitAddon) {
-                fitAddon = new FitAddon.FitAddon()
-                term.loadAddon(fitAddon)
-            }
-            term.open(el)
-            if (fitAddon) fitAddon.fit()
+            const { term, fitAddon } = createDohubTerminal(el)
             term.focus()
-            const proto = window.location.protocol === 'https:' ? 'wss:' : 'ws:'
-            const params = new URLSearchParams()
-            params.set('shell', this.workspaceTerminalShell === 'sh' ? 'sh' : 'bash')
-            if (this.workspaceTerminal.selectedPod) params.set('pod', this.workspaceTerminal.selectedPod)
-            const wsUrl = proto + '//' + window.location.host + '/ws/workspaces/' + this.modalWorkspace.id + '/terminal?' + params.toString()
+            const podName = this.workspaceTerminal.selectedPod
+            const shellName = this.workspaceTerminalShell === 'sh' ? 'sh' : 'bash'
+            const wsUrl = terminalWebSocketUrl(
+                '/ws/workspaces/' + this.modalWorkspace.id + '/terminal',
+                term.cols,
+                term.rows,
+                { shell: shellName, pod: podName },
+            )
             const ws = new WebSocket(wsUrl)
-            ws.binaryType = 'arraybuffer'
             const sendInput = (text) => this.workspaceTerminalSendInput(ws, text)
-            ws.onopen = () => {
-                term.writeln('Connecting to ' + this.workspaceTerminal.selectedPod + ' (' + this.workspaceTerminalShell + ')…')
-                if (fitAddon) {
-                    fitAddon.fit()
-                    ws.send(JSON.stringify({ t: 'r', c: term.cols, r: term.rows }))
-                }
-                term.focus()
-            }
-            ws.onmessage = (ev) => {
-                if (typeof ev.data === 'string') term.write(ev.data)
-                else term.write(new Uint8Array(ev.data))
-            }
-            ws.onclose = () => term.writeln('\r\n\x1b[33m[disconnected]\x1b[0m')
-            ws.onerror = () => term.writeln('\r\n\x1b[31m[connection error]\x1b[0m')
+            bindShellTerminalWebSocket(term, ws, {
+                onOpen: () => {
+                    this.workspaceTerminal.status = 'Connecting to ' + podName + ' (' + shellName + ')…'
+                    if (fitAddon) fitAddon.fit()
+                },
+                onShellStart: () => {
+                    this.workspaceTerminal.status = ''
+                },
+                onClose: () => {
+                    this.workspaceTerminal.status = 'Disconnected'
+                    term.writeln('\r\n\x1b[33m[disconnected]\x1b[0m')
+                },
+                onError: () => {
+                    this.workspaceTerminal.status = 'Connection error'
+                    term.writeln('\r\n\x1b[31m[connection error]\x1b[0m')
+                },
+            })
             term.onData((data) => sendInput(data))
             term.onResize((size) => {
                 if (ws.readyState === WebSocket.OPEN) {

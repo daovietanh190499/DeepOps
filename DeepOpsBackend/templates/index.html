@@ -677,8 +677,11 @@
                             <div><dt class="text-slate-500">Last checked</dt><dd v-text="modalSshNode.last_checked_at || '—'"></dd></div>
                         </dl>
                     </div>
-                    <div v-show="sshNodeModalTab==='terminal'" class="h-[min(60vh,480px)] rounded-lg overflow-hidden border border-slate-800">
-                        <div ref="sshNodeTerminalEl" class="h-full w-full"></div>
+                    <div v-show="sshNodeModalTab==='terminal'" class="space-y-2">
+                        <p v-if="sshNodeTerminalStatus" class="text-xs text-slate-500" v-text="sshNodeTerminalStatus"></p>
+                        <div class="h-[min(60vh,480px)] rounded-lg overflow-hidden border border-slate-800">
+                            <div ref="sshNodeTerminalEl" class="h-full w-full"></div>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -1600,6 +1603,7 @@
                     </button>
                 </div>
                 <p class="text-xs text-slate-500">Interactive shell in the main container via <code class="rounded bg-slate-100 px-1">kubectl exec -it</code>. Server must be running.</p>
+                <p v-if="workspaceTerminal.status" class="text-xs text-slate-500" v-text="workspaceTerminal.status"></p>
                 <p v-if="workspaceTerminal.error" class="text-xs text-rose-600 whitespace-pre-wrap" v-text="workspaceTerminal.error"></p>
                 <div class="flex-1 min-h-[40vh] max-h-[60vh] rounded-lg overflow-hidden border border-slate-800">
                     <div ref="workspaceTerminalEl" class="h-full w-full min-h-[40vh]"></div>

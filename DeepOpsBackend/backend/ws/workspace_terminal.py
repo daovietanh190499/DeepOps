@@ -62,6 +62,13 @@ async def _workspace_for_user(user: User, workspace_id: uuid.UUID) -> Workspace 
     return ws
 
 
+def _parse_positive_int(value: str | None, default: int) -> int:
+    try:
+        return max(int(value), 1)
+    except (TypeError, ValueError):
+        return default
+
+
 async def workspace_terminal(scope, receive, send) -> None:
     if scope['type'] != 'websocket':
         return
@@ -84,6 +91,8 @@ async def workspace_terminal(scope, receive, send) -> None:
     query = _query_params(scope)
     shell = normalize_exec_shell((query.get('shell') or [''])[0])
     pod_name = (query.get('pod') or [''])[0].strip() or None
+    init_cols = _parse_positive_int((query.get('cols') or [''])[0], 80)
+    init_rows = _parse_positive_int((query.get('rows') or [''])[0], 24)
 
     try:
         pod, _container = await sync_to_async(resolve_exec_target)(
@@ -112,7 +121,9 @@ async def workspace_terminal(scope, receive, send) -> None:
         loop.call_soon_threadsafe(outbound.put_nowait, None)
 
     try:
-        session = await sync_to_async(WorkspaceKubectlExecSession)(pod, shell)
+        session = await sync_to_async(WorkspaceKubectlExecSession)(
+            pod, shell, cols=init_cols, rows=init_rows,
+        )
         await sync_to_async(session.read_loop)(_push_output, _on_reader_close)
 
         async def _forward_output() -> None:
