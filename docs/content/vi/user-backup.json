@@ -1,0 +1,13 @@
+{
+  "href": "user/backup.html",
+  "vi": {
+    "section": "Người dùng",
+    "title": "Backup rclone",
+    "subtitle": "Lên lịch và chạy backup thư mục workspace lên cloud storage."
+  },
+  "en": {
+    "section": "User guide",
+    "title": "Rclone backup",
+    "subtitle": "Backup workspace data to remote storage."
+  }
+}

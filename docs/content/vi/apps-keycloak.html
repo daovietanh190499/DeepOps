@@ -1,0 +1,43 @@
+<p>Keycloak triển khai trên Dohub tại <a href="https://keycloak.hub.example.com/">keycloak.hub.example.com</a> — IAM cho các ứng dụng (Overleaf, …).</p>
+
+<figure class="my-6"><img src="../assets/screenshots/keycloak-login.png" alt="Keycloak login" class="w-full rounded-xl border shadow-sm"></figure>
+
+<h2>Đăng nhập admin console</h2>
+<ol>
+<li>Mở <code>https://keycloak.hub.example.com/admin/</code>.</li>
+<li>Đăng nhập tài khoản admin realm <code>master</code> (do operator cấp).</li>
+</ol>
+
+<h2>Tạo Realm</h2>
+<figure class="my-6"><img src="../assets/screenshots/keycloak-realm.svg" alt="Create realm" class="w-full rounded-xl border shadow-sm"></figure>
+<ol>
+<li>Dropdown realm (góc trái) → <strong>Create realm</strong>.</li>
+<li><strong>Realm name</strong> — ví dụ <code>overleaf</code>.</li>
+<li><strong>Create</strong>.</li>
+</ol>
+
+<h2>Tạo Client</h2>
+<figure class="my-6"><img src="../assets/screenshots/keycloak-client.svg" alt="Create client" class="w-full rounded-xl border shadow-sm"></figure>
+<ol>
+<li><strong>Clients</strong> → <strong>Create client</strong>.</li>
+<li><strong>Client ID</strong> — khớp cấu hình app (ví dụ Overleaf OIDC).</li>
+<li><strong>Client authentication</strong> — ON nếu confidential client.</li>
+<li><strong>Valid redirect URIs</strong> — URL callback app.</li>
+<li><strong>Web origins</strong> — CORS nếu cần.</li>
+<li>Lưu <strong>Client secret</strong> (tab Credentials) cho app.</li>
+</ol>
+
+<h2>Groups</h2>
+<figure class="my-6"><img src="../assets/screenshots/keycloak-groups.svg" alt="Groups" class="w-full rounded-xl border shadow-sm"></figure>
+<ol>
+<li><strong>Groups</strong> → <strong>Create group</strong> — ví dụ <code>overleaf-users</code>.</li>
+<li><strong>Members</strong> — <strong>Add member</strong>, tìm user (ví dụ <code>daovietanh19</code> cho demo Overleaf).</li>
+</ol>
+
+<h2>Roles</h2>
+<ol>
+<li><strong>Realm roles</strong> hoặc <strong>Client roles</strong> → <strong>Create role</strong>.</li>
+<li>Gán role cho group: <strong>Groups</strong> → group → <strong>Role mapping</strong> → <strong>Assign role</strong>.</li>
+</ol>
+
+<p>Ứng dụng Overleaf thường map group Keycloak → quyền truy cập project — xem <a href="overleaf.html">Overleaf</a>.</p>

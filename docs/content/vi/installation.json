@@ -1,0 +1,13 @@
+{
+  "href": "installation.html",
+  "vi": {
+    "section": "Bắt đầu",
+    "title": "Cài đặt cluster",
+    "subtitle": "Hướng dẫn triển khai MicroK8s, DirectPV, HAMi và Dohub từ đầu."
+  },
+  "en": {
+    "section": "Getting started",
+    "title": "Cluster installation",
+    "subtitle": "Deploy MicroK8s, DirectPV, HAMi, and Dohub from scratch."
+  }
+}

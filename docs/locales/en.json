@@ -1,0 +1,67 @@
+{
+  "lang": "en",
+  "flag": "🇬🇧",
+  "name": "English",
+  "ui": {
+    "prev": "Previous",
+    "next": "Next",
+    "github": "GitHub",
+    "index_title": "Dohub overview",
+    "index_subtitle": "Official documentation for users and administrators.",
+    "index_lead": "Dohub is a hub for managing <strong>code-server</strong> workspaces (and custom containers) on Kubernetes. This guide covers cluster installation, user features, administration, and apps deployed on Dohub.",
+    "index_logo_caption": "Dohub — workspace hub on Kubernetes",
+    "index_quick_links": "Quick links",
+    "index_repo": "Repository",
+    "index_warn": "When following create/delete steps, use temporary names (e.g. <code>docs-demo-*</code>) and remove them right after capturing screenshots — do not modify production resources."
+  },
+  "nav": [
+    {
+      "title": "Getting started",
+      "items": [
+        ["index.html", "Overview"],
+        ["installation.html", "Cluster installation"]
+      ]
+    },
+    {
+      "title": "User guide",
+      "items": [
+        ["user/drives.html", "Create & delete drives"],
+        ["user/servers.html", "Manage servers"],
+        ["user/images.html", "Register Docker images"],
+        ["user/port-expose.html", "Expose port (wstunnel)"],
+        ["user/logs-describe.html", "Logs & Describe"],
+        ["user/terminal.html", "Interactive terminal"],
+        ["user/monitor.html", "Resource monitor"],
+        ["user/backup.html", "Rclone backup"],
+        ["user/custom-domain.html", "Custom domain"]
+      ]
+    },
+    {
+      "title": "Administrator",
+      "items": [
+        ["admin/overall.html", "Cluster overall"],
+        ["admin/directpv.html", "DirectPV discover & init"],
+        ["admin/drives.html", "Manage drives"],
+        ["admin/servers.html", "Manage servers"],
+        ["admin/templates.html", "Server templates"],
+        ["admin/users.html", "Users & accept"],
+        ["admin/groups.html", "Resource groups"],
+        ["admin/docker-images.html", "Docker images"]
+      ]
+    },
+    {
+      "title": "Apps on Dohub",
+      "items": [
+        ["apps/keycloak.html", "Keycloak (admin)"],
+        ["apps/overleaf.html", "Overleaf"]
+      ]
+    }
+  ],
+  "pages": {
+    "installation.html": {
+      "section": "Getting started",
+      "title": "Cluster installation",
+      "subtitle": "Deploy MicroK8s, DirectPV, HAMi, and Dohub from scratch."
+    }
+  }
+}

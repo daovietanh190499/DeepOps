@@ -1,0 +1,58 @@
+/* Override Tailwind Typography — code inside <pre> must stay readable */
+.doc-body pre,
+.prose pre,
+pre.bg-slate-900,
+pre.bg-slate-800,
+pre.text-slate-100 {
+  background-color: #0f172a !important;
+  color: #e2e8f0 !important;
+}
+
+.doc-body pre code,
+.doc-body pre > code,
+.prose pre code,
+.prose pre > code,
+pre.bg-slate-900 code,
+pre.bg-slate-800 code,
+pre.text-slate-100 code,
+pre code {
+  background-color: transparent !important;
+  background: none !important;
+  color: #e2e8f0 !important;
+  padding: 0 !important;
+  font-size: inherit !important;
+  font-weight: 400 !important;
+  border-radius: 0 !important;
+  box-shadow: none !important;
+  border: none !important;
+}
+
+.prose pre code::before,
+.prose pre code::after,
+pre code::before,
+pre code::after {
+  content: none !important;
+  display: none !important;
+}
+
+.prose :not(pre) > code {
+  background-color: #f1f5f9;
+  color: #0f172a;
+  padding: 0.125rem 0.375rem;
+  border-radius: 0.25rem;
+  font-size: 0.875em;
+}
+
+.prose :not(pre) > code::before,
+.prose :not(pre) > code::after {
+  content: none !important;
+}
+
+.lang-block.hidden {
+  display: none !important;
+}
+
+[data-lang-btn].active {
+  outline: 2px solid #2563eb;
+  outline-offset: 2px;
+}

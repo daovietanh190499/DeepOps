@@ -1,0 +1,13 @@
+{
+  "href": "apps/overleaf.html",
+  "vi": {
+    "section": "Ứng dụng trên Dohub",
+    "title": "Overleaf",
+    "subtitle": "Đăng nhập, chờ quyền group và hướng dẫn admin add user."
+  },
+  "en": {
+    "section": "Apps on Dohub",
+    "title": "Overleaf",
+    "subtitle": "Login, wait for group access, and admin group setup."
+  }
+}

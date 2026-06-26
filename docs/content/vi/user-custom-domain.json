@@ -1,0 +1,13 @@
+{
+  "href": "user/custom-domain.html",
+  "vi": {
+    "section": "Người dùng",
+    "title": "Custom domain",
+    "subtitle": "Đặt hostname ingress tùy chỉnh cho workspace (theo quyền group)."
+  },
+  "en": {
+    "section": "User guide",
+    "title": "Custom domain",
+    "subtitle": "Custom ingress hostname for workspaces (group permission)."
+  }
+}

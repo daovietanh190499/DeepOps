@@ -1,0 +1,13 @@
+{
+  "href": "user/port-expose.html",
+  "vi": {
+    "section": "Người dùng",
+    "title": "Expose port (wstunnel)",
+    "subtitle": "Mở cổng TCP trong container qua HTTPS/WSS trên domain hub."
+  },
+  "en": {
+    "section": "User guide",
+    "title": "Expose port (wstunnel)",
+    "subtitle": "Forward TCP ports through the hub wstunnel proxy."
+  }
+}

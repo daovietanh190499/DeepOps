@@ -1,0 +1,13 @@
+{
+  "href": "user/logs-describe.html",
+  "vi": {
+    "section": "Người dùng",
+    "title": "Logs và Describe",
+    "subtitle": "Xem log container và kubectl describe từ UI."
+  },
+  "en": {
+    "section": "User guide",
+    "title": "Logs & Describe",
+    "subtitle": "Inspect pod logs and Kubernetes object descriptions."
+  }
+}

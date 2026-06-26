@@ -1,0 +1,49 @@
+<p>Drive là volume lưu trữ bền vững trên cluster (StorageClass <code>directpv-min-io</code>). Mỗi drive thuộc về một user và có thể mount vào một hoặc nhiều server khi tạo workspace.</p>
+
+<figure class="my-6"><img src="../assets/screenshots/drives-list.png" alt="Danh sách drives" class="w-full rounded-xl border shadow-sm"><figcaption class="mt-2 text-center text-sm text-slate-500">Tab <strong>My drives</strong> trên Dohub</figcaption></figure>
+
+<h2>Prerequisites</h2>
+<ul>
+<li>Đã đăng nhập GitHub và được admin <strong>Accept</strong> tài khoản.</li>
+<li>Chưa vượt giới hạn số drive của resource group (hiển thị <code>Drives: n / max</code> nếu có giới hạn).</li>
+</ul>
+
+<h2>Create a new drive</h2>
+<ol>
+<li>Mở <a href="https://hub.example.com/">Dohub</a> → tab <strong>My drives</strong>.</li>
+<li>Nhấn <strong>Create drive</strong>.</li>
+<li>Điền form:
+  <ul>
+  <li><strong>Name</strong> — tên hiển thị (ví dụ <code>docs-demo-drive</code> cho mục đích thử nghiệm).</li>
+  <li><strong>Size</strong> — dung lượng từ catalog admin (ví dụ <code>20Gi</code>, <code>100Gi</code>).</li>
+  </ul>
+</li>
+<li>Nhấn <strong>Create drive</strong> (loading: <em>Creating…</em>).</li>
+</ol>
+
+<figure class="my-6"><img src="../assets/screenshots/drives-create-modal.png" alt="Modal tạo drive" class="w-full rounded-xl border shadow-sm"></figure>
+
+<div class="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900 my-4"><strong>Note:</strong> Khi viết tài liệu hoặc demo, use names prefixed with <code>docs-demo-</code> and delete immediately when finished. Do not delete a drive in use by a running server.</div>
+
+<h2>Bulk create drive</h2>
+<p>Nút <strong>Bulk create drive</strong> mở modal hỗ trợ <strong>JSON</strong> hoặc <strong>CSV</strong>:</p>
+<pre><code>[{"name":"docs-demo-a","size":"20Gi"},{"name":"docs-demo-b","size":"20Gi"}]</code></pre>
+<p>CSV header: <code>name,size</code></p>
+
+<h2>Delete drive</h2>
+<ol>
+<li>Trên thẻ drive, nhấn <strong>Delete drive</strong> (bị vô hiệu nếu drive đang <em>bound</em> bởi server đang chạy).</li>
+<li>Modal <strong>Delete drive</strong> yêu cầu gõ <code>delete</code> để xác nhận.</li>
+<li>Nhấn <strong>Delete</strong>.</li>
+</ol>
+
+<figure class="my-6"><img src="../assets/screenshots/drives-delete-modal.png" alt="Xác nhận xóa drive" class="w-full rounded-xl border shadow-sm"></figure>
+
+<h2>Status drive</h2>
+<table>
+<thead><tr><th>Badge</th><th>Ý nghĩa</th></tr></thead>
+<tbody>
+<tr><td><code>bound</code></td><td>Đang gắn với PVC / server</td></tr>
+<tr><td>Loading…</td><td>Đang đồng bộ trạng thái K8s</td></tr>
+</tbody>
+</table>

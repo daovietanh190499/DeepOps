@@ -1,0 +1,13 @@
+{
+  "href": "admin/directpv.html",
+  "vi": {
+    "section": "Quản trị viên",
+    "title": "DirectPV discover & init",
+    "subtitle": "Khám phá ổ đĩa raw và khởi tạo cho DirectPV (xóa dữ liệu ổ)."
+  },
+  "en": {
+    "section": "Administrator",
+    "title": "DirectPV discover & init",
+    "subtitle": "Discover raw drives and initialize DirectPV (destructive)."
+  }
+}

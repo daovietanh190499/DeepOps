@@ -1,0 +1,13 @@
+{
+  "href": "user/terminal.html",
+  "vi": {
+    "section": "Người dùng",
+    "title": "Terminal tương tác",
+    "subtitle": "Shell trong main container qua kubectl exec và xterm.js."
+  },
+  "en": {
+    "section": "User guide",
+    "title": "Interactive terminal",
+    "subtitle": "Shell into the main workspace container from the browser."
+  }
+}

@@ -1,0 +1,18 @@
+<p>Sidecar <strong>monitor</strong> ghi metrics định kỳ (kubectl top, nvidia-smi) và hiển thị biểu đồ trên UI.</p>
+
+<figure class="my-6"><img src="../assets/screenshots/monitor-tab.png" alt="Monitor" class="w-full rounded-xl border shadow-sm"></figure>
+
+<h2>Prerequisites</h2>
+<ul>
+<li>Server đang chạy với monitor sidecar (enable khi spawn).</li>
+<li>Cluster có <strong>metrics-server</strong>.</li>
+</ul>
+
+<h2>Điều khiển</h2>
+<ul>
+<li><strong>Pod</strong> — chọn pod.</li>
+<li><strong>Range</strong> — 5 min, 15 min, 30 min, 1 hour, 5 hours.</li>
+<li><strong>Refresh</strong> / <strong>Download</strong> — tải JSONL log metrics.</li>
+</ul>
+
+<p>Thẻ tóm tắt: <strong>CPU</strong>, <strong>RAM</strong>, <strong>GPU</strong>, <strong>GPU memory</strong>.</p>

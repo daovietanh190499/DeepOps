@@ -8,9 +8,15 @@ import re
 import sys
 from pathlib import Path
 
+from urllib.parse import urlparse
+
 ROOT = Path(__file__).resolve().parents[1]
 AUTH = ROOT / '.auth'
-DOHUB = os.environ.get('DOHUB_URL', 'https://iaihub.uet.edu.vn').rstrip('/')
+DOHUB = os.environ.get('DOHUB_URL', 'https://hub.example.com').rstrip('/')
+
+
+def dohub_host() -> str:
+    return urlparse(DOHUB).hostname or 'hub.example.com'
 
 
 def main() -> None:
@@ -46,7 +52,7 @@ def main() -> None:
         page = context.new_page()
         page.goto(f'{DOHUB}/login', wait_until='domcontentloaded', timeout=60000)
         print(f'Đăng nhập GitHub trong cửa sổ trình duyệt ({role}). Chờ redirect về Dohub…')
-        page.wait_for_url(re.compile(r'iaihub\.uet\.edu\.vn'), timeout=600000)
+        page.wait_for_url(re.compile(re.escape(dohub_host())), timeout=600000)
         context.storage_state(path=str(out))
         browser.close()
     print('Đã lưu', out)

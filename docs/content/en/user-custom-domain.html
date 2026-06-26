@@ -1,0 +1,15 @@
+<p>Mặc định URL workspace: <code>https://{slug}-{username}.{DOMAIN_NAME}/</code>. User trong group có <strong>Allow custom service domain</strong> có thể ghi đè hostname.</p>
+
+<figure class="my-6"><img src="../assets/screenshots/custom-domain.svg" alt="Custom domain field" class="w-full rounded-xl border shadow-sm"></figure>
+
+<h2>Users with permission</h2>
+<ol>
+<li>Khi <strong>Create server</strong> / <strong>Edit server</strong>, điền <strong>Service domain (ingress host)</strong> — ví dụ <code>myapp.example.com</code>.</li>
+<li>DNS phải trỏ tới ingress cluster.</li>
+<li>Tab <strong>General</strong> hiển thị <strong>Service domain</strong> với nút copy.</li>
+</ol>
+
+<h2>Admin grants permission</h2>
+<p><strong>Users → Groups → Edit group</strong> → enable <strong>Allow custom service domain</strong>. See <a href="../admin/groups.html">Resource groups</a>.</p>
+
+<div class="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm my-4"><strong>TLS:</strong> Mỗi hostname cần certificate phù hợp (Let's Encrypt HTTP-01 hoặc wildcard DNS-01).</div>

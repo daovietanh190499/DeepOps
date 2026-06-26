@@ -1,0 +1,13 @@
+{
+  "href": "admin/overall.html",
+  "vi": {
+    "section": "Quản trị viên",
+    "title": "Cluster overall",
+    "subtitle": "Tổng quan cluster, join node, SSH nodes, DirectPV drives."
+  },
+  "en": {
+    "section": "Administrator",
+    "title": "Cluster overall",
+    "subtitle": "Cluster info, join nodes, SSH, and DirectPV drive list."
+  }
+}

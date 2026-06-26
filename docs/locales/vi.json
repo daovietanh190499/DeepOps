@@ -1,0 +1,67 @@
+{
+  "lang": "vi",
+  "flag": "🇻🇳",
+  "name": "Tiếng Việt",
+  "ui": {
+    "prev": "Trước",
+    "next": "Tiếp",
+    "github": "GitHub",
+    "index_title": "Tổng quan Dohub",
+    "index_subtitle": "Tài liệu chính thức cho người dùng và quản trị viên.",
+    "index_lead": "Dohub là nền tảng hub quản lý workspace <strong>code-server</strong> (và các container tùy chỉnh) trên Kubernetes. Tài liệu này hướng dẫn cài đặt cluster, sử dụng tính năng người dùng, quản trị viên và các ứng dụng triển khai trên nền Dohub.",
+    "index_logo_caption": "Dohub — workspace hub trên Kubernetes",
+    "index_quick_links": "Liên kết nhanh",
+    "index_repo": "Repository",
+    "index_warn": "Khi làm theo hướng dẫn có thao tác tạo/xóa, hãy dùng tên tạm (ví dụ <code>docs-demo-*</code>) và xóa ngay sau khi chụp ảnh — không chỉnh sửa tài nguyên production đang chạy."
+  },
+  "nav": [
+    {
+      "title": "Bắt đầu",
+      "items": [
+        ["index.html", "Tổng quan"],
+        ["installation.html", "Cài đặt cluster"]
+      ]
+    },
+    {
+      "title": "Người dùng",
+      "items": [
+        ["user/drives.html", "Tạo & xóa drive"],
+        ["user/servers.html", "Quản lý server"],
+        ["user/images.html", "Đăng ký Docker image"],
+        ["user/port-expose.html", "Expose port (wstunnel)"],
+        ["user/logs-describe.html", "Logs & Describe"],
+        ["user/terminal.html", "Terminal tương tác"],
+        ["user/monitor.html", "Monitor tài nguyên"],
+        ["user/backup.html", "Backup rclone"],
+        ["user/custom-domain.html", "Custom domain"]
+      ]
+    },
+    {
+      "title": "Quản trị viên",
+      "items": [
+        ["admin/overall.html", "Cluster overall"],
+        ["admin/directpv.html", "DirectPV discover & init"],
+        ["admin/drives.html", "Quản lý drives"],
+        ["admin/servers.html", "Quản lý servers"],
+        ["admin/templates.html", "Server templates"],
+        ["admin/users.html", "Users & accept"],
+        ["admin/groups.html", "Resource groups"],
+        ["admin/docker-images.html", "Docker images"]
+      ]
+    },
+    {
+      "title": "Ứng dụng trên Dohub",
+      "items": [
+        ["apps/keycloak.html", "Keycloak (admin)"],
+        ["apps/overleaf.html", "Overleaf"]
+      ]
+    }
+  ],
+  "pages": {
+    "installation.html": {
+      "section": "Bắt đầu",
+      "title": "Cài đặt cluster",
+      "subtitle": "Hướng dẫn triển khai MicroK8s, DirectPV, HAMi và Dohub từ đầu."
+    }
+  }
+}

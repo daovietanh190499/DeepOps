@@ -1,0 +1,13 @@
+{
+  "href": "admin/servers.html",
+  "vi": {
+    "section": "Quản trị viên",
+    "title": "Quản lý servers (admin)",
+    "subtitle": "Xem, start, stop, delete workspace của mọi user."
+  },
+  "en": {
+    "section": "Administrator",
+    "title": "Manage servers",
+    "subtitle": "View all workspaces across users."
+  }
+}

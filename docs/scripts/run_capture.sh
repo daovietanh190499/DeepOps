@@ -16,7 +16,7 @@ fi
 source /tmp/pw-libs/env.sh
 export PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:-$HOME/.cache/ms-playwright}"
 
-export DOHUB_URL="${DOHUB_URL:-https://iaihub.uet.edu.vn}"
+export DOHUB_URL="${DOHUB_URL:-https://hub.example.com}"
 export DOCS_HEADLESS="${DOCS_HEADLESS:-1}"
 
 # Không đọc OTP từ .env — chỉ nhập khi GitHub hiện trang xác minh

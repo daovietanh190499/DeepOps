@@ -21,12 +21,12 @@ from urllib.parse import urlparse
 
 ROOT = Path(__file__).resolve().parents[1]
 OUT = ROOT / 'assets' / 'screenshots'
-CONTENT = ROOT / 'content'
+CONTENT = ROOT / 'content' / 'vi'
 AUTH = ROOT / '.auth'
 
-DOHUB = os.environ.get('DOHUB_URL', 'https://iaihub.uet.edu.vn').rstrip('/')
-KEYCLOAK = os.environ.get('KEYCLOAK_URL', 'https://keycloak.iaihub.uet.edu.vn').rstrip('/')
-OVERLEAF = os.environ.get('OVERLEAF_URL', 'https://overleaf.iaihub.uet.edu.vn').rstrip('/')
+DOHUB = os.environ.get('DOHUB_URL', 'https://hub.example.com').rstrip('/')
+KEYCLOAK = os.environ.get('KEYCLOAK_URL', 'https://keycloak.example.com').rstrip('/')
+OVERLEAF = os.environ.get('OVERLEAF_URL', 'https://overleaf.example.com').rstrip('/')
 
 ADMIN_USER = os.environ.get('DOCS_ADMIN_USER', 'agentdv')
 ADMIN_PASS = os.environ.get('DOCS_ADMIN_PASS', '')
@@ -63,8 +63,16 @@ def resolve_dohub_cookie(*, role: str = 'user') -> str:
     return cookie
 
 
+def dohub_host() -> str:
+    return urlparse(DOHUB).hostname or 'hub.example.com'
+
+
+def dohub_url_re() -> re.Pattern[str]:
+    return re.compile(re.escape(dohub_host()))
+
+
 def dohub_cookie_payload(access_key: str) -> dict:
-    host = urlparse(DOHUB).hostname or 'iaihub.uet.edu.vn'
+    host = dohub_host()
     return {
         'name': 'user_access_key',
         'value': access_key,
@@ -187,7 +195,7 @@ def wait_past_github_login(page) -> None:
     """Chờ GitHub xử lý sau submit (OTP / authorize / redirect)."""
     for _ in range(90):
         wait_vue(page, 1000)
-        if re.search(r'iaihub\.uet\.edu\.vn', page.url):
+        if dohub_url_re().search(page.url):
             return
         if page.locator('button[name="authorize"]').count():
             return
@@ -218,7 +226,7 @@ def complete_github_otp_if_needed(page, username: str, *, role: str = 'user') ->
             pass
 
     page.wait_for_url(
-        re.compile(r'(github\.com/login/oauth|iaihub\.uet\.edu\.vn)'),
+        re.compile(r'(github\.com/login/oauth|' + re.escape(dohub_host()) + r')'),
         timeout=120000,
     )
 
@@ -257,7 +265,7 @@ def github_login(
             page.wait_for_url(re.compile(r'github\.com'), timeout=90000)
 
     # Đã vào Dohub (session còn hiệu lực)
-    if re.search(r'iaihub\.uet\.edu\.vn', page.url) and 'login' not in page.url:
+    if dohub_url_re().search(page.url) and 'login' not in page.url:
         if storage:
             page.context.storage_state(path=str(storage))
             print('saved auth', storage)
@@ -273,7 +281,7 @@ def github_login(
 
     if page.locator('button[name="authorize"]').count():
         page.click('button[name="authorize"]')
-    page.wait_for_url(re.compile(r'iaihub\.uet\.edu\.vn'), timeout=120000)
+    page.wait_for_url(dohub_url_re(), timeout=120000)
     wait_vue(page, 4000)
     if storage:
         page.context.storage_state(path=str(storage))

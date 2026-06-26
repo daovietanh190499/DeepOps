@@ -1,0 +1,24 @@
+<p>Sidecar <strong>backup</strong> dùng <a href="https://rclone.org/">rclone</a> đồng bộ thư mục đã mount lên remote (Google Drive, S3, …).</p>
+
+<figure class="my-6"><img src="../assets/screenshots/backup-tab.png" alt="Backup tab" class="w-full rounded-xl border shadow-sm"></figure>
+
+<h2>Cấu hình</h2>
+<ol>
+<li>Tab <strong>Backup</strong> trên modal server.</li>
+<li><strong>Cron schedule</strong> — ví dụ <code>0 2 * * *</code> (2h sáng hàng ngày).</li>
+<li><strong>Remote destination</strong> — ví dụ <code>gdrive:backups/my-server</code>.</li>
+<li><strong>rclone.conf</strong> — dán config remote → <strong>Save settings</strong>.</li>
+<li>Chọn <strong>Volumes to backup</strong> (checkbox theo mount).</li>
+</ol>
+
+<h2>Hành động</h2>
+<table>
+<thead><tr><th>Nút</th><th>Tác dụng</th></tr></thead>
+<tbody>
+<tr><td><strong>Schedule</strong> / <strong>Update schedule</strong></td><td>Đẩy config + enable cron trong sidecar</td></tr>
+<tr><td><strong>Backup now</strong></td><td>Chạy rclone ngay (<code>kubectl exec</code> sidecar)</td></tr>
+<tr><td><strong>Stop backup</strong></td><td>Dừng cron; sidecar container vẫn chạy</td></tr>
+</tbody>
+</table>
+
+<p>Status: <strong>Running…</strong>, <strong>Success</strong>, <strong>Failed</strong>, <strong>No run yet</strong>.</p>

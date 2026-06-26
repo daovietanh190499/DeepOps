@@ -1,0 +1,13 @@
+{
+  "href": "user/images.html",
+  "vi": {
+    "section": "Người dùng",
+    "title": "Đăng ký Docker image",
+    "subtitle": "Gửi image tùy chỉnh và chờ admin duyệt (accept)."
+  },
+  "en": {
+    "section": "User guide",
+    "title": "Register Docker images",
+    "subtitle": "Submit custom images and wait for admin approval."
+  }
+}

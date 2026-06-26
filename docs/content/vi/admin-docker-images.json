@@ -1,0 +1,13 @@
+{
+  "href": "admin/docker-images.html",
+  "vi": {
+    "section": "Quản trị viên",
+    "title": "Docker images (admin)",
+    "subtitle": "Đăng ký image, accept submission của user, import/export."
+  },
+  "en": {
+    "section": "Administrator",
+    "title": "Docker images",
+    "subtitle": "Approve or reject user-submitted images."
+  }
+}

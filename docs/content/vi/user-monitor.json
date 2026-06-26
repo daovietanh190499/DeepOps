@@ -1,0 +1,13 @@
+{
+  "href": "user/monitor.html",
+  "vi": {
+    "section": "Người dùng",
+    "title": "Monitor tài nguyên",
+    "subtitle": "CPU, RAM, GPU từ sidecar monitor-sidecar."
+  },
+  "en": {
+    "section": "User guide",
+    "title": "Resource monitor",
+    "subtitle": "CPU, memory, and GPU usage for a running server."
+  }
+}

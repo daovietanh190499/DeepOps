@@ -1,29 +1,28 @@
 # Dohub Documentation Wiki
 
-Static documentation site for [Dohub](https://iaihub.uet.edu.vn), published via GitHub Pages:
+Static documentation site for Dohub, published via GitHub Pages:
 
 **https://daovietanh190499.github.io/DeepOps/docs/**
+
+Hỗ trợ song ngữ **Tiếng Việt / English** — dùng nút cờ 🇻🇳 / 🇬🇧 trên header.
 
 ## Cấu trúc
 
 ```
 docs/
-  build.py              # Generator HTML từ content fragments
-  index.html            # (generated) Trang chủ wiki
-  installation.html     # (generated) Cài đặt cluster
-  user/                 # (generated) Hướng dẫn người dùng
-  admin/                # (generated) Hướng dẫn admin
-  apps/                 # (generated) Keycloak, Overleaf
-  content/              # Nguồn nội dung (.html + .json metadata)
+  build.py              # Generator HTML (bilingual VI/EN)
+  locales/              # Chuỗi UI + navigation
+  content/
+    vi/                 # Nội dung tiếng Việt (.html + .json)
+    en/                 # Nội dung tiếng Anh
   assets/
-    logo.png            # Logo Dohub
-    screenshots/        # Ảnh minh họa (.svg placeholder hoặc .png thật)
+    docs.css, docs.js   # Style code blocks + language switcher
+    logo.png
+    screenshots/        # Ảnh minh họa (.png)
   scripts/
-    make_placeholder.py
     capture_screenshots.py
+    migrate_i18n.py
 ```
-
-Theme dựa trên [Spinal docs template](https://github.com/spinalcms/docs-template) (Tailwind CSS + typography), đã rebrand cho Dohub.
 
 ## Build
 
@@ -32,17 +31,9 @@ cd docs
 python3 build.py
 ```
 
-Sửa nội dung trong `content/*.html` và `content/*.json`, rồi chạy lại `build.py`.
+Sửa nội dung trong `content/vi/` (và `content/en/` nếu cần), rồi chạy lại `build.py`.
 
 ## Ảnh minh họa
-
-Placeholder SVG được tạo bằng:
-
-```bash
-python3 scripts/make_placeholder.py
-```
-
-Thay bằng screenshot PNG cùng tên trong `assets/screenshots/` (chỉ `.png`, không dùng `.svg`).
 
 Script chụp ảnh (Playwright):
 
@@ -52,34 +43,18 @@ bash scripts/setup_chromium_libs.sh
 
 # Tạo .env.capture từ .env.capture.example
 cp .env.capture.example .env.capture
-# Điền DOCS_USER_TOKEN / DOCS_ADMIN_TOKEN (GitHub PAT) — khuyến nghị, tránh OTP
+# Điền DOHUB_URL (hub của bạn) và DOCS_USER_COOKIE / DOCS_ADMIN_COOKIE
 
-# Chạy
 bash scripts/run_capture.sh
 ```
 
-**Đăng nhập bằng cookie Dohub (khuyến nghị):** lấy `user_access_key` từ DevTools → Application → Cookies → `iaihub.uet.edu.vn`:
+**Đăng nhập bằng cookie Dohub (khuyến nghị):** lấy `user_access_key` từ DevTools → Application → Cookies → domain hub của bạn:
 
 ```bash
-DOCS_USER_COOKIE=uuid-của-daovietanh99
-DOCS_ADMIN_COOKIE=uuid-của-agentdv
+DOCS_USER_COOKIE=uuid-user
+DOCS_ADMIN_COOKIE=uuid-admin
 ```
 
 Cookie hết hạn khi đăng nhập lại trên trình duyệt — cần lấy giá trị mới.
 
-**Đăng nhập GitHub** (nếu không có cookie): mật khẩu/PAT → OTP hỏi sau khi email tới.
-
-Session lưu tại `docs/.auth/` sau lần chạy thành công.
-
 **Quy tắc:** chỉ tạo/xóa tài nguyên demo (`docs-demo-*`). **Không** chạy DirectPV discover/init khi chụp ảnh.
-
-## Tailwind (tuỳ chọn)
-
-Nếu có Node.js:
-
-```bash
-npm install
-npx tailwindcss -i ./src/input.css -o ./dist/output.css --minify
-```
-
-Trang generated hiện dùng Tailwind CDN; `dist/output.css` là tùy chọn cho offline build.

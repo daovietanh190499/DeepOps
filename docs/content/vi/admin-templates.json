@@ -1,0 +1,13 @@
+{
+  "href": "admin/templates.html",
+  "vi": {
+    "section": "Quản trị viên",
+    "title": "Server templates (Quick templates)",
+    "subtitle": "Thêm, sửa, xóa template hiển thị khi user tạo server."
+  },
+  "en": {
+    "section": "Administrator",
+    "title": "Server templates",
+    "subtitle": "Catalog of spawn templates (CPU, RAM, image, mounts)."
+  }
+}

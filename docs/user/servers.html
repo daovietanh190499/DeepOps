@@ -5,23 +5,25 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Quản lý server (workspace) — Dohub Docs</title>
   <link rel="icon" href="../assets/logo.png">
-  <script src="https://cdn.tailwindcss.com?plugins=forms,typography"></script>
-  <script>
-    tailwind.config = {
-      theme: { extend: { colors: { brand: { 500: '#3b82f6', 600: '#2563eb', 700: '#1d4ed8' } } } }
-    }
-  </script>
+  <link rel="stylesheet" href="../assets/docs.css">
+  <script src="https://cdn.tailwindcss.com?plugins=forms"></script>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <style>body { font-family: 'DM Sans', system-ui, sans-serif; }</style>
 </head>
 <body class="bg-slate-50 text-slate-800 antialiased">
-  <header class="sticky top-0 z-50 flex items-center justify-between border-b border-slate-200 bg-white/95 px-4 py-2 shadow-sm backdrop-blur-sm">
-    <a href="../index.html" class="flex items-center gap-2.5">
-      <img src="../assets/logo.png" alt="Dohub" class="h-9 w-9 rounded-lg object-contain">
-      <span class="text-lg font-bold tracking-tight text-slate-900">Dohub <span class="font-medium text-slate-500">Docs</span></span>
+  <header class="sticky top-0 z-50 flex items-center justify-between gap-3 border-b border-slate-200 bg-white/95 px-4 py-2 shadow-sm backdrop-blur-sm">
+    <a href="../index.html" class="flex min-w-0 items-center gap-2.5">
+      <img src="../assets/logo.png" alt="Dohub" class="h-9 w-9 shrink-0 rounded-lg object-contain">
+      <span class="truncate text-lg font-bold tracking-tight text-slate-900">Dohub <span class="font-medium text-slate-500">Docs</span></span>
     </a>
-    <a href="https://iaihub.uet.edu.vn/" class="hidden rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700 sm:inline-block">Mở Dohub</a>
+    <div class="flex shrink-0 items-center gap-2">
+      <div class="flex items-center gap-1.5" role="group" aria-label="Language">
+      <button type="button" data-lang-btn="vi" data-lang="vi" class="rounded-md px-2 py-1 text-lg leading-none hover:bg-slate-100" title="Tiếng Việt" aria-pressed="true">🇻🇳</button>
+      <button type="button" data-lang-btn="en" data-lang="en" class="rounded-md px-2 py-1 text-lg leading-none hover:bg-slate-100" title="English" aria-pressed="false">🇬🇧</button>
+    </div>
+      <a href="https://github.com/daovietanh190499/DeepOps" class="hidden rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-sm font-semibold text-slate-700 hover:bg-slate-50 sm:inline-block">GitHub</a>
+    </div>
   </header>
   <main class="relative mx-auto flex max-w-8xl justify-center sm:px-2 lg:px-8 xl:px-12">
     <label for="navigation" class="fixed bottom-0 left-0 z-50 mb-4 ml-4 flex h-12 w-12 cursor-pointer items-center justify-center rounded-full border border-slate-300 bg-white text-slate-600 shadow-lg lg:hidden">
@@ -31,50 +33,50 @@
     <div class="fixed left-0 top-[3.5rem] hidden h-screen px-4 shadow-xl peer-checked:block lg:relative lg:top-0 lg:block lg:h-auto lg:flex-none lg:px-0 lg:shadow-none">
       <div class="absolute inset-y-0 right-0 w-full bg-white lg:w-72 lg:bg-slate-50"></div>
       <nav class="sticky top-[4.5rem] w-64 pr-8 text-sm xl:w-72 xl:pr-16"><ul role="list" class="-ml-0.5 h-[calc(100vh-4.5rem)] overflow-y-auto py-7 pl-0.5 space-y-8">
-<li><h3 class="font-semibold tracking-tight text-slate-900">Bắt đầu</h3>
+<li><h3 class="font-semibold tracking-tight text-slate-900"><div class="lang-block" data-lang="vi">Bắt đầu</div><div class="lang-block hidden" data-lang="en">Getting started</div></h3>
 <ul role="list" class="pl-3 mt-3 space-y-2">
-<li><a href="../index.html" class="text-slate-600 hover:text-slate-900">Tổng quan</a></li>
-<li><a href="../installation.html" class="text-slate-600 hover:text-slate-900">Cài đặt cluster</a></li>
+<li><a href="../index.html" class="text-slate-600 hover:text-slate-900"><div class="lang-block" data-lang="vi">Tổng quan</div><div class="lang-block hidden" data-lang="en">Overview</div></a></li>
+<li><a href="../installation.html" class="text-slate-600 hover:text-slate-900"><div class="lang-block" data-lang="vi">Cài đặt cluster</div><div class="lang-block hidden" data-lang="en">Cluster installation</div></a></li>
 </ul></li>
-<li><h3 class="font-semibold tracking-tight text-slate-900">Người dùng</h3>
+<li><h3 class="font-semibold tracking-tight text-slate-900"><div class="lang-block" data-lang="vi">Người dùng</div><div class="lang-block hidden" data-lang="en">User guide</div></h3>
 <ul role="list" class="pl-3 mt-3 space-y-2">
-<li><a href="drives.html" class="text-slate-600 hover:text-slate-900">Tạo &amp; xóa drive</a></li>
-<li><a href="servers.html" class="text-blue-700 font-semibold">Quản lý server</a></li>
-<li><a href="images.html" class="text-slate-600 hover:text-slate-900">Đăng ký Docker image</a></li>
-<li><a href="port-expose.html" class="text-slate-600 hover:text-slate-900">Expose port (wstunnel)</a></li>
-<li><a href="logs-describe.html" class="text-slate-600 hover:text-slate-900">Logs &amp; Describe</a></li>
-<li><a href="terminal.html" class="text-slate-600 hover:text-slate-900">Terminal tương tác</a></li>
-<li><a href="monitor.html" class="text-slate-600 hover:text-slate-900">Monitor tài nguyên</a></li>
-<li><a href="backup.html" class="text-slate-600 hover:text-slate-900">Backup rclone</a></li>
-<li><a href="custom-domain.html" class="text-slate-600 hover:text-slate-900">Custom domain</a></li>
+<li><a href="drives.html" class="text-slate-600 hover:text-slate-900"><div class="lang-block" data-lang="vi">Tạo &amp; xóa drive</div><div class="lang-block hidden" data-lang="en">Create &amp; delete drives</div></a></li>
+<li><a href="servers.html" class="text-blue-700 font-semibold"><div class="lang-block" data-lang="vi">Quản lý server</div><div class="lang-block hidden" data-lang="en">Manage servers</div></a></li>
+<li><a href="images.html" class="text-slate-600 hover:text-slate-900"><div class="lang-block" data-lang="vi">Đăng ký Docker image</div><div class="lang-block hidden" data-lang="en">Register Docker images</div></a></li>
+<li><a href="port-expose.html" class="text-slate-600 hover:text-slate-900"><div class="lang-block" data-lang="vi">Expose port (wstunnel)</div><div class="lang-block hidden" data-lang="en">Expose port (wstunnel)</div></a></li>
+<li><a href="logs-describe.html" class="text-slate-600 hover:text-slate-900"><div class="lang-block" data-lang="vi">Logs &amp; Describe</div><div class="lang-block hidden" data-lang="en">Logs &amp; Describe</div></a></li>
+<li><a href="terminal.html" class="text-slate-600 hover:text-slate-900"><div class="lang-block" data-lang="vi">Terminal tương tác</div><div class="lang-block hidden" data-lang="en">Interactive terminal</div></a></li>
+<li><a href="monitor.html" class="text-slate-600 hover:text-slate-900"><div class="lang-block" data-lang="vi">Monitor tài nguyên</div><div class="lang-block hidden" data-lang="en">Resource monitor</div></a></li>
+<li><a href="backup.html" class="text-slate-600 hover:text-slate-900"><div class="lang-block" data-lang="vi">Backup rclone</div><div class="lang-block hidden" data-lang="en">Rclone backup</div></a></li>
+<li><a href="custom-domain.html" class="text-slate-600 hover:text-slate-900"><div class="lang-block" data-lang="vi">Custom domain</div><div class="lang-block hidden" data-lang="en">Custom domain</div></a></li>
 </ul></li>
-<li><h3 class="font-semibold tracking-tight text-slate-900">Quản trị viên</h3>
+<li><h3 class="font-semibold tracking-tight text-slate-900"><div class="lang-block" data-lang="vi">Quản trị viên</div><div class="lang-block hidden" data-lang="en">Administrator</div></h3>
 <ul role="list" class="pl-3 mt-3 space-y-2">
-<li><a href="../admin/overall.html" class="text-slate-600 hover:text-slate-900">Cluster overall</a></li>
-<li><a href="../admin/directpv.html" class="text-slate-600 hover:text-slate-900">DirectPV discover &amp; init</a></li>
-<li><a href="../admin/drives.html" class="text-slate-600 hover:text-slate-900">Quản lý drives</a></li>
-<li><a href="../admin/servers.html" class="text-slate-600 hover:text-slate-900">Quản lý servers</a></li>
-<li><a href="../admin/templates.html" class="text-slate-600 hover:text-slate-900">Server templates</a></li>
-<li><a href="../admin/users.html" class="text-slate-600 hover:text-slate-900">Users &amp; accept</a></li>
-<li><a href="../admin/groups.html" class="text-slate-600 hover:text-slate-900">Resource groups</a></li>
-<li><a href="../admin/docker-images.html" class="text-slate-600 hover:text-slate-900">Docker images</a></li>
+<li><a href="../admin/overall.html" class="text-slate-600 hover:text-slate-900"><div class="lang-block" data-lang="vi">Cluster overall</div><div class="lang-block hidden" data-lang="en">Cluster overall</div></a></li>
+<li><a href="../admin/directpv.html" class="text-slate-600 hover:text-slate-900"><div class="lang-block" data-lang="vi">DirectPV discover &amp; init</div><div class="lang-block hidden" data-lang="en">DirectPV discover &amp; init</div></a></li>
+<li><a href="../admin/drives.html" class="text-slate-600 hover:text-slate-900"><div class="lang-block" data-lang="vi">Quản lý drives</div><div class="lang-block hidden" data-lang="en">Manage drives</div></a></li>
+<li><a href="../admin/servers.html" class="text-slate-600 hover:text-slate-900"><div class="lang-block" data-lang="vi">Quản lý servers</div><div class="lang-block hidden" data-lang="en">Manage servers</div></a></li>
+<li><a href="../admin/templates.html" class="text-slate-600 hover:text-slate-900"><div class="lang-block" data-lang="vi">Server templates</div><div class="lang-block hidden" data-lang="en">Server templates</div></a></li>
+<li><a href="../admin/users.html" class="text-slate-600 hover:text-slate-900"><div class="lang-block" data-lang="vi">Users &amp; accept</div><div class="lang-block hidden" data-lang="en">Users &amp; accept</div></a></li>
+<li><a href="../admin/groups.html" class="text-slate-600 hover:text-slate-900"><div class="lang-block" data-lang="vi">Resource groups</div><div class="lang-block hidden" data-lang="en">Resource groups</div></a></li>
+<li><a href="../admin/docker-images.html" class="text-slate-600 hover:text-slate-900"><div class="lang-block" data-lang="vi">Docker images</div><div class="lang-block hidden" data-lang="en">Docker images</div></a></li>
 </ul></li>
-<li><h3 class="font-semibold tracking-tight text-slate-900">Ứng dụng trên Dohub</h3>
+<li><h3 class="font-semibold tracking-tight text-slate-900"><div class="lang-block" data-lang="vi">Ứng dụng trên Dohub</div><div class="lang-block hidden" data-lang="en">Apps on Dohub</div></h3>
 <ul role="list" class="pl-3 mt-3 space-y-2">
-<li><a href="../apps/keycloak.html" class="text-slate-600 hover:text-slate-900">Keycloak (admin)</a></li>
-<li><a href="../apps/overleaf.html" class="text-slate-600 hover:text-slate-900">Overleaf</a></li>
+<li><a href="../apps/keycloak.html" class="text-slate-600 hover:text-slate-900"><div class="lang-block" data-lang="vi">Keycloak (admin)</div><div class="lang-block hidden" data-lang="en">Keycloak (admin)</div></a></li>
+<li><a href="../apps/overleaf.html" class="text-slate-600 hover:text-slate-900"><div class="lang-block" data-lang="vi">Overleaf</div><div class="lang-block hidden" data-lang="en">Overleaf</div></a></li>
 </ul></li>
 </ul></nav>
     </div>
     <div class="min-w-0 flex-auto max-w-3xl px-4 py-10 lg:max-w-none lg:pl-8 lg:pr-0 xl:px-16">
       <article>
         <header>
-          <p class="text-sm font-medium text-slate-500">Người dùng</p>
-          <h1 class="text-3xl font-bold tracking-tight text-slate-900">Quản lý server (workspace)</h1>
-          <p class="mt-2 text-lg text-slate-600">Tạo, chỉnh sửa, bật, tắt và xóa server — từ template hoặc form thủ công.</p>
+          <p class="text-sm font-medium text-slate-500"><div class="lang-block" data-lang="vi">Người dùng</div><div class="lang-block hidden" data-lang="en">User guide</div></p>
+          <h1 class="text-3xl font-bold tracking-tight text-slate-900"><div class="lang-block" data-lang="vi">Quản lý server (workspace)</div><div class="lang-block hidden" data-lang="en">Manage servers</div></h1>
+          <p class="mt-2 text-lg text-slate-600"><div class="lang-block" data-lang="vi">Tạo, chỉnh sửa, bật, tắt và xóa server — từ template hoặc form thủ công.</div><div class="lang-block hidden" data-lang="en">Create, edit, start, stop, and delete code-server workspaces.</div></p>
         </header>
-        <div class="prose prose-slate mt-8 max-w-none prose-headings:font-semibold prose-a:text-blue-600 prose-code:rounded prose-code:bg-slate-100 prose-code:px-1 prose-code:before:content-none prose-code:after:content-none prose-pre:bg-slate-900 prose-pre:text-slate-100 prose-pre:[&_code]:bg-transparent prose-pre:[&_code]:text-slate-100 prose-pre:[&_code]:p-0 prose-pre:[&_code]:before:content-none prose-pre:[&_code]:after:content-none">
-<p>Server (workspace) là một Helm release <code>codehub</code> trên Kubernetes: container chính (thường code-server), ingress riêng, optional sidecar (monitor, backup, wstunnel).</p>
+        <div class="mt-8 doc-body prose prose-slate max-w-none prose-headings:font-semibold prose-a:text-blue-600">
+<div class="lang-block" data-lang="vi"><p>Server (workspace) là một Helm release <code>codehub</code> trên Kubernetes: container chính (thường code-server), ingress riêng, optional sidecar (monitor, backup, wstunnel).</p>
 
 <figure class="my-6"><img src="../assets/screenshots/servers-list.png" alt="My servers" class="w-full rounded-xl border shadow-sm"></figure>
 
@@ -152,11 +154,90 @@
 <pre><code>[{"name":"docs-demo-ws","cpu":2,"ram":"4G","drive_mounts":[{"drive_id":"&lt;uuid&gt;","mount_path":"/home/coder"}],"docker_repository":"codercom/code-server","docker_tag":"4.89.0-ubuntu"}]</code></pre>
 
 <div class="rounded-xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-900 my-4"><strong>Quan trọng:</strong> Không chỉnh sửa/xóa server production. Demo: tạo <code>docs-demo-*</code> rồi xóa ngay.</div>
+</div><div class="lang-block hidden" data-lang="en"><p>Server (workspace) là một Helm release <code>codehub</code> trên Kubernetes: container chính (thường code-server), ingress riêng, optional sidecar (monitor, backup, wstunnel).</p>
 
+<figure class="my-6"><img src="../assets/screenshots/servers-list.png" alt="My servers" class="w-full rounded-xl border shadow-sm"></figure>
+
+<h2>Luồng tổng quan</h2>
+<ol>
+<li><strong>Create server</strong> — lưu cấu hình vào DB (pod chưa chạy).</li>
+<li><strong>Start</strong> — Helm install/upgrade, tạo pod + ingress.</li>
+<li><strong>Stop</strong> — gỡ release, giữ cấu hình.</li>
+<li><strong>Edit</strong> — chỉ khi server <em>offline</em>.</li>
+<li><strong>Delete</strong> — xóa workspace và release (nếu có).</li>
+</ol>
+
+<h2>Tạo từ Quick template</h2>
+<ol>
+<li>Tab <strong>My servers</strong> → <strong>Create server</strong>.</li>
+<li>Phần <strong>Quick templates</strong>: click một template (Lollipop, Oreo, …) để điền sẵn CPU, RAM, GPU, image, mounts.</li>
+<li>Kiểm tra lại form bên dưới, nhấn <strong>Create server</strong>.</li>
+</ol>
+
+<h2>Tạo thủ công — từng trường</h2>
+
+<figure class="my-6"><img src="../assets/screenshots/servers-create-modal.png" alt="Modal create server" class="w-full rounded-xl border shadow-sm"></figure>
+
+<table>
+<thead><tr><th>Trường</th><th>Mô tả</th></tr></thead>
+<tbody>
+<tr><td><strong>Server name</strong></td><td>Tên hiển thị; slug dùng cho URL và release name.</td></tr>
+<tr><td><strong>Service domain</strong></td><td>Chỉ hiện nếu group có quyền <em>custom domain</em>. Hostname ingress tùy chỉnh; để trống dùng <code>{slug}-{user}.{DOMAIN}</code>.</td></tr>
+<tr><td><strong>CPU (vCPU)</strong></td><td>Request CPU; limit ≈ 1.5× (theo chart).</td></tr>
+<tr><td><strong>RAM</strong></td><td>Ví dụ <code>4G</code>, <code>8G</code>.</td></tr>
+<tr><td><strong>Node</strong></td><td><code>auto</code> hoặc pin pod lên hostname cụ thể.</td></tr>
+<tr><td><strong>Mount drives</strong></td><td>Chọn drive + <strong>mount path</strong> (mặc định <code>/home/coder</code>). Nhiều drive: <strong>+ Add drive</strong>.</td></tr>
+<tr><td><strong>Mount files</strong></td><td>File nhỏ → ConfigMap mount (tên file, path, nội dung).</td></tr>
+<tr><td><strong>GPU</strong></td><td><code>none</code> hoặc profile HAMi (ví dụ <code>mig-2g.10gb</code>, <code>gpu</code>, <code>gpu:2</code>).</td></tr>
+<tr><td><strong>Privileged container</strong></td><td>Checkbox nếu group cho phép — <code>securityContext.privileged</code>.</td></tr>
+<tr><td><strong>Docker image</strong></td><td>Combobox tìm image đã đăng ký / catalog.</td></tr>
+<tr><td><strong>Version (tag)</strong></td><td>Tag image (ví dụ <code>4.89.0-ubuntu</code>).</td></tr>
+<tr><td><strong>Image pull policy</strong></td><td><code>IfNotPresent</code>, <code>Always</code>, <code>Never</code>.</td></tr>
+<tr><td><strong>Exposed ports</strong></td><td>Port HTTP chính + phụ, phân tách dấu phẩy (mặc định <code>8080</code>).</td></tr>
+<tr><td><strong>Container command</strong></td><td>Override CMD; để trống dùng mặc định image.</td></tr>
+<tr><td><strong>Environment variables</strong></td><td>KEY + value, <strong>Add / Update</strong>. Hỗ trợ value dài (textarea).</td></tr>
+</tbody>
+</table>
+
+<figure class="my-6"><img src="../assets/screenshots/servers-form-fields.png" alt="Chi tiết form" class="w-full rounded-xl border shadow-sm"></figure>
+
+<p>Panel <strong>Current specifications</strong> tóm tắt cấu hình; <strong>Export JSON</strong> tải file cấu hình.</p>
+
+<h2>Chỉnh sửa server</h2>
+<ol>
+<li><strong>Stop</strong> server trước (bắt buộc).</li>
+<li>Mở card server hoặc modal → <strong>Edit</strong> (hoặc mở lại <strong>Create server</strong> ở chế độ edit).</li>
+<li>Thay đổi trường → <strong>Save changes</strong>.</li>
+</ol>
+
+<figure class="my-6"><img src="../assets/screenshots/servers-edit-modal.svg" alt="Edit server" class="w-full rounded-xl border shadow-sm"></figure>
+
+<h2>Start / Stop</h2>
+<figure class="my-6"><img src="../assets/screenshots/servers-start-stop.png" alt="Start Stop" class="w-full rounded-xl border shadow-sm"></figure>
+<ul>
+<li><strong>Start</strong> — triển khai pod; URL workspace xuất hiện sau khi Running.</li>
+<li><strong>Stop</strong> — <code>helm uninstall</code>; dữ liệu trên PVC drive vẫn giữ.</li>
+</ul>
+
+<h2>Delete server</h2>
+<ol>
+<li>Nên <strong>Stop</strong> trước (khuyến nghị).</li>
+<li>Icon Delete trên card → gõ <code>delete</code> → <strong>Delete</strong>.</li>
+</ol>
+
+<figure class="my-6"><img src="../assets/screenshots/servers-delete-modal.svg" alt="Delete server" class="w-full rounded-xl border shadow-sm"></figure>
+
+<h2>Bulk create server</h2>
+<p><strong>Bulk create server</strong> — JSON/CSV nhiều server; tùy chọn <strong>Start servers after create</strong>.</p>
+<pre><code>[{"name":"docs-demo-ws","cpu":2,"ram":"4G","drive_mounts":[{"drive_id":"&lt;uuid&gt;","mount_path":"/home/coder"}],"docker_repository":"codercom/code-server","docker_tag":"4.89.0-ubuntu"}]</code></pre>
+
+<div class="rounded-xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-900 my-4"><strong>Quan trọng:</strong> Không chỉnh sửa/xóa server production. Demo: tạo <code>docs-demo-*</code> rồi xóa ngay.</div>
+</div>
         </div>
       </article>
-      <dl class="mt-10 flex border-t border-slate-200 pt-6"><div class="mr-auto text-left"><dt class="text-sm text-slate-600">Trước</dt><dd class="mt-1"><a href="drives.html" class="font-semibold text-slate-900 hover:underline">Tạo &amp; xóa drive</a></dd></div><div class="ml-auto text-right"><dt class="text-sm text-slate-600">Tiếp</dt><dd class="mt-1"><a href="images.html" class="font-semibold text-slate-900 hover:underline">Đăng ký Docker image</a></dd></div></dl>
+      <dl class="mt-10 flex border-t border-slate-200 pt-6"><div class="mr-auto text-left"><dt class="text-sm text-slate-600"><div class="lang-block" data-lang="vi">Trước</div><div class="lang-block hidden" data-lang="en">Previous</div></dt><dd class="mt-1"><a href="drives.html" class="font-semibold text-slate-900 hover:underline"><div class="lang-block" data-lang="vi">Tạo &amp; xóa drive</div><div class="lang-block hidden" data-lang="en">Create &amp; delete drives</div></a></dd></div><div class="ml-auto text-right"><dt class="text-sm text-slate-600"><div class="lang-block" data-lang="vi">Tiếp</div><div class="lang-block hidden" data-lang="en">Next</div></dt><dd class="mt-1"><a href="images.html" class="font-semibold text-slate-900 hover:underline"><div class="lang-block" data-lang="vi">Đăng ký Docker image</div><div class="lang-block hidden" data-lang="en">Register Docker images</div></a></dd></div></dl>
     </div>
   </main>
+  <script src="../assets/docs.js"></script>
 </body>
 </html>

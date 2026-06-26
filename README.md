@@ -8,13 +8,12 @@ Nền tảng hub quản lý và spawn workspace **code-server** (và container t
 
 **Wiki đầy đủ (GitHub Pages):** [https://daovietanh190499.github.io/DeepOps/docs/](https://daovietanh190499.github.io/DeepOps/docs/)
 
-Bao gồm: cài đặt cluster, hướng dẫn user/admin từng tính năng, Keycloak và Overleaf.
+Bao gồm: cài đặt cluster, hướng dẫn user/admin từng tính năng, Keycloak và Overleaf. Hỗ trợ **Tiếng Việt / English** (nút cờ 🇻🇳 🇬🇧 trên header).
 
 Tài liệu nguồn nằm trong thư mục [`docs/`](./docs/). Sau khi sửa nội dung:
 
 ```bash
 cd docs
-python3 scripts/make_placeholder.py   # tùy chọn — placeholder ảnh
 python3 build.py                    # generate HTML wiki
 ```
 
@@ -22,10 +21,9 @@ Chụp ảnh màn hình thật (cần Playwright + Chromium):
 
 ```bash
 cd docs
-python3 -m pip install playwright
-python3 -m playwright install chromium
-export DOHUB_URL=https://iaihub.uet.edu.vn
-python3 scripts/capture_screenshots.py
+cp .env.capture.example .env.capture
+# Điền DOHUB_URL và cookie/PAT trong .env.capture
+bash scripts/run_capture.sh
 ```
 
 ## Highlights
@@ -46,7 +44,7 @@ python3 scripts/capture_screenshots.py
 
 ## Triển khai nhanh
 
-Chi tiết: [Cài đặt cluster](https://daovietanh190499.github.io/DeepOps/installation.html) hoặc [`DEPLOY.md`](./DEPLOY.md).
+Chi tiết: [Cài đặt cluster](https://daovietanh190499.github.io/DeepOps/docs/installation.html) hoặc [`DEPLOY.md`](./DEPLOY.md).
 
 ```bash
 cp dohub/secrets/.env.example dohub/secrets/.env
@@ -55,12 +53,6 @@ cp dohub/secrets/.env.example dohub/secrets/.env
 chmod +x build-and-deploy.sh
 ./build-and-deploy.sh all
 ```
-
-## Production
-
-- Hub: [https://iaihub.uet.edu.vn](https://iaihub.uet.edu.vn)
-- Keycloak: [https://keycloak.iaihub.uet.edu.vn](https://keycloak.iaihub.uet.edu.vn)
-- Overleaf: [https://overleaf.iaihub.uet.edu.vn](https://overleaf.iaihub.uet.edu.vn)
 
 ## Requirements
 

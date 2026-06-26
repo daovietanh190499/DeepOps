@@ -1,0 +1,13 @@
+{
+  "href": "admin/users.html",
+  "vi": {
+    "section": "Quản trị viên",
+    "title": "Users & Accept",
+    "subtitle": "Duyệt user mới và quản lý role."
+  },
+  "en": {
+    "section": "Administrator",
+    "title": "Users & accept",
+    "subtitle": "Pending users, roles, and acceptance."
+  }
+}

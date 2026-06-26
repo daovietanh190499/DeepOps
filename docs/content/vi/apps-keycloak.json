@@ -1,0 +1,13 @@
+{
+  "href": "apps/keycloak.html",
+  "vi": {
+    "section": "Ứng dụng trên Dohub",
+    "title": "Keycloak (hướng dẫn admin)",
+    "subtitle": "Đăng nhập, realms, clients, groups và roles trên keycloak.example.com."
+  },
+  "en": {
+    "section": "Apps on Dohub",
+    "title": "Keycloak (admin guide)",
+    "subtitle": "Login, realms, clients, groups, and roles."
+  }
+}

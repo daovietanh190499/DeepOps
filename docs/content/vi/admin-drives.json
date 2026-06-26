@@ -1,0 +1,13 @@
+{
+  "href": "admin/drives.html",
+  "vi": {
+    "section": "Quản trị viên",
+    "title": "Quản lý drives (admin)",
+    "subtitle": "Xem và xóa drive của mọi user; cấu hình size catalog."
+  },
+  "en": {
+    "section": "Administrator",
+    "title": "Manage drives",
+    "subtitle": "View and delete all user drives (admin)."
+  }
+}
