@@ -1,0 +1,107 @@
+<!doctype html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Cluster overall — Dohub Docs</title>
+  <link rel="icon" href="../assets/logo.png">
+  <script src="https://cdn.tailwindcss.com?plugins=forms,typography"></script>
+  <script>
+    tailwind.config = {
+      theme: { extend: { colors: { brand: { 500: '#3b82f6', 600: '#2563eb', 700: '#1d4ed8' } } } }
+    }
+  </script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <style>body { font-family: 'DM Sans', system-ui, sans-serif; }</style>
+</head>
+<body class="bg-slate-50 text-slate-800 antialiased">
+  <header class="sticky top-0 z-50 flex items-center justify-between border-b border-slate-200 bg-white/95 px-4 py-2 shadow-sm backdrop-blur-sm">
+    <a href="../index.html" class="flex items-center gap-2.5">
+      <img src="../assets/logo.png" alt="Dohub" class="h-9 w-9 rounded-lg object-contain">
+      <span class="text-lg font-bold tracking-tight text-slate-900">Dohub <span class="font-medium text-slate-500">Docs</span></span>
+    </a>
+    <a href="https://iaihub.uet.edu.vn/" class="hidden rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700 sm:inline-block">Mở Dohub</a>
+  </header>
+  <main class="relative mx-auto flex max-w-8xl justify-center sm:px-2 lg:px-8 xl:px-12">
+    <label for="navigation" class="fixed bottom-0 left-0 z-50 mb-4 ml-4 flex h-12 w-12 cursor-pointer items-center justify-center rounded-full border border-slate-300 bg-white text-slate-600 shadow-lg lg:hidden">
+      <svg class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-width="2" d="M4 8h16M4 16h16"/></svg>
+    </label>
+    <input type="checkbox" id="navigation" class="peer hidden">
+    <div class="fixed left-0 top-[3.5rem] hidden h-screen px-4 shadow-xl peer-checked:block lg:relative lg:top-0 lg:block lg:h-auto lg:flex-none lg:px-0 lg:shadow-none">
+      <div class="absolute inset-y-0 right-0 w-full bg-white lg:w-72 lg:bg-slate-50"></div>
+      <nav class="sticky top-[4.5rem] w-64 pr-8 text-sm xl:w-72 xl:pr-16"><ul role="list" class="-ml-0.5 h-[calc(100vh-4.5rem)] overflow-y-auto py-7 pl-0.5 space-y-8">
+<li><h3 class="font-semibold tracking-tight text-slate-900">Bắt đầu</h3>
+<ul role="list" class="pl-3 mt-3 space-y-2">
+<li><a href="../index.html" class="text-slate-600 hover:text-slate-900">Tổng quan</a></li>
+<li><a href="../installation.html" class="text-slate-600 hover:text-slate-900">Cài đặt cluster</a></li>
+</ul></li>
+<li><h3 class="font-semibold tracking-tight text-slate-900">Người dùng</h3>
+<ul role="list" class="pl-3 mt-3 space-y-2">
+<li><a href="../user/drives.html" class="text-slate-600 hover:text-slate-900">Tạo &amp; xóa drive</a></li>
+<li><a href="../user/servers.html" class="text-slate-600 hover:text-slate-900">Quản lý server</a></li>
+<li><a href="../user/images.html" class="text-slate-600 hover:text-slate-900">Đăng ký Docker image</a></li>
+<li><a href="../user/port-expose.html" class="text-slate-600 hover:text-slate-900">Expose port (wstunnel)</a></li>
+<li><a href="../user/logs-describe.html" class="text-slate-600 hover:text-slate-900">Logs &amp; Describe</a></li>
+<li><a href="../user/terminal.html" class="text-slate-600 hover:text-slate-900">Terminal tương tác</a></li>
+<li><a href="../user/monitor.html" class="text-slate-600 hover:text-slate-900">Monitor tài nguyên</a></li>
+<li><a href="../user/backup.html" class="text-slate-600 hover:text-slate-900">Backup rclone</a></li>
+<li><a href="../user/custom-domain.html" class="text-slate-600 hover:text-slate-900">Custom domain</a></li>
+</ul></li>
+<li><h3 class="font-semibold tracking-tight text-slate-900">Quản trị viên</h3>
+<ul role="list" class="pl-3 mt-3 space-y-2">
+<li><a href="../admin/overall.html" class="text-blue-700 font-semibold">Cluster overall</a></li>
+<li><a href="../admin/directpv.html" class="text-slate-600 hover:text-slate-900">DirectPV discover &amp; init</a></li>
+<li><a href="../admin/drives.html" class="text-slate-600 hover:text-slate-900">Quản lý drives</a></li>
+<li><a href="../admin/servers.html" class="text-slate-600 hover:text-slate-900">Quản lý servers</a></li>
+<li><a href="../admin/templates.html" class="text-slate-600 hover:text-slate-900">Server templates</a></li>
+<li><a href="../admin/users.html" class="text-slate-600 hover:text-slate-900">Users &amp; accept</a></li>
+<li><a href="../admin/groups.html" class="text-slate-600 hover:text-slate-900">Resource groups</a></li>
+<li><a href="../admin/docker-images.html" class="text-slate-600 hover:text-slate-900">Docker images</a></li>
+</ul></li>
+<li><h3 class="font-semibold tracking-tight text-slate-900">Ứng dụng trên Dohub</h3>
+<ul role="list" class="pl-3 mt-3 space-y-2">
+<li><a href="../apps/keycloak.html" class="text-slate-600 hover:text-slate-900">Keycloak (admin)</a></li>
+<li><a href="../apps/overleaf.html" class="text-slate-600 hover:text-slate-900">Overleaf</a></li>
+</ul></li>
+</ul></nav>
+    </div>
+    <div class="min-w-0 flex-auto max-w-3xl px-4 py-10 lg:max-w-none lg:pl-8 lg:pr-0 xl:px-16">
+      <article>
+        <header>
+          <p class="text-sm font-medium text-slate-500">Quản trị viên</p>
+          <h1 class="text-3xl font-bold tracking-tight text-slate-900">Cluster overall</h1>
+          <p class="mt-2 text-lg text-slate-600">Tổng quan cluster, join node, SSH nodes, DirectPV drives.</p>
+        </header>
+        <div class="prose prose-slate mt-8 max-w-none prose-headings:font-semibold prose-a:text-blue-600 prose-code:rounded prose-code:bg-slate-100 prose-code:px-1 prose-pre:bg-slate-900">
+<p>Tab <strong>Overall</strong> (admin) hiển thị thông tin cluster và công cụ vận hành.</p>
+
+<figure class="my-6"><img src="../assets/screenshots/admin-overall.png" alt="Cluster overall" class="w-full rounded-xl border shadow-sm"></figure>
+
+<h2>Cluster information</h2>
+<ul>
+<li><strong>Server version</strong> / <strong>Client version</strong> — phiên bản Kubernetes.</li>
+<li><strong>Nodes</strong>, <strong>Namespaces</strong> — thống kê nhanh.</li>
+<li><strong>Join new node</strong> — <strong>Get join command</strong> chạy <code>microk8s add-node</code>, <strong>Copy</strong> lệnh join.</li>
+</ul>
+
+<h2>Kubernetes nodes</h2>
+<p>Bảng: Name, Status, Roles, Internal/External IP, Version, OS, CPU, Memory.</p>
+
+<h2>SSH nodes</h2>
+<p>Quản lý máy SSH ngoài cluster (health check, terminal admin):</p>
+<ul>
+<li><strong>Add SSH node</strong> — Label, Host, Port, Username.</li>
+<li><strong>Hub SSH manager public key</strong> — copy/regenerate key để thêm vào <code>authorized_keys</code> remote.</li>
+</ul>
+
+<h2>DirectPV drives (read-only list)</h2>
+<p>Bảng output <code>kubectl directpv list drives</code> — xem trước khi discover/init chi tiết tại <a href="directpv.html">DirectPV discover &amp; init</a>.</p>
+
+        </div>
+      </article>
+      <dl class="mt-10 flex border-t border-slate-200 pt-6"><div class="mr-auto text-left"><dt class="text-sm text-slate-600">Trước</dt><dd class="mt-1"><a href="../user/custom-domain.html" class="font-semibold text-slate-900 hover:underline">Custom domain</a></dd></div><div class="ml-auto text-right"><dt class="text-sm text-slate-600">Tiếp</dt><dd class="mt-1"><a href="../admin/directpv.html" class="font-semibold text-slate-900 hover:underline">DirectPV discover &amp; init</a></dd></div></dl>
+    </div>
+  </main>
+</body>
+</html>

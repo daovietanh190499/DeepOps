@@ -1,0 +1,24 @@
+<div class="rounded-xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-900 my-4"><strong>Cảnh báo:</strong> <code>Init drives</code> <strong>format và xóa toàn bộ dữ liệu</strong> trên ổ được chọn. Chỉ chọn ổ dành riêng cho DirectPV, không phải OS disk.</div>
+
+<figure class="my-6"><img src="../assets/screenshots/admin-directpv-discover.png" alt="Discover" class="w-full rounded-xl border shadow-sm"></figure>
+
+<h2>Discover</h2>
+<ol>
+<li>Admin → <strong>Overall</strong> → mục <strong>DirectPV discover</strong>.</li>
+<li><strong>Discover</strong> — chạy <code>kubectl directpv discover</code>, hiển thị bảng ổ: Name, Size, Make, FS, ID.</li>
+<li>Cột <strong>Select</strong> — toggle <code>yes</code> / <code>no</code> cho từng ổ cần init.</li>
+</ol>
+
+<h2>Init</h2>
+<figure class="my-6"><img src="../assets/screenshots/admin-directpv-init.svg" alt="Init confirm" class="w-full rounded-xl border shadow-sm"></figure>
+<ol>
+<li><strong>Init drives</strong> — modal <strong>Initialize DirectPV drives?</strong></li>
+<li><strong>Yes, init drives</strong> — chạy <code>kubectl directpv init … --dangerous</code>.</li>
+</ol>
+
+<p>Sau init, StorageClass <code>directpv-min-io</code> sẵn sàng cho PVC drive/user.</p>
+
+<h2>CLI tương đương</h2>
+<pre><code>kubectl directpv discover --output-file /tmp/directpv-drives.yaml
+# chỉnh selected: true
+kubectl directpv init /tmp/directpv-drives.yaml --dangerous</code></pre>

@@ -1,0 +1,29 @@
+<figure class="my-6"><img src="../assets/screenshots/admin-templates.png" alt="Templates" class="w-full rounded-xl border shadow-sm"></figure>
+
+<p><strong>Admin → Servers → Catalog</strong></p>
+
+<h2>Quick templates</h2>
+<p>Mỗi template gồm: Name, CPU, RAM, GPU, icon, Docker image/tag, ports, mount paths, file mounts, env defaults, active.</p>
+
+<h2>Thêm template</h2>
+<ol>
+<li>Điền hàng inline hoặc <strong>Add template</strong>.</li>
+<li><strong>Mount paths</strong> — ví dụ <code>/home/coder, /app/data</code>.</li>
+<li><strong>Default file mounts</strong> — upload file nhỏ + mount path.</li>
+<li><strong>Environment defaults</strong> — JSON; hỗ trợ token <code>{{username}}</code>.</li>
+</ol>
+
+<h2>Sửa / xóa</h2>
+<ul>
+<li><strong>Edit</strong> — modal đầy đủ trường + <strong>Sort order</strong>, <strong>Active</strong>.</li>
+<li><strong>Delete</strong> — gỡ template.</li>
+<li><strong>Download JSON</strong> / <strong>Import (JSON/CSV)</strong> — bulk.</li>
+</ul>
+
+<h2>Equipment catalogs</h2>
+<p>CPU, RAM, GPU options dùng trong dropdown form user:</p>
+<ul>
+<li>CPU: <code>0.5</code>, <code>2</code>, … → <strong>Add</strong>.</li>
+<li>RAM: <code>4G</code>, <code>8G</code>, …</li>
+<li>GPU: <code>1:1024</code> (count:MiB VRAM).</li>
+</ul>

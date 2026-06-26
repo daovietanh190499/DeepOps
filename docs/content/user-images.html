@@ -1,0 +1,33 @@
+<p>User có thể đề xuất Docker image mới để dùng khi tạo server. Image ở trạng thái <strong>pending</strong> cho đến khi admin <strong>Accept</strong>.</p>
+
+<figure class="my-6"><img src="../assets/screenshots/images-submit.svg" alt="Submit image" class="w-full rounded-xl border shadow-sm"></figure>
+
+<h2>Đăng ký image</h2>
+<ol>
+<li>Tab <strong>My images</strong>.</li>
+<li>Điền:
+<ul>
+<li><strong>Label</strong> — tên hiển thị (ví dụ <code>My Overleaf</code>).</li>
+<li><strong>repository/name</strong> — ví dụ <code>myregistry/overleaf</code>.</li>
+<li><strong>Default tag</strong> — ví dụ <code>latest</code>.</li>
+<li><strong>Tags (comma-separated)</strong> — các tag khác: <code>latest,5.0.0</code>.</li>
+</ul>
+</li>
+<li><strong>Submit image</strong>.</li>
+</ol>
+
+<h2>Theo dõi trạng thái</h2>
+<table>
+<thead><tr><th>Status</th><th>Ý nghĩa</th></tr></thead>
+<tbody>
+<tr><td><code>pending</code></td><td>Chờ admin duyệt — chưa chọn được trong form Create server</td></tr>
+<tr><td><code>accepted</code></td><td>Đã duyệt — xuất hiện trong combobox Docker image</td></tr>
+</tbody>
+</table>
+
+<figure class="my-6"><img src="../assets/screenshots/images-pending.svg" alt="Pending status" class="w-full rounded-xl border shadow-sm"></figure>
+
+<h2>Xóa image đã submit</h2>
+<p>Cột <strong>Actions</strong> → <strong>Delete</strong> (chỉ image do bạn tạo).</p>
+
+<div class="rounded-xl border border-blue-200 bg-blue-50 p-4 text-sm my-4">Admin duyệt tại tab <strong>Images</strong> — xem <a href="../admin/docker-images.html">Docker images (admin)</a>.</div>

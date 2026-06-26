@@ -1,0 +1,26 @@
+<p>Tab <strong>Terminal</strong> mở shell tương tác trong container chính (<code>codehub</code>) qua WebSocket + <code>kubectl exec -it</code>.</p>
+
+<figure class="my-6"><img src="../assets/screenshots/terminal-tab.png" alt="Terminal" class="w-full rounded-xl border shadow-sm"></figure>
+
+<h2>Điều kiện</h2>
+<ul>
+<li>Server <strong>Running</strong> và có pod Ready.</li>
+<li>Hub pod có quyền exec vào namespace workspace.</li>
+</ul>
+
+<h2>Sử dụng</h2>
+<ol>
+<li>Tab <strong>Terminal</strong>.</li>
+<li><strong>Pod</strong> — chọn pod đang chạy.</li>
+<li><strong>Shell</strong> — <code>bash</code> hoặc <code>sh</code> (theo <code>exec_shell</code> workspace).</li>
+<li><strong>Reconnect</strong> — kết nối lại sau khi đổi pod/shell.</li>
+</ol>
+
+<h2>Phím tắt</h2>
+<ul>
+<li><kbd>Ctrl</kbd>+<kbd>C</kbd> — gửi SIGINT (nếu không có selection).</li>
+<li><kbd>Ctrl</kbd>+<kbd>V</kbd> — dán từ clipboard.</li>
+<li><kbd>Ctrl</kbd>+<kbd>C</kbd> với text đã chọn — copy (không gửi interrupt).</li>
+</ul>
+
+<div class="rounded-xl border border-blue-200 bg-blue-50 p-4 text-sm my-4">Trạng thái <em>Connecting…</em> hiển thị ngoài vùng terminal để tránh lệch con trỏ prompt.</div>

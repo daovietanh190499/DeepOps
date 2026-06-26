@@ -1,0 +1,78 @@
+<p>Server (workspace) là một Helm release <code>codehub</code> trên Kubernetes: container chính (thường code-server), ingress riêng, optional sidecar (monitor, backup, wstunnel).</p>
+
+<figure class="my-6"><img src="../assets/screenshots/servers-list.png" alt="My servers" class="w-full rounded-xl border shadow-sm"></figure>
+
+<h2>Luồng tổng quan</h2>
+<ol>
+<li><strong>Create server</strong> — lưu cấu hình vào DB (pod chưa chạy).</li>
+<li><strong>Start</strong> — Helm install/upgrade, tạo pod + ingress.</li>
+<li><strong>Stop</strong> — gỡ release, giữ cấu hình.</li>
+<li><strong>Edit</strong> — chỉ khi server <em>offline</em>.</li>
+<li><strong>Delete</strong> — xóa workspace và release (nếu có).</li>
+</ol>
+
+<h2>Tạo từ Quick template</h2>
+<ol>
+<li>Tab <strong>My servers</strong> → <strong>Create server</strong>.</li>
+<li>Phần <strong>Quick templates</strong>: click một template (Lollipop, Oreo, …) để điền sẵn CPU, RAM, GPU, image, mounts.</li>
+<li>Kiểm tra lại form bên dưới, nhấn <strong>Create server</strong>.</li>
+</ol>
+
+<h2>Tạo thủ công — từng trường</h2>
+
+<figure class="my-6"><img src="../assets/screenshots/servers-create-modal.png" alt="Modal create server" class="w-full rounded-xl border shadow-sm"></figure>
+
+<table>
+<thead><tr><th>Trường</th><th>Mô tả</th></tr></thead>
+<tbody>
+<tr><td><strong>Server name</strong></td><td>Tên hiển thị; slug dùng cho URL và release name.</td></tr>
+<tr><td><strong>Service domain</strong></td><td>Chỉ hiện nếu group có quyền <em>custom domain</em>. Hostname ingress tùy chỉnh; để trống dùng <code>{slug}-{user}.{DOMAIN}</code>.</td></tr>
+<tr><td><strong>CPU (vCPU)</strong></td><td>Request CPU; limit ≈ 1.5× (theo chart).</td></tr>
+<tr><td><strong>RAM</strong></td><td>Ví dụ <code>4G</code>, <code>8G</code>.</td></tr>
+<tr><td><strong>Node</strong></td><td><code>auto</code> hoặc pin pod lên hostname cụ thể.</td></tr>
+<tr><td><strong>Mount drives</strong></td><td>Chọn drive + <strong>mount path</strong> (mặc định <code>/home/coder</code>). Nhiều drive: <strong>+ Add drive</strong>.</td></tr>
+<tr><td><strong>Mount files</strong></td><td>File nhỏ → ConfigMap mount (tên file, path, nội dung).</td></tr>
+<tr><td><strong>GPU</strong></td><td><code>none</code> hoặc profile HAMi (ví dụ <code>mig-2g.10gb</code>, <code>gpu</code>, <code>gpu:2</code>).</td></tr>
+<tr><td><strong>Privileged container</strong></td><td>Checkbox nếu group cho phép — <code>securityContext.privileged</code>.</td></tr>
+<tr><td><strong>Docker image</strong></td><td>Combobox tìm image đã đăng ký / catalog.</td></tr>
+<tr><td><strong>Version (tag)</strong></td><td>Tag image (ví dụ <code>4.89.0-ubuntu</code>).</td></tr>
+<tr><td><strong>Image pull policy</strong></td><td><code>IfNotPresent</code>, <code>Always</code>, <code>Never</code>.</td></tr>
+<tr><td><strong>Exposed ports</strong></td><td>Port HTTP chính + phụ, phân tách dấu phẩy (mặc định <code>8080</code>).</td></tr>
+<tr><td><strong>Container command</strong></td><td>Override CMD; để trống dùng mặc định image.</td></tr>
+<tr><td><strong>Environment variables</strong></td><td>KEY + value, <strong>Add / Update</strong>. Hỗ trợ value dài (textarea).</td></tr>
+</tbody>
+</table>
+
+<figure class="my-6"><img src="../assets/screenshots/servers-form-fields.png" alt="Chi tiết form" class="w-full rounded-xl border shadow-sm"></figure>
+
+<p>Panel <strong>Current specifications</strong> tóm tắt cấu hình; <strong>Export JSON</strong> tải file cấu hình.</p>
+
+<h2>Chỉnh sửa server</h2>
+<ol>
+<li><strong>Stop</strong> server trước (bắt buộc).</li>
+<li>Mở card server hoặc modal → <strong>Edit</strong> (hoặc mở lại <strong>Create server</strong> ở chế độ edit).</li>
+<li>Thay đổi trường → <strong>Save changes</strong>.</li>
+</ol>
+
+<figure class="my-6"><img src="../assets/screenshots/servers-edit-modal.svg" alt="Edit server" class="w-full rounded-xl border shadow-sm"></figure>
+
+<h2>Start / Stop</h2>
+<figure class="my-6"><img src="../assets/screenshots/servers-start-stop.svg" alt="Start Stop" class="w-full rounded-xl border shadow-sm"></figure>
+<ul>
+<li><strong>Start</strong> — triển khai pod; URL workspace xuất hiện sau khi Running.</li>
+<li><strong>Stop</strong> — <code>helm uninstall</code>; dữ liệu trên PVC drive vẫn giữ.</li>
+</ul>
+
+<h2>Xóa server</h2>
+<ol>
+<li>Nên <strong>Stop</strong> trước (khuyến nghị).</li>
+<li>Icon Delete trên card → gõ <code>delete</code> → <strong>Delete</strong>.</li>
+</ol>
+
+<figure class="my-6"><img src="../assets/screenshots/servers-delete-modal.svg" alt="Delete server" class="w-full rounded-xl border shadow-sm"></figure>
+
+<h2>Bulk create server</h2>
+<p><strong>Bulk create server</strong> — JSON/CSV nhiều server; tùy chọn <strong>Start servers after create</strong>.</p>
+<pre><code>[{"name":"docs-demo-ws","cpu":2,"ram":"4G","drive_mounts":[{"drive_id":"&lt;uuid&gt;","mount_path":"/home/coder"}],"docker_repository":"codercom/code-server","docker_tag":"4.89.0-ubuntu"}]</code></pre>
+
+<div class="rounded-xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-900 my-4"><strong>Quan trọng:</strong> Không chỉnh sửa/xóa server production. Demo: tạo <code>docs-demo-*</code> rồi xóa ngay.</div>

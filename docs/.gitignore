@@ -1,0 +1,3 @@
+.auth/
+.env.capture
+assets/screenshots/debug-*.png

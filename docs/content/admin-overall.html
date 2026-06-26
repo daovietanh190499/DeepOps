@@ -1,0 +1,23 @@
+<p>Tab <strong>Overall</strong> (admin) hiển thị thông tin cluster và công cụ vận hành.</p>
+
+<figure class="my-6"><img src="../assets/screenshots/admin-overall.png" alt="Cluster overall" class="w-full rounded-xl border shadow-sm"></figure>
+
+<h2>Cluster information</h2>
+<ul>
+<li><strong>Server version</strong> / <strong>Client version</strong> — phiên bản Kubernetes.</li>
+<li><strong>Nodes</strong>, <strong>Namespaces</strong> — thống kê nhanh.</li>
+<li><strong>Join new node</strong> — <strong>Get join command</strong> chạy <code>microk8s add-node</code>, <strong>Copy</strong> lệnh join.</li>
+</ul>
+
+<h2>Kubernetes nodes</h2>
+<p>Bảng: Name, Status, Roles, Internal/External IP, Version, OS, CPU, Memory.</p>
+
+<h2>SSH nodes</h2>
+<p>Quản lý máy SSH ngoài cluster (health check, terminal admin):</p>
+<ul>
+<li><strong>Add SSH node</strong> — Label, Host, Port, Username.</li>
+<li><strong>Hub SSH manager public key</strong> — copy/regenerate key để thêm vào <code>authorized_keys</code> remote.</li>
+</ul>
+
+<h2>DirectPV drives (read-only list)</h2>
+<p>Bảng output <code>kubectl directpv list drives</code> — xem trước khi discover/init chi tiết tại <a href="directpv.html">DirectPV discover &amp; init</a>.</p>
