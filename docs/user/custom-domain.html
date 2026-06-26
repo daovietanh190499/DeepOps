@@ -32,7 +32,7 @@
     <input type="checkbox" id="navigation" class="peer hidden">
     <div class="fixed left-0 top-[3.5rem] hidden h-screen px-4 shadow-xl peer-checked:block lg:relative lg:top-0 lg:block lg:h-auto lg:flex-none lg:px-0 lg:shadow-none">
       <div class="absolute inset-y-0 right-0 w-full bg-white lg:w-72 lg:bg-slate-50"></div>
-      <nav class="sticky top-[4.5rem] w-64 pr-8 text-sm xl:w-72 xl:pr-16"><ul role="list" class="-ml-0.5 h-[calc(100vh-4.5rem)] overflow-y-auto py-7 pl-0.5 space-y-8">
+      <nav class="doc-nav sticky top-[4.5rem] w-64 pr-8 text-sm xl:w-72 xl:pr-16"><ul role="list" class="-ml-0.5 h-[calc(100vh-4.5rem)] overflow-y-auto py-7 pl-0.5 space-y-8">
 <li><h3 class="font-semibold tracking-tight text-slate-900"><div class="lang-block" data-lang="vi">Bắt đầu</div><div class="lang-block hidden" data-lang="en">Getting started</div></h3>
 <ul role="list" class="pl-3 mt-3 space-y-2">
 <li><a href="../index.html" class="text-slate-600 hover:text-slate-900"><div class="lang-block" data-lang="vi">Tổng quan</div><div class="lang-block hidden" data-lang="en">Overview</div></a></li>
@@ -70,12 +70,12 @@
     </div>
     <div class="min-w-0 flex-auto max-w-3xl px-4 py-10 lg:max-w-none lg:pl-8 lg:pr-0 xl:px-16">
       <article>
-        <header>
+        <header class="doc-article-header">
           <p class="text-sm font-medium text-slate-500"><div class="lang-block" data-lang="vi">Người dùng</div><div class="lang-block hidden" data-lang="en">User guide</div></p>
           <h1 class="text-3xl font-bold tracking-tight text-slate-900"><div class="lang-block" data-lang="vi">Custom domain</div><div class="lang-block hidden" data-lang="en">Custom domain</div></h1>
           <p class="mt-2 text-lg text-slate-600"><div class="lang-block" data-lang="vi">Đặt hostname ingress tùy chỉnh cho workspace (theo quyền group).</div><div class="lang-block hidden" data-lang="en">Custom ingress hostname for workspaces (group permission).</div></p>
         </header>
-        <div class="mt-8 doc-body prose prose-slate max-w-none prose-headings:font-semibold prose-a:text-blue-600">
+        <div class="mt-8 doc-body prose prose-slate max-w-none prose-headings:font-semibold prose-a:text-blue-600 prose-li:my-1">
 <div class="lang-block" data-lang="vi"><p>Mặc định URL workspace: <code>https://{slug}-{username}.{DOMAIN_NAME}/</code>. User trong group có <strong>Allow custom service domain</strong> có thể ghi đè hostname.</p>
 
 <figure class="my-6"><img src="../assets/screenshots/custom-domain.svg" alt="Custom domain field" class="w-full rounded-xl border shadow-sm"></figure>
@@ -91,25 +91,25 @@
 <p><strong>Users → Groups → Edit group</strong> → bật <strong>Allow custom service domain</strong>. Xem <a href="../admin/groups.html">Resource groups</a>.</p>
 
 <div class="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm my-4"><strong>TLS:</strong> Mỗi hostname cần certificate phù hợp (Let's Encrypt HTTP-01 hoặc wildcard DNS-01).</div>
-</div><div class="lang-block hidden" data-lang="en"><p>Mặc định URL workspace: <code>https://{slug}-{username}.{DOMAIN_NAME}/</code>. User trong group có <strong>Allow custom service domain</strong> có thể ghi đè hostname.</p>
+</div><div class="lang-block hidden" data-lang="en"><p>By default, workspace URLs follow <code>https://{slug}-{username}.{DOMAIN_NAME}/</code>. Users in a group with <strong>Allow custom service domain</strong> can override the hostname.</p>
 
 <figure class="my-6"><img src="../assets/screenshots/custom-domain.svg" alt="Custom domain field" class="w-full rounded-xl border shadow-sm"></figure>
 
-<h2>Users with permission</h2>
+<h2>For users with permission</h2>
 <ol>
-<li>Khi <strong>Create server</strong> / <strong>Edit server</strong>, điền <strong>Service domain (ingress host)</strong> — ví dụ <code>myapp.example.com</code>.</li>
-<li>DNS phải trỏ tới ingress cluster.</li>
-<li>Tab <strong>General</strong> hiển thị <strong>Service domain</strong> với nút copy.</li>
+<li>When <strong>Create server</strong> / <strong>Edit server</strong>, set <strong>Service domain (ingress host)</strong> — e.g. <code>myapp.example.com</code>.</li>
+<li>DNS must point to the cluster ingress.</li>
+<li>The <strong>General</strong> tab shows <strong>Service domain</strong> with a copy button.</li>
 </ol>
 
-<h2>Admin grants permission</h2>
+<h2>Grant permission (admin)</h2>
 <p><strong>Users → Groups → Edit group</strong> → enable <strong>Allow custom service domain</strong>. See <a href="../admin/groups.html">Resource groups</a>.</p>
 
-<div class="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm my-4"><strong>TLS:</strong> Mỗi hostname cần certificate phù hợp (Let's Encrypt HTTP-01 hoặc wildcard DNS-01).</div>
+<div class="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm my-4"><strong>TLS:</strong> Each hostname needs a valid certificate (Let's Encrypt HTTP-01 or wildcard DNS-01).</div>
 </div>
         </div>
       </article>
-      <dl class="mt-10 flex border-t border-slate-200 pt-6"><div class="mr-auto text-left"><dt class="text-sm text-slate-600"><div class="lang-block" data-lang="vi">Trước</div><div class="lang-block hidden" data-lang="en">Previous</div></dt><dd class="mt-1"><a href="backup.html" class="font-semibold text-slate-900 hover:underline"><div class="lang-block" data-lang="vi">Backup rclone</div><div class="lang-block hidden" data-lang="en">Rclone backup</div></a></dd></div><div class="ml-auto text-right"><dt class="text-sm text-slate-600"><div class="lang-block" data-lang="vi">Tiếp</div><div class="lang-block hidden" data-lang="en">Next</div></dt><dd class="mt-1"><a href="../admin/overall.html" class="font-semibold text-slate-900 hover:underline"><div class="lang-block" data-lang="vi">Cluster overall</div><div class="lang-block hidden" data-lang="en">Cluster overall</div></a></dd></div></dl>
+      <dl class="doc-pager"><div class="mr-auto text-left"><dt class="text-sm text-slate-600"><div class="lang-block" data-lang="vi">Trước</div><div class="lang-block hidden" data-lang="en">Previous</div></dt><dd class="mt-1"><a href="backup.html" class="font-semibold text-slate-900 hover:underline"><div class="lang-block" data-lang="vi">Backup rclone</div><div class="lang-block hidden" data-lang="en">Rclone backup</div></a></dd></div><div class="ml-auto text-right"><dt class="text-sm text-slate-600"><div class="lang-block" data-lang="vi">Tiếp</div><div class="lang-block hidden" data-lang="en">Next</div></dt><dd class="mt-1"><a href="../admin/overall.html" class="font-semibold text-slate-900 hover:underline"><div class="lang-block" data-lang="vi">Cluster overall</div><div class="lang-block hidden" data-lang="en">Cluster overall</div></a></dd></div></dl>
     </div>
   </main>
   <script src="../assets/docs.js"></script>

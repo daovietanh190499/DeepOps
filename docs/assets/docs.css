@@ -1,4 +1,130 @@
-/* Override Tailwind Typography — code inside <pre> must stay readable */
+/* ── Layout & typography ───────────────────────────────────── */
+.doc-body {
+  font-size: 0.9375rem;
+  line-height: 1.7;
+  color: #334155;
+}
+
+.doc-body > p:first-of-type {
+  font-size: 1rem;
+  color: #475569;
+  margin-bottom: 1.5rem;
+}
+
+.doc-body h2 {
+  font-size: 1.125rem;
+  font-weight: 600;
+  color: #0f172a;
+  margin-top: 2.25rem;
+  margin-bottom: 0.875rem;
+  padding-bottom: 0.5rem;
+  border-bottom: 1px solid #e2e8f0;
+  scroll-margin-top: 5rem;
+}
+
+.doc-body h2:first-child {
+  margin-top: 0;
+}
+
+.doc-body h3 {
+  font-size: 1rem;
+  font-weight: 600;
+  color: #1e293b;
+  margin-top: 1.5rem;
+  margin-bottom: 0.5rem;
+}
+
+.doc-body p {
+  margin-top: 0.75rem;
+  margin-bottom: 0.75rem;
+}
+
+.doc-body ul,
+.doc-body ol {
+  margin-top: 0.5rem;
+  margin-bottom: 1rem;
+  padding-left: 1.5rem;
+}
+
+.doc-body li {
+  margin-top: 0.35rem;
+  margin-bottom: 0.35rem;
+}
+
+.doc-body li > ul,
+.doc-body li > ol {
+  margin-top: 0.25rem;
+  margin-bottom: 0.25rem;
+}
+
+/* ── Figures & screenshots ─────────────────────────────────── */
+.doc-body figure {
+  margin: 1.75rem 0;
+}
+
+.doc-body figure img {
+  border: 1px solid #e2e8f0;
+  border-radius: 0.75rem;
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.06);
+}
+
+.doc-body figcaption {
+  margin-top: 0.5rem;
+  text-align: center;
+  font-size: 0.8125rem;
+  color: #64748b;
+}
+
+/* ── Tables ─────────────────────────────────────────────────── */
+.doc-body table {
+  width: 100%;
+  margin: 1rem 0 1.25rem;
+  border-collapse: collapse;
+  font-size: 0.875rem;
+  border: 1px solid #e2e8f0;
+  border-radius: 0.5rem;
+  overflow: hidden;
+}
+
+.doc-body thead {
+  background-color: #f8fafc;
+}
+
+.doc-body th {
+  text-align: left;
+  font-weight: 600;
+  color: #0f172a;
+  padding: 0.625rem 0.875rem;
+  border-bottom: 1px solid #e2e8f0;
+}
+
+.doc-body td {
+  padding: 0.625rem 0.875rem;
+  border-bottom: 1px solid #f1f5f9;
+  vertical-align: top;
+}
+
+.doc-body tbody tr:last-child td {
+  border-bottom: none;
+}
+
+.doc-body tbody tr:hover {
+  background-color: #f8fafc;
+}
+
+/* ── Callout boxes ─────────────────────────────────────────── */
+.doc-body .rounded-xl.border {
+  margin: 1.25rem 0;
+  padding: 0.875rem 1rem;
+  border-radius: 0.75rem;
+  line-height: 1.6;
+}
+
+.doc-body .border-amber-200 { border-color: #fde68a !important; background-color: #fffbeb !important; color: #92400e !important; }
+.doc-body .border-blue-200  { border-color: #bfdbfe !important; background-color: #eff6ff !important; color: #1e40af !important; }
+.doc-body .border-rose-200  { border-color: #fecdd3 !important; background-color: #fff1f2 !important; color: #9f1239 !important; }
+
+/* ── Inline & block code ───────────────────────────────────── */
 .doc-body pre,
 .prose pre,
 pre.bg-slate-900,
@@ -6,6 +132,13 @@ pre.bg-slate-800,
 pre.text-slate-100 {
   background-color: #0f172a !important;
   color: #e2e8f0 !important;
+  border-radius: 0.75rem;
+  padding: 1rem 1.125rem !important;
+  margin: 1rem 0 1.25rem;
+  overflow-x: auto;
+  font-size: 0.8125rem;
+  line-height: 1.6;
+  border: 1px solid #1e293b;
 }
 
 .doc-body pre code,
@@ -35,12 +168,15 @@ pre code::after {
   display: none !important;
 }
 
+.doc-body :not(pre) > code,
 .prose :not(pre) > code {
   background-color: #f1f5f9;
   color: #0f172a;
-  padding: 0.125rem 0.375rem;
+  padding: 0.15rem 0.4rem;
   border-radius: 0.25rem;
-  font-size: 0.875em;
+  font-size: 0.85em;
+  font-weight: 500;
+  border: 1px solid #e2e8f0;
 }
 
 .prose :not(pre) > code::before,
@@ -48,11 +184,96 @@ pre code::after {
   content: none !important;
 }
 
+.doc-body kbd {
+  display: inline-block;
+  padding: 0.1rem 0.35rem;
+  font-size: 0.8em;
+  font-family: inherit;
+  background: #f8fafc;
+  border: 1px solid #cbd5e1;
+  border-radius: 0.25rem;
+  box-shadow: 0 1px 0 #cbd5e1;
+}
+
+/* ── Article header ─────────────────────────────────────────── */
+.doc-article-header {
+  padding-bottom: 1.5rem;
+  margin-bottom: 0.5rem;
+  border-bottom: 1px solid #e2e8f0;
+}
+
+/* ── Language switcher ──────────────────────────────────────── */
 .lang-block.hidden {
   display: none !important;
 }
 
 [data-lang-btn].active {
+  background-color: #eff6ff;
   outline: 2px solid #2563eb;
   outline-offset: 2px;
+  border-radius: 0.375rem;
+}
+
+/* ── Index cards ──────────────────────────────────────────────── */
+.doc-card-grid {
+  list-style: none;
+  padding: 0;
+  margin: 2rem 0;
+  display: grid;
+  gap: 0.75rem;
+}
+
+@media (min-width: 640px) {
+  .doc-card-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+.doc-card-grid > li {
+  margin: 0;
+}
+
+.doc-card-grid a {
+  display: block;
+  padding: 1rem 1.25rem;
+  border-radius: 0.75rem;
+  border: 1px solid #e2e8f0;
+  background: #fff;
+  text-decoration: none;
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+
+.doc-card-grid a:hover {
+  border-color: #93c5fd;
+  box-shadow: 0 2px 8px rgba(37, 99, 235, 0.08);
+}
+
+.doc-card-grid .doc-card-section {
+  font-size: 0.6875rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: #94a3b8;
+}
+
+.doc-card-grid .doc-card-title {
+  margin-top: 0.25rem;
+  font-weight: 700;
+  color: #0f172a;
+}
+
+/* ── Prev / next ─────────────────────────────────────────────── */
+.doc-pager {
+  margin-top: 2.5rem;
+  padding-top: 1.5rem;
+  border-top: 1px solid #e2e8f0;
+  display: flex;
+  gap: 1rem;
+}
+
+/* ── Sidebar nav ─────────────────────────────────────────────── */
+.doc-nav a {
+  display: block;
+  padding: 0.2rem 0;
+  line-height: 1.4;
 }

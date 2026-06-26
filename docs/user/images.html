@@ -32,7 +32,7 @@
     <input type="checkbox" id="navigation" class="peer hidden">
     <div class="fixed left-0 top-[3.5rem] hidden h-screen px-4 shadow-xl peer-checked:block lg:relative lg:top-0 lg:block lg:h-auto lg:flex-none lg:px-0 lg:shadow-none">
       <div class="absolute inset-y-0 right-0 w-full bg-white lg:w-72 lg:bg-slate-50"></div>
-      <nav class="sticky top-[4.5rem] w-64 pr-8 text-sm xl:w-72 xl:pr-16"><ul role="list" class="-ml-0.5 h-[calc(100vh-4.5rem)] overflow-y-auto py-7 pl-0.5 space-y-8">
+      <nav class="doc-nav sticky top-[4.5rem] w-64 pr-8 text-sm xl:w-72 xl:pr-16"><ul role="list" class="-ml-0.5 h-[calc(100vh-4.5rem)] overflow-y-auto py-7 pl-0.5 space-y-8">
 <li><h3 class="font-semibold tracking-tight text-slate-900"><div class="lang-block" data-lang="vi">Bắt đầu</div><div class="lang-block hidden" data-lang="en">Getting started</div></h3>
 <ul role="list" class="pl-3 mt-3 space-y-2">
 <li><a href="../index.html" class="text-slate-600 hover:text-slate-900"><div class="lang-block" data-lang="vi">Tổng quan</div><div class="lang-block hidden" data-lang="en">Overview</div></a></li>
@@ -70,12 +70,12 @@
     </div>
     <div class="min-w-0 flex-auto max-w-3xl px-4 py-10 lg:max-w-none lg:pl-8 lg:pr-0 xl:px-16">
       <article>
-        <header>
+        <header class="doc-article-header">
           <p class="text-sm font-medium text-slate-500"><div class="lang-block" data-lang="vi">Người dùng</div><div class="lang-block hidden" data-lang="en">User guide</div></p>
           <h1 class="text-3xl font-bold tracking-tight text-slate-900"><div class="lang-block" data-lang="vi">Đăng ký Docker image</div><div class="lang-block hidden" data-lang="en">Register Docker images</div></h1>
           <p class="mt-2 text-lg text-slate-600"><div class="lang-block" data-lang="vi">Gửi image tùy chỉnh và chờ admin duyệt (accept).</div><div class="lang-block hidden" data-lang="en">Submit custom images and wait for admin approval.</div></p>
         </header>
-        <div class="mt-8 doc-body prose prose-slate max-w-none prose-headings:font-semibold prose-a:text-blue-600">
+        <div class="mt-8 doc-body prose prose-slate max-w-none prose-headings:font-semibold prose-a:text-blue-600 prose-li:my-1">
 <div class="lang-block" data-lang="vi"><p>User có thể đề xuất Docker image mới để dùng khi tạo server. Image ở trạng thái <strong>pending</strong> cho đến khi admin <strong>Accept</strong>.</p>
 
 <figure class="my-6"><img src="../assets/screenshots/images-submit.svg" alt="Submit image" class="w-full rounded-xl border shadow-sm"></figure>
@@ -109,43 +109,43 @@
 <p>Cột <strong>Actions</strong> → <strong>Delete</strong> (chỉ image do bạn tạo).</p>
 
 <div class="rounded-xl border border-blue-200 bg-blue-50 p-4 text-sm my-4">Admin duyệt tại tab <strong>Images</strong> — xem <a href="../admin/docker-images.html">Docker images (admin)</a>.</div>
-</div><div class="lang-block hidden" data-lang="en"><p>User có thể đề xuất Docker image mới để dùng khi tạo server. Image ở trạng thái <strong>pending</strong> cho đến khi admin <strong>Accept</strong>.</p>
+</div><div class="lang-block hidden" data-lang="en"><p>Users can submit new Docker images for use when creating servers. Images stay <strong>pending</strong> until an admin <strong>Accepts</strong> them.</p>
 
 <figure class="my-6"><img src="../assets/screenshots/images-submit.svg" alt="Submit image" class="w-full rounded-xl border shadow-sm"></figure>
 
-<h2>Đăng ký image</h2>
+<h2>Register an image</h2>
 <ol>
-<li>Tab <strong>My images</strong>.</li>
-<li>Điền:
+<li>Open the <strong>My images</strong> tab.</li>
+<li>Fill in:
 <ul>
-<li><strong>Label</strong> — tên hiển thị (ví dụ <code>My Overleaf</code>).</li>
-<li><strong>repository/name</strong> — ví dụ <code>myregistry/overleaf</code>.</li>
-<li><strong>Default tag</strong> — ví dụ <code>latest</code>.</li>
-<li><strong>Tags (comma-separated)</strong> — các tag khác: <code>latest,5.0.0</code>.</li>
+<li><strong>Label</strong> — display name (e.g. <code>My Overleaf</code>).</li>
+<li><strong>repository/name</strong> — e.g. <code>myregistry/overleaf</code>.</li>
+<li><strong>Default tag</strong> — e.g. <code>latest</code>.</li>
+<li><strong>Tags (comma-separated)</strong> — additional tags: <code>latest,5.0.0</code>.</li>
 </ul>
 </li>
-<li><strong>Submit image</strong>.</li>
+<li>Click <strong>Submit image</strong>.</li>
 </ol>
 
-<h2>Theo dõi trạng thái</h2>
+<h2>Track status</h2>
 <table>
-<thead><tr><th>Status</th><th>Ý nghĩa</th></tr></thead>
+<thead><tr><th>Status</th><th>Meaning</th></tr></thead>
 <tbody>
-<tr><td><code>pending</code></td><td>Wait for admin duyệt — chưa chọn được trong form Create server</td></tr>
-<tr><td><code>accepted</code></td><td>Đã duyệt — xuất hiện trong combobox Docker image</td></tr>
+<tr><td><code>pending</code></td><td>Awaiting admin approval — not selectable in Create server</td></tr>
+<tr><td><code>accepted</code></td><td>Approved — appears in the Docker image combobox</td></tr>
 </tbody>
 </table>
 
 <figure class="my-6"><img src="../assets/screenshots/images-pending.svg" alt="Pending status" class="w-full rounded-xl border shadow-sm"></figure>
 
-<h2>Xóa image đã submit</h2>
-<p>Cột <strong>Actions</strong> → <strong>Delete</strong> (chỉ image do bạn tạo).</p>
+<h2>Delete a submitted image</h2>
+<p><strong>Actions</strong> column → <strong>Delete</strong> (only for images you created).</p>
 
-<div class="rounded-xl border border-blue-200 bg-blue-50 p-4 text-sm my-4">Admin duyệt tại tab <strong>Images</strong> — xem <a href="../admin/docker-images.html">Docker images (admin)</a>.</div>
+<div class="rounded-xl border border-blue-200 bg-blue-50 p-4 text-sm my-4">Admins approve images under <strong>Images</strong> — see <a href="../admin/docker-images.html">Docker images (admin)</a>.</div>
 </div>
         </div>
       </article>
-      <dl class="mt-10 flex border-t border-slate-200 pt-6"><div class="mr-auto text-left"><dt class="text-sm text-slate-600"><div class="lang-block" data-lang="vi">Trước</div><div class="lang-block hidden" data-lang="en">Previous</div></dt><dd class="mt-1"><a href="servers.html" class="font-semibold text-slate-900 hover:underline"><div class="lang-block" data-lang="vi">Quản lý server</div><div class="lang-block hidden" data-lang="en">Manage servers</div></a></dd></div><div class="ml-auto text-right"><dt class="text-sm text-slate-600"><div class="lang-block" data-lang="vi">Tiếp</div><div class="lang-block hidden" data-lang="en">Next</div></dt><dd class="mt-1"><a href="port-expose.html" class="font-semibold text-slate-900 hover:underline"><div class="lang-block" data-lang="vi">Expose port (wstunnel)</div><div class="lang-block hidden" data-lang="en">Expose port (wstunnel)</div></a></dd></div></dl>
+      <dl class="doc-pager"><div class="mr-auto text-left"><dt class="text-sm text-slate-600"><div class="lang-block" data-lang="vi">Trước</div><div class="lang-block hidden" data-lang="en">Previous</div></dt><dd class="mt-1"><a href="servers.html" class="font-semibold text-slate-900 hover:underline"><div class="lang-block" data-lang="vi">Quản lý server</div><div class="lang-block hidden" data-lang="en">Manage servers</div></a></dd></div><div class="ml-auto text-right"><dt class="text-sm text-slate-600"><div class="lang-block" data-lang="vi">Tiếp</div><div class="lang-block hidden" data-lang="en">Next</div></dt><dd class="mt-1"><a href="port-expose.html" class="font-semibold text-slate-900 hover:underline"><div class="lang-block" data-lang="vi">Expose port (wstunnel)</div><div class="lang-block hidden" data-lang="en">Expose port (wstunnel)</div></a></dd></div></dl>
     </div>
   </main>
   <script src="../assets/docs.js"></script>

@@ -32,7 +32,7 @@
     <input type="checkbox" id="navigation" class="peer hidden">
     <div class="fixed left-0 top-[3.5rem] hidden h-screen px-4 shadow-xl peer-checked:block lg:relative lg:top-0 lg:block lg:h-auto lg:flex-none lg:px-0 lg:shadow-none">
       <div class="absolute inset-y-0 right-0 w-full bg-white lg:w-72 lg:bg-slate-50"></div>
-      <nav class="sticky top-[4.5rem] w-64 pr-8 text-sm xl:w-72 xl:pr-16"><ul role="list" class="-ml-0.5 h-[calc(100vh-4.5rem)] overflow-y-auto py-7 pl-0.5 space-y-8">
+      <nav class="doc-nav sticky top-[4.5rem] w-64 pr-8 text-sm xl:w-72 xl:pr-16"><ul role="list" class="-ml-0.5 h-[calc(100vh-4.5rem)] overflow-y-auto py-7 pl-0.5 space-y-8">
 <li><h3 class="font-semibold tracking-tight text-slate-900"><div class="lang-block" data-lang="vi">Bắt đầu</div><div class="lang-block hidden" data-lang="en">Getting started</div></h3>
 <ul role="list" class="pl-3 mt-3 space-y-2">
 <li><a href="../index.html" class="text-slate-600 hover:text-slate-900"><div class="lang-block" data-lang="vi">Tổng quan</div><div class="lang-block hidden" data-lang="en">Overview</div></a></li>
@@ -70,13 +70,13 @@
     </div>
     <div class="min-w-0 flex-auto max-w-3xl px-4 py-10 lg:max-w-none lg:pl-8 lg:pr-0 xl:px-16">
       <article>
-        <header>
+        <header class="doc-article-header">
           <p class="text-sm font-medium text-slate-500"><div class="lang-block" data-lang="vi">Ứng dụng trên Dohub</div><div class="lang-block hidden" data-lang="en">Apps on Dohub</div></p>
           <h1 class="text-3xl font-bold tracking-tight text-slate-900"><div class="lang-block" data-lang="vi">Overleaf</div><div class="lang-block hidden" data-lang="en">Overleaf</div></h1>
           <p class="mt-2 text-lg text-slate-600"><div class="lang-block" data-lang="vi">Đăng nhập, chờ quyền group và hướng dẫn admin add user.</div><div class="lang-block hidden" data-lang="en">Login, wait for group access, and admin group setup.</div></p>
         </header>
-        <div class="mt-8 doc-body prose prose-slate max-w-none prose-headings:font-semibold prose-a:text-blue-600">
-<div class="lang-block" data-lang="vi"><p>Overleaf chạy như workspace Dohub, truy cập <a href="https://overleaf.hub.example.com/">overleaf.hub.example.com</a> (hoặc subdomain workspace tương ứng).</p>
+        <div class="mt-8 doc-body prose prose-slate max-w-none prose-headings:font-semibold prose-a:text-blue-600 prose-li:my-1">
+<div class="lang-block" data-lang="vi"><p>Overleaf chạy như workspace Dohub, truy cập <a href="https://overleaf.example.com/">overleaf.example.com</a> (hoặc subdomain workspace tương ứng).</p>
 
 <h2>User — đăng nhập</h2>
 <figure class="my-6"><img src="../assets/screenshots/overleaf-login.png" alt="Overleaf login" class="w-full rounded-xl border shadow-sm"></figure>
@@ -105,39 +105,39 @@
 </ol>
 
 <div class="rounded-xl border border-blue-200 bg-blue-50 p-4 text-sm my-4">Server Overleaf trên Dohub spawn từ template Docker tùy chỉnh; đảm bảo image đã <strong>accepted</strong> trong tab <strong>Images</strong>.</div>
-</div><div class="lang-block hidden" data-lang="en"><p>Overleaf chạy như workspace Dohub, truy cập <a href="https://overleaf.hub.example.com/">overleaf.hub.example.com</a> (or your workspace subdomain).</p>
+</div><div class="lang-block hidden" data-lang="en"><p>Overleaf runs as a Dohub workspace; access it at <a href="https://overleaf.example.com/">overleaf.example.com</a> (or your workspace subdomain).</p>
 
-<h2>User — đăng nhập</h2>
+<h2>User — sign in</h2>
 <figure class="my-6"><img src="../assets/screenshots/overleaf-login.png" alt="Overleaf login" class="w-full rounded-xl border shadow-sm"></figure>
 <ol>
-<li>Mở URL Overleaf.</li>
-<li>Chọn đăng nhập SSO / Keycloak (tùy cấu hình instance).</li>
-<li>Sign in tài khoản đã được admin accept trên Dohub (nếu liên kết) hoặc tài khoản Keycloak.</li>
+<li>Open the Overleaf URL.</li>
+<li>Choose SSO / Keycloak login (depends on instance config).</li>
+<li>Sign in with an account accepted on Dohub (if linked) or a Keycloak account.</li>
 </ol>
 
-<h2>User — chờ quyền</h2>
-<figure class="my-6"><img src="../assets/screenshots/overleaf-wait-group.png" alt="Chờ quyền" class="w-full rounded-xl border shadow-sm"></figure>
-<p>Lần đầu có thể thấy thông báo không đủ quyền — admin cần add user vào <strong>group</strong> Keycloak (và/hoặc group Overleaf internal).</p>
+<h2>User — waiting for access</h2>
+<figure class="my-6"><img src="../assets/screenshots/overleaf-wait-group.png" alt="Waiting for access" class="w-full rounded-xl border shadow-sm"></figure>
+<p>On first login you may see insufficient permissions — an admin must add you to a Keycloak <strong>group</strong> (and/or Overleaf internal group).</p>
 <ol>
-<li>Liên hệ admin.</li>
-<li>Sau khi được add vào group (ví dụ <code>overleaf-users</code>), đăng xuất và đăng nhập lại.</li>
-<li>Tạo project LaTeX mới hoặc mở project được share.</li>
+<li>Contact an admin.</li>
+<li>After being added to a group (e.g. <code>overleaf-users</code>), sign out and sign in again.</li>
+<li>Create a new LaTeX project or open a shared project.</li>
 </ol>
 
-<h2>Admin — add user vào group</h2>
+<h2>Admin — add user to group</h2>
 <figure class="my-6"><img src="../assets/screenshots/overleaf-admin-group.png" alt="Admin add group" class="w-full rounded-xl border shadow-sm"></figure>
 <ol>
-<li>Keycloak admin → realm Overleaf → <strong>Groups</strong>.</li>
-<li>Chọn group có quyền sử dụng (ví dụ <code>overleaf-users</code>).</li>
-<li><strong>Members</strong> → <strong>Add member</strong> → tìm user (demo: <code>daovietanh19</code>).</li>
-<li>User refresh trang Overleaf.</li>
+<li>Keycloak admin → Overleaf realm → <strong>Groups</strong>.</li>
+<li>Select the access group (e.g. <code>overleaf-users</code>).</li>
+<li><strong>Members</strong> → <strong>Add member</strong> → find user (demo: <code>daovietanh19</code>).</li>
+<li>User refreshes the Overleaf page.</li>
 </ol>
 
-<div class="rounded-xl border border-blue-200 bg-blue-50 p-4 text-sm my-4">Server Overleaf trên Dohub spawn từ template Docker tùy chỉnh; đảm bảo image đã <strong>accepted</strong> trong tab <strong>Images</strong>.</div>
+<div class="rounded-xl border border-blue-200 bg-blue-50 p-4 text-sm my-4">The Overleaf server on Dohub is spawned from a custom Docker template; ensure the image is <strong>accepted</strong> under the <strong>Images</strong> tab.</div>
 </div>
         </div>
       </article>
-      <dl class="mt-10 flex border-t border-slate-200 pt-6"><div class="mr-auto text-left"><dt class="text-sm text-slate-600"><div class="lang-block" data-lang="vi">Trước</div><div class="lang-block hidden" data-lang="en">Previous</div></dt><dd class="mt-1"><a href="keycloak.html" class="font-semibold text-slate-900 hover:underline"><div class="lang-block" data-lang="vi">Keycloak (admin)</div><div class="lang-block hidden" data-lang="en">Keycloak (admin)</div></a></dd></div></dl>
+      <dl class="doc-pager"><div class="mr-auto text-left"><dt class="text-sm text-slate-600"><div class="lang-block" data-lang="vi">Trước</div><div class="lang-block hidden" data-lang="en">Previous</div></dt><dd class="mt-1"><a href="keycloak.html" class="font-semibold text-slate-900 hover:underline"><div class="lang-block" data-lang="vi">Keycloak (admin)</div><div class="lang-block hidden" data-lang="en">Keycloak (admin)</div></a></dd></div></dl>
     </div>
   </main>
   <script src="../assets/docs.js"></script>

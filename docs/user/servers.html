@@ -32,7 +32,7 @@
     <input type="checkbox" id="navigation" class="peer hidden">
     <div class="fixed left-0 top-[3.5rem] hidden h-screen px-4 shadow-xl peer-checked:block lg:relative lg:top-0 lg:block lg:h-auto lg:flex-none lg:px-0 lg:shadow-none">
       <div class="absolute inset-y-0 right-0 w-full bg-white lg:w-72 lg:bg-slate-50"></div>
-      <nav class="sticky top-[4.5rem] w-64 pr-8 text-sm xl:w-72 xl:pr-16"><ul role="list" class="-ml-0.5 h-[calc(100vh-4.5rem)] overflow-y-auto py-7 pl-0.5 space-y-8">
+      <nav class="doc-nav sticky top-[4.5rem] w-64 pr-8 text-sm xl:w-72 xl:pr-16"><ul role="list" class="-ml-0.5 h-[calc(100vh-4.5rem)] overflow-y-auto py-7 pl-0.5 space-y-8">
 <li><h3 class="font-semibold tracking-tight text-slate-900"><div class="lang-block" data-lang="vi">Bắt đầu</div><div class="lang-block hidden" data-lang="en">Getting started</div></h3>
 <ul role="list" class="pl-3 mt-3 space-y-2">
 <li><a href="../index.html" class="text-slate-600 hover:text-slate-900"><div class="lang-block" data-lang="vi">Tổng quan</div><div class="lang-block hidden" data-lang="en">Overview</div></a></li>
@@ -70,12 +70,12 @@
     </div>
     <div class="min-w-0 flex-auto max-w-3xl px-4 py-10 lg:max-w-none lg:pl-8 lg:pr-0 xl:px-16">
       <article>
-        <header>
+        <header class="doc-article-header">
           <p class="text-sm font-medium text-slate-500"><div class="lang-block" data-lang="vi">Người dùng</div><div class="lang-block hidden" data-lang="en">User guide</div></p>
           <h1 class="text-3xl font-bold tracking-tight text-slate-900"><div class="lang-block" data-lang="vi">Quản lý server (workspace)</div><div class="lang-block hidden" data-lang="en">Manage servers</div></h1>
           <p class="mt-2 text-lg text-slate-600"><div class="lang-block" data-lang="vi">Tạo, chỉnh sửa, bật, tắt và xóa server — từ template hoặc form thủ công.</div><div class="lang-block hidden" data-lang="en">Create, edit, start, stop, and delete code-server workspaces.</div></p>
         </header>
-        <div class="mt-8 doc-body prose prose-slate max-w-none prose-headings:font-semibold prose-a:text-blue-600">
+        <div class="mt-8 doc-body prose prose-slate max-w-none prose-headings:font-semibold prose-a:text-blue-600 prose-li:my-1">
 <div class="lang-block" data-lang="vi"><p>Server (workspace) là một Helm release <code>codehub</code> trên Kubernetes: container chính (thường code-server), ingress riêng, optional sidecar (monitor, backup, wstunnel).</p>
 
 <figure class="my-6"><img src="../assets/screenshots/servers-list.png" alt="My servers" class="w-full rounded-xl border shadow-sm"></figure>
@@ -154,88 +154,88 @@
 <pre><code>[{"name":"docs-demo-ws","cpu":2,"ram":"4G","drive_mounts":[{"drive_id":"&lt;uuid&gt;","mount_path":"/home/coder"}],"docker_repository":"codercom/code-server","docker_tag":"4.89.0-ubuntu"}]</code></pre>
 
 <div class="rounded-xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-900 my-4"><strong>Quan trọng:</strong> Không chỉnh sửa/xóa server production. Demo: tạo <code>docs-demo-*</code> rồi xóa ngay.</div>
-</div><div class="lang-block hidden" data-lang="en"><p>Server (workspace) là một Helm release <code>codehub</code> trên Kubernetes: container chính (thường code-server), ingress riêng, optional sidecar (monitor, backup, wstunnel).</p>
+</div><div class="lang-block hidden" data-lang="en"><p>A server (workspace) is a <code>codehub</code> Helm release on Kubernetes: a main container (usually code-server), its own ingress, and optional sidecars (monitor, backup, wstunnel).</p>
 
 <figure class="my-6"><img src="../assets/screenshots/servers-list.png" alt="My servers" class="w-full rounded-xl border shadow-sm"></figure>
 
-<h2>Luồng tổng quan</h2>
+<h2>Overview</h2>
 <ol>
-<li><strong>Create server</strong> — lưu cấu hình vào DB (pod chưa chạy).</li>
-<li><strong>Start</strong> — Helm install/upgrade, tạo pod + ingress.</li>
-<li><strong>Stop</strong> — gỡ release, giữ cấu hình.</li>
-<li><strong>Edit</strong> — chỉ khi server <em>offline</em>.</li>
-<li><strong>Delete</strong> — xóa workspace và release (nếu có).</li>
+<li><strong>Create server</strong> — saves configuration to the database (pod not running yet).</li>
+<li><strong>Start</strong> — Helm install/upgrade; creates pod and ingress.</li>
+<li><strong>Stop</strong> — removes the release; keeps configuration.</li>
+<li><strong>Edit</strong> — only when the server is <em>offline</em>.</li>
+<li><strong>Delete</strong> — removes the workspace and release (if any).</li>
 </ol>
 
-<h2>Tạo từ Quick template</h2>
+<h2>Create from a quick template</h2>
 <ol>
-<li>Tab <strong>My servers</strong> → <strong>Create server</strong>.</li>
-<li>Phần <strong>Quick templates</strong>: click một template (Lollipop, Oreo, …) để điền sẵn CPU, RAM, GPU, image, mounts.</li>
-<li>Kiểm tra lại form bên dưới, nhấn <strong>Create server</strong>.</li>
+<li><strong>My servers</strong> tab → <strong>Create server</strong>.</li>
+<li>Under <strong>Quick templates</strong>, click a template (Lollipop, Oreo, …) to pre-fill CPU, RAM, GPU, image, and mounts.</li>
+<li>Review the form below, then click <strong>Create server</strong>.</li>
 </ol>
 
-<h2>Tạo thủ công — từng trường</h2>
+<h2>Manual create — field reference</h2>
 
-<figure class="my-6"><img src="../assets/screenshots/servers-create-modal.png" alt="Modal create server" class="w-full rounded-xl border shadow-sm"></figure>
+<figure class="my-6"><img src="../assets/screenshots/servers-create-modal.png" alt="Create server modal" class="w-full rounded-xl border shadow-sm"></figure>
 
 <table>
-<thead><tr><th>Trường</th><th>Mô tả</th></tr></thead>
+<thead><tr><th>Field</th><th>Description</th></tr></thead>
 <tbody>
-<tr><td><strong>Server name</strong></td><td>Tên hiển thị; slug dùng cho URL và release name.</td></tr>
-<tr><td><strong>Service domain</strong></td><td>Chỉ hiện nếu group có quyền <em>custom domain</em>. Hostname ingress tùy chỉnh; để trống dùng <code>{slug}-{user}.{DOMAIN}</code>.</td></tr>
-<tr><td><strong>CPU (vCPU)</strong></td><td>Request CPU; limit ≈ 1.5× (theo chart).</td></tr>
-<tr><td><strong>RAM</strong></td><td>Ví dụ <code>4G</code>, <code>8G</code>.</td></tr>
-<tr><td><strong>Node</strong></td><td><code>auto</code> hoặc pin pod lên hostname cụ thể.</td></tr>
-<tr><td><strong>Mount drives</strong></td><td>Chọn drive + <strong>mount path</strong> (mặc định <code>/home/coder</code>). Nhiều drive: <strong>+ Add drive</strong>.</td></tr>
-<tr><td><strong>Mount files</strong></td><td>File nhỏ → ConfigMap mount (tên file, path, nội dung).</td></tr>
-<tr><td><strong>GPU</strong></td><td><code>none</code> hoặc profile HAMi (ví dụ <code>mig-2g.10gb</code>, <code>gpu</code>, <code>gpu:2</code>).</td></tr>
-<tr><td><strong>Privileged container</strong></td><td>Checkbox nếu group cho phép — <code>securityContext.privileged</code>.</td></tr>
-<tr><td><strong>Docker image</strong></td><td>Combobox tìm image đã đăng ký / catalog.</td></tr>
-<tr><td><strong>Version (tag)</strong></td><td>Tag image (ví dụ <code>4.89.0-ubuntu</code>).</td></tr>
+<tr><td><strong>Server name</strong></td><td>Display name; slug is used for URL and release name.</td></tr>
+<tr><td><strong>Service domain</strong></td><td>Shown only if your group has <em>custom domain</em> permission. Custom ingress hostname; leave empty for <code>{slug}-{user}.{DOMAIN}</code>.</td></tr>
+<tr><td><strong>CPU (vCPU)</strong></td><td>CPU request; limit ≈ 1.5× (per chart).</td></tr>
+<tr><td><strong>RAM</strong></td><td>e.g. <code>4G</code>, <code>8G</code>.</td></tr>
+<tr><td><strong>Node</strong></td><td><code>auto</code> or pin the pod to a specific hostname.</td></tr>
+<tr><td><strong>Mount drives</strong></td><td>Select drive + <strong>mount path</strong> (default <code>/home/coder</code>). Multiple drives: <strong>+ Add drive</strong>.</td></tr>
+<tr><td><strong>Mount files</strong></td><td>Small files → ConfigMap mount (filename, path, content).</td></tr>
+<tr><td><strong>GPU</strong></td><td><code>none</code> or a HAMi profile (e.g. <code>mig-2g.10gb</code>, <code>gpu</code>, <code>gpu:2</code>).</td></tr>
+<tr><td><strong>Privileged container</strong></td><td>Checkbox if your group allows it — sets <code>securityContext.privileged</code>.</td></tr>
+<tr><td><strong>Docker image</strong></td><td>Search registered / catalog images.</td></tr>
+<tr><td><strong>Version (tag)</strong></td><td>Image tag (e.g. <code>4.89.0-ubuntu</code>).</td></tr>
 <tr><td><strong>Image pull policy</strong></td><td><code>IfNotPresent</code>, <code>Always</code>, <code>Never</code>.</td></tr>
-<tr><td><strong>Exposed ports</strong></td><td>Port HTTP chính + phụ, phân tách dấu phẩy (mặc định <code>8080</code>).</td></tr>
-<tr><td><strong>Container command</strong></td><td>Override CMD; để trống dùng mặc định image.</td></tr>
-<tr><td><strong>Environment variables</strong></td><td>KEY + value, <strong>Add / Update</strong>. Hỗ trợ value dài (textarea).</td></tr>
+<tr><td><strong>Exposed ports</strong></td><td>Primary HTTP port + extras, comma-separated (default <code>8080</code>).</td></tr>
+<tr><td><strong>Container command</strong></td><td>Override CMD; leave empty for image default.</td></tr>
+<tr><td><strong>Environment variables</strong></td><td>KEY + value, <strong>Add / Update</strong>. Supports long values (textarea).</td></tr>
 </tbody>
 </table>
 
-<figure class="my-6"><img src="../assets/screenshots/servers-form-fields.png" alt="Chi tiết form" class="w-full rounded-xl border shadow-sm"></figure>
+<figure class="my-6"><img src="../assets/screenshots/servers-form-fields.png" alt="Form fields detail" class="w-full rounded-xl border shadow-sm"></figure>
 
-<p>Panel <strong>Current specifications</strong> tóm tắt cấu hình; <strong>Export JSON</strong> tải file cấu hình.</p>
+<p>The <strong>Current specifications</strong> panel summarizes the config; <strong>Export JSON</strong> downloads the configuration file.</p>
 
-<h2>Chỉnh sửa server</h2>
+<h2>Edit a server</h2>
 <ol>
-<li><strong>Stop</strong> server trước (bắt buộc).</li>
-<li>Mở card server hoặc modal → <strong>Edit</strong> (hoặc mở lại <strong>Create server</strong> ở chế độ edit).</li>
-<li>Thay đổi trường → <strong>Save changes</strong>.</li>
+<li><strong>Stop</strong> the server first (required).</li>
+<li>Open the server card or modal → <strong>Edit</strong> (or reopen <strong>Create server</strong> in edit mode).</li>
+<li>Change fields → <strong>Save changes</strong>.</li>
 </ol>
 
 <figure class="my-6"><img src="../assets/screenshots/servers-edit-modal.svg" alt="Edit server" class="w-full rounded-xl border shadow-sm"></figure>
 
 <h2>Start / Stop</h2>
-<figure class="my-6"><img src="../assets/screenshots/servers-start-stop.png" alt="Start Stop" class="w-full rounded-xl border shadow-sm"></figure>
+<figure class="my-6"><img src="../assets/screenshots/servers-start-stop.png" alt="Start and Stop" class="w-full rounded-xl border shadow-sm"></figure>
 <ul>
-<li><strong>Start</strong> — triển khai pod; URL workspace xuất hiện sau khi Running.</li>
-<li><strong>Stop</strong> — <code>helm uninstall</code>; dữ liệu trên PVC drive vẫn giữ.</li>
+<li><strong>Start</strong> — deploys the pod; workspace URL appears when Running.</li>
+<li><strong>Stop</strong> — runs <code>helm uninstall</code>; data on drive PVCs is preserved.</li>
 </ul>
 
-<h2>Delete server</h2>
+<h2>Delete a server</h2>
 <ol>
-<li>Nên <strong>Stop</strong> trước (khuyến nghị).</li>
-<li>Icon Delete trên card → gõ <code>delete</code> → <strong>Delete</strong>.</li>
+<li><strong>Stop</strong> first (recommended).</li>
+<li>Delete icon on the card → type <code>delete</code> → <strong>Delete</strong>.</li>
 </ol>
 
 <figure class="my-6"><img src="../assets/screenshots/servers-delete-modal.svg" alt="Delete server" class="w-full rounded-xl border shadow-sm"></figure>
 
-<h2>Bulk create server</h2>
-<p><strong>Bulk create server</strong> — JSON/CSV nhiều server; tùy chọn <strong>Start servers after create</strong>.</p>
+<h2>Bulk create servers</h2>
+<p><strong>Bulk create server</strong> — JSON/CSV for multiple servers; optional <strong>Start servers after create</strong>.</p>
 <pre><code>[{"name":"docs-demo-ws","cpu":2,"ram":"4G","drive_mounts":[{"drive_id":"&lt;uuid&gt;","mount_path":"/home/coder"}],"docker_repository":"codercom/code-server","docker_tag":"4.89.0-ubuntu"}]</code></pre>
 
-<div class="rounded-xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-900 my-4"><strong>Quan trọng:</strong> Không chỉnh sửa/xóa server production. Demo: tạo <code>docs-demo-*</code> rồi xóa ngay.</div>
+<div class="rounded-xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-900 my-4"><strong>Important:</strong> Do not modify or delete production servers. For demos, create <code>docs-demo-*</code> resources and remove them immediately.</div>
 </div>
         </div>
       </article>
-      <dl class="mt-10 flex border-t border-slate-200 pt-6"><div class="mr-auto text-left"><dt class="text-sm text-slate-600"><div class="lang-block" data-lang="vi">Trước</div><div class="lang-block hidden" data-lang="en">Previous</div></dt><dd class="mt-1"><a href="drives.html" class="font-semibold text-slate-900 hover:underline"><div class="lang-block" data-lang="vi">Tạo &amp; xóa drive</div><div class="lang-block hidden" data-lang="en">Create &amp; delete drives</div></a></dd></div><div class="ml-auto text-right"><dt class="text-sm text-slate-600"><div class="lang-block" data-lang="vi">Tiếp</div><div class="lang-block hidden" data-lang="en">Next</div></dt><dd class="mt-1"><a href="images.html" class="font-semibold text-slate-900 hover:underline"><div class="lang-block" data-lang="vi">Đăng ký Docker image</div><div class="lang-block hidden" data-lang="en">Register Docker images</div></a></dd></div></dl>
+      <dl class="doc-pager"><div class="mr-auto text-left"><dt class="text-sm text-slate-600"><div class="lang-block" data-lang="vi">Trước</div><div class="lang-block hidden" data-lang="en">Previous</div></dt><dd class="mt-1"><a href="drives.html" class="font-semibold text-slate-900 hover:underline"><div class="lang-block" data-lang="vi">Tạo &amp; xóa drive</div><div class="lang-block hidden" data-lang="en">Create &amp; delete drives</div></a></dd></div><div class="ml-auto text-right"><dt class="text-sm text-slate-600"><div class="lang-block" data-lang="vi">Tiếp</div><div class="lang-block hidden" data-lang="en">Next</div></dt><dd class="mt-1"><a href="images.html" class="font-semibold text-slate-900 hover:underline"><div class="lang-block" data-lang="vi">Đăng ký Docker image</div><div class="lang-block hidden" data-lang="en">Register Docker images</div></a></dd></div></dl>
     </div>
   </main>
   <script src="../assets/docs.js"></script>

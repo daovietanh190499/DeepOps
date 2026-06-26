@@ -16,7 +16,7 @@ LOCALES = ROOT / 'locales'
 SITE_URL = 'https://daovietanh190499.github.io/DeepOps/docs/'
 GITHUB_REPO = 'https://github.com/daovietanh190499/DeepOps'
 
-PROSE_WRAPPER = 'doc-body prose prose-slate max-w-none prose-headings:font-semibold prose-a:text-blue-600'
+PROSE_WRAPPER = 'doc-body prose prose-slate max-w-none prose-headings:font-semibold prose-a:text-blue-600 prose-li:my-1'
 
 
 def page_dir(href: str) -> Path:
@@ -225,11 +225,11 @@ def render_page(
     <input type="checkbox" id="navigation" class="peer hidden">
     <div class="fixed left-0 top-[3.5rem] hidden h-screen px-4 shadow-xl peer-checked:block lg:relative lg:top-0 lg:block lg:h-auto lg:flex-none lg:px-0 lg:shadow-none">
       <div class="absolute inset-y-0 right-0 w-full bg-white lg:w-72 lg:bg-slate-50"></div>
-      <nav class="sticky top-[4.5rem] w-64 pr-8 text-sm xl:w-72 xl:pr-16">{nav}</nav>
+      <nav class="doc-nav sticky top-[4.5rem] w-64 pr-8 text-sm xl:w-72 xl:pr-16">{nav}</nav>
     </div>
     <div class="min-w-0 flex-auto max-w-3xl px-4 py-10 lg:max-w-none lg:pl-8 lg:pr-0 xl:px-16">
       <article>
-        <header>
+        <header class="doc-article-header">
           <p class="text-sm font-medium text-slate-500">{lang_text(section_vi, section_en)}</p>
           <h1 class="text-3xl font-bold tracking-tight text-slate-900">{lang_text(title_vi, title_en)}</h1>
           <p class="mt-2 text-lg text-slate-600">{lang_text(subtitle_vi, subtitle_en)}</p>
@@ -238,7 +238,7 @@ def render_page(
 {body}
         </div>
       </article>
-      <dl class="mt-10 flex border-t border-slate-200 pt-6">{prev_block}{next_block}</dl>
+      <dl class="doc-pager">{prev_block}{next_block}</dl>
     </div>
   </main>
   <script src="{depth}assets/docs.js"></script>
@@ -260,16 +260,16 @@ def build_index(vi_loc: dict, en_loc: dict) -> None:
             if href == 'index.html':
                 continue
             cards.append(
-                f'<li><a href="{rel_link("index.html", href)}" class="block rounded-xl border border-slate-200 bg-white px-5 py-4 shadow-sm hover:border-blue-300 hover:shadow-md">'
-                f'<p class="text-xs font-semibold uppercase tracking-wide text-slate-400">'
+                f'<li><a href="{rel_link("index.html", href)}">'
+                f'<p class="doc-card-section">'
                 f'{lang_text(vi_sec["title"], en_sec["title"])}</p>'
-                f'<p class="mt-1 font-bold text-slate-900">{lang_text(vi_label, en_label)}</p></a></li>'
+                f'<p class="doc-card-title">{lang_text(vi_label, en_label)}</p></a></li>'
             )
     ui_vi, ui_en = vi_loc['ui'], en_loc['ui']
     body = f'''
 <p>{lang_block(ui_vi["index_lead"], ui_en["index_lead"])}</p>
 {img('assets/logo.png', 'Logo Dohub', 'Dohub logo', ui_vi['index_logo_caption'], ui_en['index_logo_caption'])}
-<div class="not-prose mt-8 grid gap-4 sm:grid-cols-2">
+<div class="not-prose doc-card-grid">
 {''.join(cards)}
 </div>
 <h2>{lang_text(ui_vi['index_quick_links'], ui_en['index_quick_links'])}</h2>

@@ -1,24 +1,24 @@
-<div class="rounded-xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-900 my-4"><strong>Warning:</strong> <code>Init drives</code> <strong>format và xóa toàn bộ dữ liệu</strong> trên ổ được chọn. Chỉ chọn ổ dành riêng cho DirectPV, not the OS disk.</div>
+<div class="rounded-xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-900 my-4"><strong>Warning:</strong> <code>Init drives</code> <strong>formats and erases all data</strong> on selected disks. Only select disks dedicated to DirectPV — not the OS disk.</div>
 
 <figure class="my-6"><img src="../assets/screenshots/admin-directpv-discover.png" alt="Discover" class="w-full rounded-xl border shadow-sm"></figure>
 
 <h2>Discover</h2>
 <ol>
-<li>Admin → <strong>Overall</strong> → mục <strong>DirectPV discover</strong>.</li>
-<li><strong>Discover</strong> — chạy <code>kubectl directpv discover</code>, hiển thị bảng ổ: Name, Size, Make, FS, ID.</li>
-<li>Cột <strong>Select</strong> — toggle <code>yes</code> / <code>no</code> cho từng ổ cần init.</li>
+<li>Admin → <strong>Overall</strong> → <strong>DirectPV discover</strong> section.</li>
+<li><strong>Discover</strong> — runs <code>kubectl directpv discover</code>; shows disk table: Name, Size, Make, FS, ID.</li>
+<li><strong>Select</strong> column — toggle <code>yes</code> / <code>no</code> for each disk to initialize.</li>
 </ol>
 
 <h2>Init</h2>
 <figure class="my-6"><img src="../assets/screenshots/admin-directpv-init.svg" alt="Init confirm" class="w-full rounded-xl border shadow-sm"></figure>
 <ol>
-<li><strong>Init drives</strong> — modal <strong>Initialize DirectPV drives?</strong></li>
-<li><strong>Yes, init drives</strong> — chạy <code>kubectl directpv init … --dangerous</code>.</li>
+<li><strong>Init drives</strong> — opens <strong>Initialize DirectPV drives?</strong> modal.</li>
+<li><strong>Yes, init drives</strong> — runs <code>kubectl directpv init … --dangerous</code>.</li>
 </ol>
 
-<p>Sau init, StorageClass <code>directpv-min-io</code> sẵn sàng cho PVC drive/user.</p>
+<p>After init, StorageClass <code>directpv-min-io</code> is ready for user drive PVCs.</p>
 
-<h2>CLI tương đương</h2>
+<h2>Equivalent CLI</h2>
 <pre><code>kubectl directpv discover --output-file /tmp/directpv-drives.yaml
-# chỉnh selected: true
+# set selected: true
 kubectl directpv init /tmp/directpv-drives.yaml --dangerous</code></pre>

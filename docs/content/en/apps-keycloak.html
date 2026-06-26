@@ -1,43 +1,43 @@
-<p>Keycloak triển khai trên Dohub tại <a href="https://keycloak.hub.example.com/">keycloak.hub.example.com</a> — IAM cho các ứng dụng (Overleaf, …).</p>
+<p>Keycloak is deployed on Dohub at <a href="https://keycloak.example.com/">keycloak.example.com</a> — IAM for apps (Overleaf, …).</p>
 
 <figure class="my-6"><img src="../assets/screenshots/keycloak-login.png" alt="Keycloak login" class="w-full rounded-xl border shadow-sm"></figure>
 
-<h2>Sign in admin console</h2>
+<h2>Sign in to admin console</h2>
 <ol>
-<li>Mở <code>https://keycloak.hub.example.com/admin/</code>.</li>
-<li>Sign in tài khoản admin realm <code>master</code> (do operator cấp).</li>
+<li>Open <code>https://keycloak.example.com/admin/</code>.</li>
+<li>Sign in with the <code>master</code> realm admin account (provided by the operator).</li>
 </ol>
 
-<h2>Tạo Realm</h2>
+<h2>Create a realm</h2>
 <figure class="my-6"><img src="../assets/screenshots/keycloak-realm.svg" alt="Create realm" class="w-full rounded-xl border shadow-sm"></figure>
 <ol>
-<li>Dropdown realm (góc trái) → <strong>Create realm</strong>.</li>
-<li><strong>Realm name</strong> — ví dụ <code>overleaf</code>.</li>
-<li><strong>Create</strong>.</li>
+<li>Realm dropdown (top left) → <strong>Create realm</strong>.</li>
+<li><strong>Realm name</strong> — e.g. <code>overleaf</code>.</li>
+<li>Click <strong>Create</strong>.</li>
 </ol>
 
-<h2>Tạo Client</h2>
+<h2>Create a client</h2>
 <figure class="my-6"><img src="../assets/screenshots/keycloak-client.svg" alt="Create client" class="w-full rounded-xl border shadow-sm"></figure>
 <ol>
 <li><strong>Clients</strong> → <strong>Create client</strong>.</li>
-<li><strong>Client ID</strong> — khớp cấu hình app (ví dụ Overleaf OIDC).</li>
-<li><strong>Client authentication</strong> — ON nếu confidential client.</li>
-<li><strong>Valid redirect URIs</strong> — URL callback app.</li>
-<li><strong>Web origins</strong> — CORS nếu cần.</li>
-<li>Lưu <strong>Client secret</strong> (tab Credentials) cho app.</li>
+<li><strong>Client ID</strong> — must match app config (e.g. Overleaf OIDC).</li>
+<li><strong>Client authentication</strong> — ON for confidential clients.</li>
+<li><strong>Valid redirect URIs</strong> — app callback URLs.</li>
+<li><strong>Web origins</strong> — CORS if needed.</li>
+<li>Save the <strong>Client secret</strong> (Credentials tab) for the app.</li>
 </ol>
 
 <h2>Groups</h2>
 <figure class="my-6"><img src="../assets/screenshots/keycloak-groups.svg" alt="Groups" class="w-full rounded-xl border shadow-sm"></figure>
 <ol>
-<li><strong>Groups</strong> → <strong>Create group</strong> — ví dụ <code>overleaf-users</code>.</li>
-<li><strong>Members</strong> — <strong>Add member</strong>, tìm user (ví dụ <code>daovietanh19</code> cho demo Overleaf).</li>
+<li><strong>Groups</strong> → <strong>Create group</strong> — e.g. <code>overleaf-users</code>.</li>
+<li><strong>Members</strong> → <strong>Add member</strong>, search for user (e.g. <code>daovietanh19</code> for Overleaf demo).</li>
 </ol>
 
 <h2>Roles</h2>
 <ol>
-<li><strong>Realm roles</strong> hoặc <strong>Client roles</strong> → <strong>Create role</strong>.</li>
-<li>Gán role cho group: <strong>Groups</strong> → group → <strong>Role mapping</strong> → <strong>Assign role</strong>.</li>
+<li><strong>Realm roles</strong> or <strong>Client roles</strong> → <strong>Create role</strong>.</li>
+<li>Assign roles to a group: <strong>Groups</strong> → group → <strong>Role mapping</strong> → <strong>Assign role</strong>.</li>
 </ol>
 
-<p>Ứng dụng Overleaf thường map group Keycloak → quyền truy cập project — xem <a href="overleaf.html">Overleaf</a>.</p>
+<p>Overleaf typically maps Keycloak groups to project access — see <a href="overleaf.html">Overleaf</a>.</p>

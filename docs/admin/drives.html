@@ -32,7 +32,7 @@
     <input type="checkbox" id="navigation" class="peer hidden">
     <div class="fixed left-0 top-[3.5rem] hidden h-screen px-4 shadow-xl peer-checked:block lg:relative lg:top-0 lg:block lg:h-auto lg:flex-none lg:px-0 lg:shadow-none">
       <div class="absolute inset-y-0 right-0 w-full bg-white lg:w-72 lg:bg-slate-50"></div>
-      <nav class="sticky top-[4.5rem] w-64 pr-8 text-sm xl:w-72 xl:pr-16"><ul role="list" class="-ml-0.5 h-[calc(100vh-4.5rem)] overflow-y-auto py-7 pl-0.5 space-y-8">
+      <nav class="doc-nav sticky top-[4.5rem] w-64 pr-8 text-sm xl:w-72 xl:pr-16"><ul role="list" class="-ml-0.5 h-[calc(100vh-4.5rem)] overflow-y-auto py-7 pl-0.5 space-y-8">
 <li><h3 class="font-semibold tracking-tight text-slate-900"><div class="lang-block" data-lang="vi">Bắt đầu</div><div class="lang-block hidden" data-lang="en">Getting started</div></h3>
 <ul role="list" class="pl-3 mt-3 space-y-2">
 <li><a href="../index.html" class="text-slate-600 hover:text-slate-900"><div class="lang-block" data-lang="vi">Tổng quan</div><div class="lang-block hidden" data-lang="en">Overview</div></a></li>
@@ -70,12 +70,12 @@
     </div>
     <div class="min-w-0 flex-auto max-w-3xl px-4 py-10 lg:max-w-none lg:pl-8 lg:pr-0 xl:px-16">
       <article>
-        <header>
+        <header class="doc-article-header">
           <p class="text-sm font-medium text-slate-500"><div class="lang-block" data-lang="vi">Quản trị viên</div><div class="lang-block hidden" data-lang="en">Administrator</div></p>
           <h1 class="text-3xl font-bold tracking-tight text-slate-900"><div class="lang-block" data-lang="vi">Quản lý drives (admin)</div><div class="lang-block hidden" data-lang="en">Manage drives</div></h1>
           <p class="mt-2 text-lg text-slate-600"><div class="lang-block" data-lang="vi">Xem và xóa drive của mọi user; cấu hình size catalog.</div><div class="lang-block hidden" data-lang="en">View and delete all user drives (admin).</div></p>
         </header>
-        <div class="mt-8 doc-body prose prose-slate max-w-none prose-headings:font-semibold prose-a:text-blue-600">
+        <div class="mt-8 doc-body prose prose-slate max-w-none prose-headings:font-semibold prose-a:text-blue-600 prose-li:my-1">
 <div class="lang-block" data-lang="vi"><p>Tab admin <strong>Drives</strong> có hai sub-tab: <strong>Drives</strong> và <strong>Size options</strong>.</p>
 
 <figure class="my-6"><img src="../assets/screenshots/admin-drives.png" alt="Admin drives" class="w-full rounded-xl border shadow-sm"></figure>
@@ -94,28 +94,28 @@
 <li>Thêm size: ô <code>e.g. 100Gi</code> → <strong>Add size</strong>.</li>
 <li>Ẩn/hiện hoặc xóa option có sẵn.</li>
 </ul>
-</div><div class="lang-block hidden" data-lang="en"><p>Tab admin <strong>Drives</strong> có hai sub-tab: <strong>Drives</strong> và <strong>Size options</strong>.</p>
+</div><div class="lang-block hidden" data-lang="en"><p>The admin <strong>Drives</strong> tab has two sub-tabs: <strong>Drives</strong> and <strong>Size options</strong>.</p>
 
 <figure class="my-6"><img src="../assets/screenshots/admin-drives.png" alt="Admin drives" class="w-full rounded-xl border shadow-sm"></figure>
 
 <h2>Drives</h2>
 <ul>
-<li>Filter: username, drive name, resource group.</li>
-<li>Thẻ drive hiển thị owner, size, trạng thái bound.</li>
-<li><strong>Delete</strong> — xóa drive user (cẩn trọng nếu đang dùng).</li>
-<li>Bulk: chọn nhiều → <strong>Delete</strong> / <strong>Clear</strong>.</li>
+<li>Filter by username, drive name, resource group.</li>
+<li>Drive cards show owner, size, and bound status.</li>
+<li><strong>Delete</strong> — remove a user's drive (use caution if in use).</li>
+<li>Bulk: select multiple → <strong>Delete</strong> / <strong>Clear</strong>.</li>
 </ul>
 
 <h2>Size options</h2>
-<p>Catalog kích thước drive trong form <strong>Create drive</strong>:</p>
+<p>Catalog of drive sizes in the <strong>Create drive</strong> form:</p>
 <ul>
-<li>Thêm size: ô <code>e.g. 100Gi</code> → <strong>Add size</strong>.</li>
-<li>Ẩn/hiện hoặc xóa option có sẵn.</li>
+<li>Add size: enter e.g. <code>100Gi</code> → <strong>Add size</strong>.</li>
+<li>Hide/show or remove existing options.</li>
 </ul>
 </div>
         </div>
       </article>
-      <dl class="mt-10 flex border-t border-slate-200 pt-6"><div class="mr-auto text-left"><dt class="text-sm text-slate-600"><div class="lang-block" data-lang="vi">Trước</div><div class="lang-block hidden" data-lang="en">Previous</div></dt><dd class="mt-1"><a href="directpv.html" class="font-semibold text-slate-900 hover:underline"><div class="lang-block" data-lang="vi">DirectPV discover &amp; init</div><div class="lang-block hidden" data-lang="en">DirectPV discover &amp; init</div></a></dd></div><div class="ml-auto text-right"><dt class="text-sm text-slate-600"><div class="lang-block" data-lang="vi">Tiếp</div><div class="lang-block hidden" data-lang="en">Next</div></dt><dd class="mt-1"><a href="servers.html" class="font-semibold text-slate-900 hover:underline"><div class="lang-block" data-lang="vi">Quản lý servers</div><div class="lang-block hidden" data-lang="en">Manage servers</div></a></dd></div></dl>
+      <dl class="doc-pager"><div class="mr-auto text-left"><dt class="text-sm text-slate-600"><div class="lang-block" data-lang="vi">Trước</div><div class="lang-block hidden" data-lang="en">Previous</div></dt><dd class="mt-1"><a href="directpv.html" class="font-semibold text-slate-900 hover:underline"><div class="lang-block" data-lang="vi">DirectPV discover &amp; init</div><div class="lang-block hidden" data-lang="en">DirectPV discover &amp; init</div></a></dd></div><div class="ml-auto text-right"><dt class="text-sm text-slate-600"><div class="lang-block" data-lang="vi">Tiếp</div><div class="lang-block hidden" data-lang="en">Next</div></dt><dd class="mt-1"><a href="servers.html" class="font-semibold text-slate-900 hover:underline"><div class="lang-block" data-lang="vi">Quản lý servers</div><div class="lang-block hidden" data-lang="en">Manage servers</div></a></dd></div></dl>
     </div>
   </main>
   <script src="../assets/docs.js"></script>

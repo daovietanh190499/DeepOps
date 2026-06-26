@@ -185,8 +185,7 @@ def main() -> None:
         en_path = EN / hp.name
         if hp.name == 'installation.html':
             en_path.write_text(vi_text, encoding='utf-8')
-        else:
-            en_path.write_text(vi_to_en_html(vi_text), encoding='utf-8')
+        # Other EN files are maintained manually in content/en/
     print('migrated', len(list(VI.glob('*.json'))), 'json,', len(list(EN.glob('*.html'))), 'en html')
 
 

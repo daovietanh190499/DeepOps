@@ -1,22 +1,22 @@
-<p>Sidecar <strong>port-tunnel</strong> (wstunnel) cho phép truy cập cổng TCP của container chính qua URL dạng:</p>
+<p>The <strong>port-tunnel</strong> sidecar (wstunnel) lets you reach TCP ports on the main container via a URL like:</p>
 <pre><code>wss://&lt;hub-domain&gt;/&lt;username&gt;/&lt;slug&gt;/port-tunnel</code></pre>
 
 <figure class="my-6"><img src="../assets/screenshots/port-expose.png" alt="Expose port UI" class="w-full rounded-xl border shadow-sm"></figure>
 
 <h2>Prerequisites</h2>
 <ul>
-<li>Server đang <strong>Running</strong>.</li>
-<li>Chart deploy với <code>portTunnel.enabled=true</code> (hub enable sidecar khi spawn).</li>
+<li>Server is <strong>Running</strong>.</li>
+<li>Chart deployed with <code>portTunnel.enabled=true</code> (hub enables the sidecar on spawn).</li>
 </ul>
 
-<h2>Các bước</h2>
+<h2>Steps</h2>
 <ol>
-<li>Mở modal chi tiết server → tab <strong>General</strong>.</li>
-<li>Cuộn tới <strong>Exposing port through websocket tunnel</strong>.</li>
-<li>Nhập <strong>Container ports</strong> — ví dụ <code>3000, 8000, 5432</code>.</li>
-<li>Nhấn <strong>Expose</strong> (loading <em>Applying…</em>).</li>
-<li>Phần <strong>How to connect (wstunnel client)</strong> hiển thị WSS URL và mapping từng port.</li>
+<li>Open the server detail modal → <strong>General</strong> tab.</li>
+<li>Scroll to <strong>Exposing port through websocket tunnel</strong>.</li>
+<li>Enter <strong>Container ports</strong> — e.g. <code>3000, 8000, 5432</code>.</li>
+<li>Click <strong>Expose</strong> (shows <em>Applying…</em> while processing).</li>
+<li><strong>How to connect (wstunnel client)</strong> shows the WSS URL and per-port mappings.</li>
 </ol>
 
-<h2>SSH (cổng 22 / 2222)</h2>
-<p>Nếu image expose SSH, mục <strong>SSH via stdio tunnel</strong> cung cấp <code>ProxyCommand</code> wstunnel và snippet <code>~/.ssh/config</code>. URL WebSocket dùng <strong>host hub</strong>, path <code>-P user/slug/ssh-tunnel</code> — không gắn path vào URL <code>wss://</code>.</p>
+<h2>SSH (ports 22 / 2222)</h2>
+<p>If the image exposes SSH, <strong>SSH via stdio tunnel</strong> provides a wstunnel <code>ProxyCommand</code> and a <code>~/.ssh/config</code> snippet. The WebSocket URL uses the <strong>hub host</strong> with path <code>-P user/slug/ssh-tunnel</code> — do not append the path to the <code>wss://</code> URL.</p>

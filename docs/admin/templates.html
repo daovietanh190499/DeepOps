@@ -32,7 +32,7 @@
     <input type="checkbox" id="navigation" class="peer hidden">
     <div class="fixed left-0 top-[3.5rem] hidden h-screen px-4 shadow-xl peer-checked:block lg:relative lg:top-0 lg:block lg:h-auto lg:flex-none lg:px-0 lg:shadow-none">
       <div class="absolute inset-y-0 right-0 w-full bg-white lg:w-72 lg:bg-slate-50"></div>
-      <nav class="sticky top-[4.5rem] w-64 pr-8 text-sm xl:w-72 xl:pr-16"><ul role="list" class="-ml-0.5 h-[calc(100vh-4.5rem)] overflow-y-auto py-7 pl-0.5 space-y-8">
+      <nav class="doc-nav sticky top-[4.5rem] w-64 pr-8 text-sm xl:w-72 xl:pr-16"><ul role="list" class="-ml-0.5 h-[calc(100vh-4.5rem)] overflow-y-auto py-7 pl-0.5 space-y-8">
 <li><h3 class="font-semibold tracking-tight text-slate-900"><div class="lang-block" data-lang="vi">Bắt đầu</div><div class="lang-block hidden" data-lang="en">Getting started</div></h3>
 <ul role="list" class="pl-3 mt-3 space-y-2">
 <li><a href="../index.html" class="text-slate-600 hover:text-slate-900"><div class="lang-block" data-lang="vi">Tổng quan</div><div class="lang-block hidden" data-lang="en">Overview</div></a></li>
@@ -70,12 +70,12 @@
     </div>
     <div class="min-w-0 flex-auto max-w-3xl px-4 py-10 lg:max-w-none lg:pl-8 lg:pr-0 xl:px-16">
       <article>
-        <header>
+        <header class="doc-article-header">
           <p class="text-sm font-medium text-slate-500"><div class="lang-block" data-lang="vi">Quản trị viên</div><div class="lang-block hidden" data-lang="en">Administrator</div></p>
           <h1 class="text-3xl font-bold tracking-tight text-slate-900"><div class="lang-block" data-lang="vi">Server templates (Quick templates)</div><div class="lang-block hidden" data-lang="en">Server templates</div></h1>
           <p class="mt-2 text-lg text-slate-600"><div class="lang-block" data-lang="vi">Thêm, sửa, xóa template hiển thị khi user tạo server.</div><div class="lang-block hidden" data-lang="en">Catalog of spawn templates (CPU, RAM, image, mounts).</div></p>
         </header>
-        <div class="mt-8 doc-body prose prose-slate max-w-none prose-headings:font-semibold prose-a:text-blue-600">
+        <div class="mt-8 doc-body prose prose-slate max-w-none prose-headings:font-semibold prose-a:text-blue-600 prose-li:my-1">
 <div class="lang-block" data-lang="vi"><figure class="my-6"><img src="../assets/screenshots/admin-templates.png" alt="Templates" class="w-full rounded-xl border shadow-sm"></figure>
 
 <p><strong>Admin → Servers → Catalog</strong></p>
@@ -110,25 +110,25 @@
 <p><strong>Admin → Servers → Catalog</strong></p>
 
 <h2>Quick templates</h2>
-<p>Mỗi template gồm: Name, CPU, RAM, GPU, icon, Docker image/tag, ports, mount paths, file mounts, env defaults, active.</p>
+<p>Each template includes: Name, CPU, RAM, GPU, icon, Docker image/tag, ports, mount paths, file mounts, env defaults, active flag.</p>
 
-<h2>Thêm template</h2>
+<h2>Add a template</h2>
 <ol>
-<li>Điền hàng inline hoặc <strong>Add template</strong>.</li>
-<li><strong>Mount paths</strong> — ví dụ <code>/home/coder, /app/data</code>.</li>
-<li><strong>Default file mounts</strong> — upload file nhỏ + mount path.</li>
-<li><strong>Environment defaults</strong> — JSON; hỗ trợ token <code>{{username}}</code>.</li>
+<li>Fill the inline row or click <strong>Add template</strong>.</li>
+<li><strong>Mount paths</strong> — e.g. <code>/home/coder, /app/data</code>.</li>
+<li><strong>Default file mounts</strong> — upload small files + mount path.</li>
+<li><strong>Environment defaults</strong> — JSON; supports <code>{{username}}</code> token.</li>
 </ol>
 
-<h2>Sửa / xóa</h2>
+<h2>Edit / delete</h2>
 <ul>
-<li><strong>Edit</strong> — modal đầy đủ trường + <strong>Sort order</strong>, <strong>Active</strong>.</li>
-<li><strong>Delete</strong> — gỡ template.</li>
-<li><strong>Download JSON</strong> / <strong>Import (JSON/CSV)</strong> — bulk.</li>
+<li><strong>Edit</strong> — full modal with <strong>Sort order</strong>, <strong>Active</strong>.</li>
+<li><strong>Delete</strong> — remove template.</li>
+<li><strong>Download JSON</strong> / <strong>Import (JSON/CSV)</strong> — bulk operations.</li>
 </ul>
 
 <h2>Equipment catalogs</h2>
-<p>CPU, RAM, GPU options dùng trong dropdown form user:</p>
+<p>CPU, RAM, and GPU options for user form dropdowns:</p>
 <ul>
 <li>CPU: <code>0.5</code>, <code>2</code>, … → <strong>Add</strong>.</li>
 <li>RAM: <code>4G</code>, <code>8G</code>, …</li>
@@ -137,7 +137,7 @@
 </div>
         </div>
       </article>
-      <dl class="mt-10 flex border-t border-slate-200 pt-6"><div class="mr-auto text-left"><dt class="text-sm text-slate-600"><div class="lang-block" data-lang="vi">Trước</div><div class="lang-block hidden" data-lang="en">Previous</div></dt><dd class="mt-1"><a href="servers.html" class="font-semibold text-slate-900 hover:underline"><div class="lang-block" data-lang="vi">Quản lý servers</div><div class="lang-block hidden" data-lang="en">Manage servers</div></a></dd></div><div class="ml-auto text-right"><dt class="text-sm text-slate-600"><div class="lang-block" data-lang="vi">Tiếp</div><div class="lang-block hidden" data-lang="en">Next</div></dt><dd class="mt-1"><a href="users.html" class="font-semibold text-slate-900 hover:underline"><div class="lang-block" data-lang="vi">Users &amp; accept</div><div class="lang-block hidden" data-lang="en">Users &amp; accept</div></a></dd></div></dl>
+      <dl class="doc-pager"><div class="mr-auto text-left"><dt class="text-sm text-slate-600"><div class="lang-block" data-lang="vi">Trước</div><div class="lang-block hidden" data-lang="en">Previous</div></dt><dd class="mt-1"><a href="servers.html" class="font-semibold text-slate-900 hover:underline"><div class="lang-block" data-lang="vi">Quản lý servers</div><div class="lang-block hidden" data-lang="en">Manage servers</div></a></dd></div><div class="ml-auto text-right"><dt class="text-sm text-slate-600"><div class="lang-block" data-lang="vi">Tiếp</div><div class="lang-block hidden" data-lang="en">Next</div></dt><dd class="mt-1"><a href="users.html" class="font-semibold text-slate-900 hover:underline"><div class="lang-block" data-lang="vi">Users &amp; accept</div><div class="lang-block hidden" data-lang="en">Users &amp; accept</div></a></dd></div></dl>
     </div>
   </main>
   <script src="../assets/docs.js"></script>

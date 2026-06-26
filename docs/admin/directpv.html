@@ -32,7 +32,7 @@
     <input type="checkbox" id="navigation" class="peer hidden">
     <div class="fixed left-0 top-[3.5rem] hidden h-screen px-4 shadow-xl peer-checked:block lg:relative lg:top-0 lg:block lg:h-auto lg:flex-none lg:px-0 lg:shadow-none">
       <div class="absolute inset-y-0 right-0 w-full bg-white lg:w-72 lg:bg-slate-50"></div>
-      <nav class="sticky top-[4.5rem] w-64 pr-8 text-sm xl:w-72 xl:pr-16"><ul role="list" class="-ml-0.5 h-[calc(100vh-4.5rem)] overflow-y-auto py-7 pl-0.5 space-y-8">
+      <nav class="doc-nav sticky top-[4.5rem] w-64 pr-8 text-sm xl:w-72 xl:pr-16"><ul role="list" class="-ml-0.5 h-[calc(100vh-4.5rem)] overflow-y-auto py-7 pl-0.5 space-y-8">
 <li><h3 class="font-semibold tracking-tight text-slate-900"><div class="lang-block" data-lang="vi">Bắt đầu</div><div class="lang-block hidden" data-lang="en">Getting started</div></h3>
 <ul role="list" class="pl-3 mt-3 space-y-2">
 <li><a href="../index.html" class="text-slate-600 hover:text-slate-900"><div class="lang-block" data-lang="vi">Tổng quan</div><div class="lang-block hidden" data-lang="en">Overview</div></a></li>
@@ -70,12 +70,12 @@
     </div>
     <div class="min-w-0 flex-auto max-w-3xl px-4 py-10 lg:max-w-none lg:pl-8 lg:pr-0 xl:px-16">
       <article>
-        <header>
+        <header class="doc-article-header">
           <p class="text-sm font-medium text-slate-500"><div class="lang-block" data-lang="vi">Quản trị viên</div><div class="lang-block hidden" data-lang="en">Administrator</div></p>
           <h1 class="text-3xl font-bold tracking-tight text-slate-900"><div class="lang-block" data-lang="vi">DirectPV discover &amp; init</div><div class="lang-block hidden" data-lang="en">DirectPV discover &amp; init</div></h1>
           <p class="mt-2 text-lg text-slate-600"><div class="lang-block" data-lang="vi">Khám phá ổ đĩa raw và khởi tạo cho DirectPV (xóa dữ liệu ổ).</div><div class="lang-block hidden" data-lang="en">Discover raw drives and initialize DirectPV (destructive).</div></p>
         </header>
-        <div class="mt-8 doc-body prose prose-slate max-w-none prose-headings:font-semibold prose-a:text-blue-600">
+        <div class="mt-8 doc-body prose prose-slate max-w-none prose-headings:font-semibold prose-a:text-blue-600 prose-li:my-1">
 <div class="lang-block" data-lang="vi"><div class="rounded-xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-900 my-4"><strong>Cảnh báo:</strong> <code>Init drives</code> <strong>format và xóa toàn bộ dữ liệu</strong> trên ổ được chọn. Chỉ chọn ổ dành riêng cho DirectPV, không phải OS disk.</div>
 
 <figure class="my-6"><img src="../assets/screenshots/admin-directpv-discover.png" alt="Discover" class="w-full rounded-xl border shadow-sm"></figure>
@@ -100,34 +100,34 @@
 <pre><code>kubectl directpv discover --output-file /tmp/directpv-drives.yaml
 # chỉnh selected: true
 kubectl directpv init /tmp/directpv-drives.yaml --dangerous</code></pre>
-</div><div class="lang-block hidden" data-lang="en"><div class="rounded-xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-900 my-4"><strong>Warning:</strong> <code>Init drives</code> <strong>format và xóa toàn bộ dữ liệu</strong> trên ổ được chọn. Chỉ chọn ổ dành riêng cho DirectPV, not the OS disk.</div>
+</div><div class="lang-block hidden" data-lang="en"><div class="rounded-xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-900 my-4"><strong>Warning:</strong> <code>Init drives</code> <strong>formats and erases all data</strong> on selected disks. Only select disks dedicated to DirectPV — not the OS disk.</div>
 
 <figure class="my-6"><img src="../assets/screenshots/admin-directpv-discover.png" alt="Discover" class="w-full rounded-xl border shadow-sm"></figure>
 
 <h2>Discover</h2>
 <ol>
-<li>Admin → <strong>Overall</strong> → mục <strong>DirectPV discover</strong>.</li>
-<li><strong>Discover</strong> — chạy <code>kubectl directpv discover</code>, hiển thị bảng ổ: Name, Size, Make, FS, ID.</li>
-<li>Cột <strong>Select</strong> — toggle <code>yes</code> / <code>no</code> cho từng ổ cần init.</li>
+<li>Admin → <strong>Overall</strong> → <strong>DirectPV discover</strong> section.</li>
+<li><strong>Discover</strong> — runs <code>kubectl directpv discover</code>; shows disk table: Name, Size, Make, FS, ID.</li>
+<li><strong>Select</strong> column — toggle <code>yes</code> / <code>no</code> for each disk to initialize.</li>
 </ol>
 
 <h2>Init</h2>
 <figure class="my-6"><img src="../assets/screenshots/admin-directpv-init.svg" alt="Init confirm" class="w-full rounded-xl border shadow-sm"></figure>
 <ol>
-<li><strong>Init drives</strong> — modal <strong>Initialize DirectPV drives?</strong></li>
-<li><strong>Yes, init drives</strong> — chạy <code>kubectl directpv init … --dangerous</code>.</li>
+<li><strong>Init drives</strong> — opens <strong>Initialize DirectPV drives?</strong> modal.</li>
+<li><strong>Yes, init drives</strong> — runs <code>kubectl directpv init … --dangerous</code>.</li>
 </ol>
 
-<p>Sau init, StorageClass <code>directpv-min-io</code> sẵn sàng cho PVC drive/user.</p>
+<p>After init, StorageClass <code>directpv-min-io</code> is ready for user drive PVCs.</p>
 
-<h2>CLI tương đương</h2>
+<h2>Equivalent CLI</h2>
 <pre><code>kubectl directpv discover --output-file /tmp/directpv-drives.yaml
-# chỉnh selected: true
+# set selected: true
 kubectl directpv init /tmp/directpv-drives.yaml --dangerous</code></pre>
 </div>
         </div>
       </article>
-      <dl class="mt-10 flex border-t border-slate-200 pt-6"><div class="mr-auto text-left"><dt class="text-sm text-slate-600"><div class="lang-block" data-lang="vi">Trước</div><div class="lang-block hidden" data-lang="en">Previous</div></dt><dd class="mt-1"><a href="overall.html" class="font-semibold text-slate-900 hover:underline"><div class="lang-block" data-lang="vi">Cluster overall</div><div class="lang-block hidden" data-lang="en">Cluster overall</div></a></dd></div><div class="ml-auto text-right"><dt class="text-sm text-slate-600"><div class="lang-block" data-lang="vi">Tiếp</div><div class="lang-block hidden" data-lang="en">Next</div></dt><dd class="mt-1"><a href="drives.html" class="font-semibold text-slate-900 hover:underline"><div class="lang-block" data-lang="vi">Quản lý drives</div><div class="lang-block hidden" data-lang="en">Manage drives</div></a></dd></div></dl>
+      <dl class="doc-pager"><div class="mr-auto text-left"><dt class="text-sm text-slate-600"><div class="lang-block" data-lang="vi">Trước</div><div class="lang-block hidden" data-lang="en">Previous</div></dt><dd class="mt-1"><a href="overall.html" class="font-semibold text-slate-900 hover:underline"><div class="lang-block" data-lang="vi">Cluster overall</div><div class="lang-block hidden" data-lang="en">Cluster overall</div></a></dd></div><div class="ml-auto text-right"><dt class="text-sm text-slate-600"><div class="lang-block" data-lang="vi">Tiếp</div><div class="lang-block hidden" data-lang="en">Next</div></dt><dd class="mt-1"><a href="drives.html" class="font-semibold text-slate-900 hover:underline"><div class="lang-block" data-lang="vi">Quản lý drives</div><div class="lang-block hidden" data-lang="en">Manage drives</div></a></dd></div></dl>
     </div>
   </main>
   <script src="../assets/docs.js"></script>

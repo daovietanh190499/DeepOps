@@ -1,24 +1,24 @@
-<p>Sidecar <strong>backup</strong> dùng <a href="https://rclone.org/">rclone</a> đồng bộ thư mục đã mount lên remote (Google Drive, S3, …).</p>
+<p>The <strong>backup</strong> sidecar uses <a href="https://rclone.org/">rclone</a> to sync mounted directories to remote storage (Google Drive, S3, …).</p>
 
 <figure class="my-6"><img src="../assets/screenshots/backup-tab.png" alt="Backup tab" class="w-full rounded-xl border shadow-sm"></figure>
 
-<h2>Cấu hình</h2>
+<h2>Configuration</h2>
 <ol>
-<li>Tab <strong>Backup</strong> trên modal server.</li>
-<li><strong>Cron schedule</strong> — ví dụ <code>0 2 * * *</code> (2h sáng hàng ngày).</li>
-<li><strong>Remote destination</strong> — ví dụ <code>gdrive:backups/my-server</code>.</li>
-<li><strong>rclone.conf</strong> — dán config remote → <strong>Save settings</strong>.</li>
-<li>Chọn <strong>Volumes to backup</strong> (checkbox theo mount).</li>
+<li>Open the <strong>Backup</strong> tab in the server modal.</li>
+<li><strong>Cron schedule</strong> — e.g. <code>0 2 * * *</code> (2 AM daily).</li>
+<li><strong>Remote destination</strong> — e.g. <code>gdrive:backups/my-server</code>.</li>
+<li><strong>rclone.conf</strong> — paste remote config → <strong>Save settings</strong>.</li>
+<li>Select <strong>Volumes to backup</strong> (checkbox per mount).</li>
 </ol>
 
-<h2>Hành động</h2>
+<h2>Actions</h2>
 <table>
-<thead><tr><th>Nút</th><th>Tác dụng</th></tr></thead>
+<thead><tr><th>Button</th><th>Effect</th></tr></thead>
 <tbody>
-<tr><td><strong>Schedule</strong> / <strong>Update schedule</strong></td><td>Đẩy config + enable cron trong sidecar</td></tr>
-<tr><td><strong>Backup now</strong></td><td>Chạy rclone ngay (<code>kubectl exec</code> sidecar)</td></tr>
-<tr><td><strong>Stop backup</strong></td><td>Dừng cron; sidecar container vẫn chạy</td></tr>
+<tr><td><strong>Schedule</strong> / <strong>Update schedule</strong></td><td>Push config and enable cron in the sidecar</td></tr>
+<tr><td><strong>Backup now</strong></td><td>Run rclone immediately (<code>kubectl exec</code> into sidecar)</td></tr>
+<tr><td><strong>Stop backup</strong></td><td>Stop cron; sidecar container keeps running</td></tr>
 </tbody>
 </table>
 
-<p>Status: <strong>Running…</strong>, <strong>Success</strong>, <strong>Failed</strong>, <strong>No run yet</strong>.</p>
+<p>Status values: <strong>Running…</strong>, <strong>Success</strong>, <strong>Failed</strong>, <strong>No run yet</strong>.</p>

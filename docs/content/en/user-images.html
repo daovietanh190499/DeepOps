@@ -1,33 +1,33 @@
-<p>User có thể đề xuất Docker image mới để dùng khi tạo server. Image ở trạng thái <strong>pending</strong> cho đến khi admin <strong>Accept</strong>.</p>
+<p>Users can submit new Docker images for use when creating servers. Images stay <strong>pending</strong> until an admin <strong>Accepts</strong> them.</p>
 
 <figure class="my-6"><img src="../assets/screenshots/images-submit.svg" alt="Submit image" class="w-full rounded-xl border shadow-sm"></figure>
 
-<h2>Đăng ký image</h2>
+<h2>Register an image</h2>
 <ol>
-<li>Tab <strong>My images</strong>.</li>
-<li>Điền:
+<li>Open the <strong>My images</strong> tab.</li>
+<li>Fill in:
 <ul>
-<li><strong>Label</strong> — tên hiển thị (ví dụ <code>My Overleaf</code>).</li>
-<li><strong>repository/name</strong> — ví dụ <code>myregistry/overleaf</code>.</li>
-<li><strong>Default tag</strong> — ví dụ <code>latest</code>.</li>
-<li><strong>Tags (comma-separated)</strong> — các tag khác: <code>latest,5.0.0</code>.</li>
+<li><strong>Label</strong> — display name (e.g. <code>My Overleaf</code>).</li>
+<li><strong>repository/name</strong> — e.g. <code>myregistry/overleaf</code>.</li>
+<li><strong>Default tag</strong> — e.g. <code>latest</code>.</li>
+<li><strong>Tags (comma-separated)</strong> — additional tags: <code>latest,5.0.0</code>.</li>
 </ul>
 </li>
-<li><strong>Submit image</strong>.</li>
+<li>Click <strong>Submit image</strong>.</li>
 </ol>
 
-<h2>Theo dõi trạng thái</h2>
+<h2>Track status</h2>
 <table>
-<thead><tr><th>Status</th><th>Ý nghĩa</th></tr></thead>
+<thead><tr><th>Status</th><th>Meaning</th></tr></thead>
 <tbody>
-<tr><td><code>pending</code></td><td>Wait for admin duyệt — chưa chọn được trong form Create server</td></tr>
-<tr><td><code>accepted</code></td><td>Đã duyệt — xuất hiện trong combobox Docker image</td></tr>
+<tr><td><code>pending</code></td><td>Awaiting admin approval — not selectable in Create server</td></tr>
+<tr><td><code>accepted</code></td><td>Approved — appears in the Docker image combobox</td></tr>
 </tbody>
 </table>
 
 <figure class="my-6"><img src="../assets/screenshots/images-pending.svg" alt="Pending status" class="w-full rounded-xl border shadow-sm"></figure>
 
-<h2>Xóa image đã submit</h2>
-<p>Cột <strong>Actions</strong> → <strong>Delete</strong> (chỉ image do bạn tạo).</p>
+<h2>Delete a submitted image</h2>
+<p><strong>Actions</strong> column → <strong>Delete</strong> (only for images you created).</p>
 
-<div class="rounded-xl border border-blue-200 bg-blue-50 p-4 text-sm my-4">Admin duyệt tại tab <strong>Images</strong> — xem <a href="../admin/docker-images.html">Docker images (admin)</a>.</div>
+<div class="rounded-xl border border-blue-200 bg-blue-50 p-4 text-sm my-4">Admins approve images under <strong>Images</strong> — see <a href="../admin/docker-images.html">Docker images (admin)</a>.</div>

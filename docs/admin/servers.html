@@ -32,7 +32,7 @@
     <input type="checkbox" id="navigation" class="peer hidden">
     <div class="fixed left-0 top-[3.5rem] hidden h-screen px-4 shadow-xl peer-checked:block lg:relative lg:top-0 lg:block lg:h-auto lg:flex-none lg:px-0 lg:shadow-none">
       <div class="absolute inset-y-0 right-0 w-full bg-white lg:w-72 lg:bg-slate-50"></div>
-      <nav class="sticky top-[4.5rem] w-64 pr-8 text-sm xl:w-72 xl:pr-16"><ul role="list" class="-ml-0.5 h-[calc(100vh-4.5rem)] overflow-y-auto py-7 pl-0.5 space-y-8">
+      <nav class="doc-nav sticky top-[4.5rem] w-64 pr-8 text-sm xl:w-72 xl:pr-16"><ul role="list" class="-ml-0.5 h-[calc(100vh-4.5rem)] overflow-y-auto py-7 pl-0.5 space-y-8">
 <li><h3 class="font-semibold tracking-tight text-slate-900"><div class="lang-block" data-lang="vi">Bắt đầu</div><div class="lang-block hidden" data-lang="en">Getting started</div></h3>
 <ul role="list" class="pl-3 mt-3 space-y-2">
 <li><a href="../index.html" class="text-slate-600 hover:text-slate-900"><div class="lang-block" data-lang="vi">Tổng quan</div><div class="lang-block hidden" data-lang="en">Overview</div></a></li>
@@ -70,12 +70,12 @@
     </div>
     <div class="min-w-0 flex-auto max-w-3xl px-4 py-10 lg:max-w-none lg:pl-8 lg:pr-0 xl:px-16">
       <article>
-        <header>
+        <header class="doc-article-header">
           <p class="text-sm font-medium text-slate-500"><div class="lang-block" data-lang="vi">Quản trị viên</div><div class="lang-block hidden" data-lang="en">Administrator</div></p>
           <h1 class="text-3xl font-bold tracking-tight text-slate-900"><div class="lang-block" data-lang="vi">Quản lý servers (admin)</div><div class="lang-block hidden" data-lang="en">Manage servers</div></h1>
           <p class="mt-2 text-lg text-slate-600"><div class="lang-block" data-lang="vi">Xem, start, stop, delete workspace của mọi user.</div><div class="lang-block hidden" data-lang="en">View all workspaces across users.</div></p>
         </header>
-        <div class="mt-8 doc-body prose prose-slate max-w-none prose-headings:font-semibold prose-a:text-blue-600">
+        <div class="mt-8 doc-body prose prose-slate max-w-none prose-headings:font-semibold prose-a:text-blue-600 prose-li:my-1">
 <div class="lang-block" data-lang="vi"><figure class="my-6"><img src="../assets/screenshots/admin-servers.png" alt="Admin servers" class="w-full rounded-xl border shadow-sm"></figure>
 
 <p>Sub-tab <strong>Servers</strong> liệt kê workspace toàn hệ thống với owner <code>@username</code>.</p>
@@ -95,25 +95,25 @@
 <p>Sub-tab <strong>Catalog</strong> — quản lý template và equipment: xem <a href="templates.html">Server templates</a>.</p>
 </div><div class="lang-block hidden" data-lang="en"><figure class="my-6"><img src="../assets/screenshots/admin-servers.png" alt="Admin servers" class="w-full rounded-xl border shadow-sm"></figure>
 
-<p>Sub-tab <strong>Servers</strong> liệt kê workspace toàn hệ thống với owner <code>@username</code>.</p>
+<p>The <strong>Servers</strong> sub-tab lists all workspaces system-wide with owner <code>@username</code>.</p>
 
-<h2>Filter</h2>
+<h2>Filters</h2>
 <ul>
 <li>Username, server name, resource group.</li>
 </ul>
 
-<h2>Thao tác</h2>
+<h2>Actions</h2>
 <ul>
-<li><strong>Start</strong> / <strong>Stop</strong> / <strong>Delete</strong> — giống user view.</li>
-<li>Click card → modal chi tiết (logs, terminal, …) như user.</li>
-<li>Bulk: <strong>Start servers</strong>, <strong>Stop servers</strong>, <strong>Delete servers</strong> với xác nhận.</li>
+<li><strong>Start</strong> / <strong>Stop</strong> / <strong>Delete</strong> — same as user view.</li>
+<li>Click a card → detail modal (logs, terminal, …) like the user view.</li>
+<li>Bulk: <strong>Start servers</strong>, <strong>Stop servers</strong>, <strong>Delete servers</strong> with confirmation.</li>
 </ul>
 
-<p>Sub-tab <strong>Catalog</strong> — quản lý template và equipment: xem <a href="templates.html">Server templates</a>.</p>
+<p>The <strong>Catalog</strong> sub-tab manages templates and equipment — see <a href="templates.html">Server templates</a>.</p>
 </div>
         </div>
       </article>
-      <dl class="mt-10 flex border-t border-slate-200 pt-6"><div class="mr-auto text-left"><dt class="text-sm text-slate-600"><div class="lang-block" data-lang="vi">Trước</div><div class="lang-block hidden" data-lang="en">Previous</div></dt><dd class="mt-1"><a href="drives.html" class="font-semibold text-slate-900 hover:underline"><div class="lang-block" data-lang="vi">Quản lý drives</div><div class="lang-block hidden" data-lang="en">Manage drives</div></a></dd></div><div class="ml-auto text-right"><dt class="text-sm text-slate-600"><div class="lang-block" data-lang="vi">Tiếp</div><div class="lang-block hidden" data-lang="en">Next</div></dt><dd class="mt-1"><a href="templates.html" class="font-semibold text-slate-900 hover:underline"><div class="lang-block" data-lang="vi">Server templates</div><div class="lang-block hidden" data-lang="en">Server templates</div></a></dd></div></dl>
+      <dl class="doc-pager"><div class="mr-auto text-left"><dt class="text-sm text-slate-600"><div class="lang-block" data-lang="vi">Trước</div><div class="lang-block hidden" data-lang="en">Previous</div></dt><dd class="mt-1"><a href="drives.html" class="font-semibold text-slate-900 hover:underline"><div class="lang-block" data-lang="vi">Quản lý drives</div><div class="lang-block hidden" data-lang="en">Manage drives</div></a></dd></div><div class="ml-auto text-right"><dt class="text-sm text-slate-600"><div class="lang-block" data-lang="vi">Tiếp</div><div class="lang-block hidden" data-lang="en">Next</div></dt><dd class="mt-1"><a href="templates.html" class="font-semibold text-slate-900 hover:underline"><div class="lang-block" data-lang="vi">Server templates</div><div class="lang-block hidden" data-lang="en">Server templates</div></a></dd></div></dl>
     </div>
   </main>
   <script src="../assets/docs.js"></script>
