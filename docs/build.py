@@ -4,13 +4,45 @@
 from __future__ import annotations
 
 import html
+import os
 import re
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent
 CONTENT = ROOT / 'content'
 ASSETS = ROOT / 'assets'
-SITE_URL = 'https://daovietanh190499.github.io/DeepOps/'
+# GitHub Pages: https://<user>.github.io/DeepOps/docs/
+SITE_URL = 'https://daovietanh190499.github.io/DeepOps/docs/'
+
+
+def page_dir(href: str) -> Path:
+    return Path(href).parent
+
+
+def rel_link(from_href: str, to_href: str) -> str:
+    """Relative URL from one generated page to another (works under /DeepOps/docs/)."""
+    start = page_dir(from_href)
+    target = Path(to_href)
+    rel = os.path.relpath(target, start=start if str(start) != '.' else '.')
+    return rel.replace('\\', '/')
+
+
+def asset_prefix(href: str) -> str:
+    """Prefix for assets/ from a page at href (e.g. '' or '../')."""
+    parts = page_dir(href).parts
+    if not parts or parts == ('.',):
+        return ''
+    return '../' * len(parts)
+
+
+PROSE_CLASSES = (
+    'prose prose-slate mt-8 max-w-none prose-headings:font-semibold prose-a:text-blue-600 '
+    'prose-code:rounded prose-code:bg-slate-100 prose-code:px-1 '
+    'prose-code:before:content-none prose-code:after:content-none '
+    'prose-pre:bg-slate-900 prose-pre:text-slate-100 '
+    'prose-pre:[&_code]:bg-transparent prose-pre:[&_code]:text-slate-100 '
+    'prose-pre:[&_code]:p-0 prose-pre:[&_code]:before:content-none prose-pre:[&_code]:after:content-none'
+)
 
 NAV = [
     {
@@ -104,20 +136,7 @@ def render_nav(current_href: str) -> str:
         parts.append('<ul role="list" class="pl-3 mt-3 space-y-2">')
         for href, label in section['items']:
             cls = 'text-blue-700 font-semibold' if href == current_href else 'text-slate-600 hover:text-slate-900'
-            depth = '../' * href.count('/')
-            link = depth + href if href != 'index.html' else (depth + 'index.html' if current_href != 'index.html' else 'index.html')
-            if current_href == 'index.html' and href == 'index.html':
-                link = 'index.html'
-            elif '/' in current_href and href == 'index.html':
-                link = '../index.html'
-            elif '/' in current_href and '/' not in href and href != 'index.html':
-                link = f'../{href}'
-            elif '/' in current_href and '/' in href:
-                link = '../' + href.split('/', 1)[1] if href.startswith('user/') or href.startswith('admin/') or href.startswith('apps/') else '../' + href
-            # normalize: from user/x.html to admin/y.html -> ../admin/y.html
-            if current_href.count('/') >= 1:
-                prefix = '../' * current_href.count('/')
-                link = prefix + href
+            link = rel_link(current_href, href)
             parts.append(f'<li><a href="{link}" class="{cls}">{html.escape(label)}</a></li>')
         parts.append('</ul></li>')
     parts.append('</ul>')
@@ -127,15 +146,14 @@ def render_nav(current_href: str) -> str:
 def prev_next(current_href: str) -> tuple[str | None, str | None, str | None, str | None]:
     pages = _flatten_nav()
     idx = next(i for i, p in enumerate(pages) if p[0] == current_href)
-    prefix = '../' * current_href.count('/')
     prev_h, prev_l = (None, None)
     next_h, next_l = (None, None)
     if idx > 0:
-        prev_h, prev_l = pages[idx - 1][0], pages[idx - 1][1]
-        prev_h = prefix + prev_h
+        prev_h = rel_link(current_href, pages[idx - 1][0])
+        prev_l = pages[idx - 1][1]
     if idx < len(pages) - 1:
-        next_h, next_l = pages[idx + 1][0], pages[idx + 1][1]
-        next_h = prefix + next_h
+        next_h = rel_link(current_href, pages[idx + 1][0])
+        next_l = pages[idx + 1][1]
     return prev_h, prev_l, next_h, next_l
 
 
@@ -147,7 +165,7 @@ def render_page(
     subtitle: str,
     body: str,
 ) -> str:
-    depth = '../' * href.count('/')
+    depth = asset_prefix(href)
     prev_h, prev_l, next_h, next_l = prev_next(href)
     nav = render_nav(href)
     prev_block = ''
@@ -181,7 +199,7 @@ def render_page(
 </head>
 <body class="bg-slate-50 text-slate-800 antialiased">
   <header class="sticky top-0 z-50 flex items-center justify-between border-b border-slate-200 bg-white/95 px-4 py-2 shadow-sm backdrop-blur-sm">
-    <a href="{depth}index.html" class="flex items-center gap-2.5">
+    <a href="{rel_link(href, 'index.html')}" class="flex items-center gap-2.5">
       <img src="{depth}assets/logo.png" alt="Dohub" class="h-9 w-9 rounded-lg object-contain">
       <span class="text-lg font-bold tracking-tight text-slate-900">Dohub <span class="font-medium text-slate-500">Docs</span></span>
     </a>
@@ -203,7 +221,7 @@ def render_page(
           <h1 class="text-3xl font-bold tracking-tight text-slate-900">{html.escape(title)}</h1>
           <p class="mt-2 text-lg text-slate-600">{html.escape(subtitle)}</p>
         </header>
-        <div class="prose prose-slate mt-8 max-w-none prose-headings:font-semibold prose-a:text-blue-600 prose-code:rounded prose-code:bg-slate-100 prose-code:px-1 prose-pre:bg-slate-900">
+        <div class="{PROSE_CLASSES}">
 {body}
         </div>
       </article>
@@ -214,15 +232,27 @@ def render_page(
 </html>'''
 
 
-def load_fragment(name: str) -> str:
+def rewrite_body_assets(body: str, href: str) -> str:
+    """Rewrite content asset paths for the page location under docs/."""
+    prefix = asset_prefix(href)
+    if not prefix:
+        return body
+    # content fragments use ../assets — from subdirs that's correct; from root use assets/
+    return body.replace('../assets/', f'{prefix}assets/')
+
+
+def load_fragment(name: str, *, page_href: str = '') -> str:
     path = CONTENT / name
     if path.exists():
-        return path.read_text(encoding='utf-8')
+        text = path.read_text(encoding='utf-8')
+        if page_href:
+            text = rewrite_body_assets(text, page_href)
+        return text
     return f'<p><em>Missing content: {html.escape(name)}</em></p>'
 
 
 def convert_installation() -> str:
-    return load_fragment('installation.html')
+    return load_fragment('installation.html', page_href='installation.html')
 
 
 PAGES: list[dict] = []
@@ -245,7 +275,7 @@ def build_index() -> None:
             if href == 'index.html':
                 continue
             cards.append(
-                f'<li><a href="{href}" class="block rounded-xl border border-slate-200 bg-white px-5 py-4 shadow-sm hover:border-blue-300 hover:shadow-md">'
+                f'<li><a href="{rel_link("index.html", href)}" class="block rounded-xl border border-slate-200 bg-white px-5 py-4 shadow-sm hover:border-blue-300 hover:shadow-md">'
                 f'<p class="text-xs font-semibold uppercase tracking-wide text-slate-400">{html.escape(sec["title"])}</p>'
                 f'<p class="mt-1 font-bold text-slate-900">{html.escape(label)}</p></a></li>'
             )
@@ -290,7 +320,7 @@ def main() -> None:
             meta['section'],
             meta['title'],
             meta['subtitle'],
-            fragment.read_text(encoding='utf-8'),
+            rewrite_body_assets(fragment.read_text(encoding='utf-8'), meta['href']),
         )
 
     legacy_install = ROOT / 'installation.html'

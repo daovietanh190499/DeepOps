@@ -6,7 +6,7 @@ Nền tảng hub quản lý và spawn workspace **code-server** (và container t
 
 ## Tài liệu
 
-**Wiki đầy đủ (GitHub Pages):** [https://daovietanh190499.github.io/DeepOps/](https://daovietanh190499.github.io/DeepOps/)
+**Wiki đầy đủ (GitHub Pages):** [https://daovietanh190499.github.io/DeepOps/docs/](https://daovietanh190499.github.io/DeepOps/docs/)
 
 Bao gồm: cài đặt cluster, hướng dẫn user/admin từng tính năng, Keycloak và Overleaf.
 

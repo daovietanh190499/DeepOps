@@ -1,7 +1,0 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="720" viewBox="0 0 1280 720">
-  <rect width="1280" height="720" fill="#f8fafc"/>
-  <rect x="40" y="40" width="1200" height="640" rx="16" fill="#0f172a" opacity="0.04" stroke="#cbd5e1"/>
-  <text x="640" y="300" text-anchor="middle" font-family="system-ui,sans-serif" font-size="42" font-weight="700" fill="#0f172a">Dohub Docs</text>
-  <text x="640" y="360" text-anchor="middle" font-family="system-ui,sans-serif" font-size="22" fill="#64748b">Trạng thái pending</text>
-  <text x="640" y="420" text-anchor="middle" font-family="ui-monospace,monospace" font-size="16" fill="#94a3b8">images-pending.png — chạy scripts/capture_screenshots.py để thay ảnh thật</text>
-</svg>

@@ -354,20 +354,26 @@ def capture_user_flow(page) -> None:
     shot(page, 'servers-list')
     delete_demo_server_if_exists(page)
 
-    page.get_by_role('button', name='Create server', exact=True).click()
-    wait_vue(page, 2000)
-    fill_input_placeholder(page, 'My workspace', DEMO_SERVER)
-    shot(page, 'servers-create-modal')
-    page.evaluate('window.scrollTo(0, 400)')
-    wait_vue(page, 500)
-    shot(page, 'servers-form-fields')
-    domain_label = page.locator('label:has-text("Service domain")')
-    if domain_label.count():
-        domain_label.first.scroll_into_view_if_needed()
+    demo_card = page.locator('.dohub-workspace-card').filter(
+        has=page.get_by_role('heading', name=DEMO_SERVER, exact=True)
+    )
+    if demo_card.count():
+        print(f'using existing {DEMO_SERVER}', flush=True)
+    else:
+        page.get_by_role('button', name='Create server', exact=True).click()
+        wait_vue(page, 2000)
+        fill_input_placeholder(page, 'My workspace', DEMO_SERVER)
+        shot(page, 'servers-create-modal')
+        page.evaluate('window.scrollTo(0, 400)')
         wait_vue(page, 500)
-        shot(page, 'custom-domain')
-    page.get_by_role('button', name='Create server', exact=True).last.click()
-    wait_vue(page, 5000)
+        shot(page, 'servers-form-fields')
+        domain_label = page.locator('label:has-text("Service domain")')
+        if domain_label.count():
+            domain_label.first.scroll_into_view_if_needed()
+            wait_vue(page, 500)
+            shot(page, 'custom-domain')
+        page.get_by_role('button', name='Create server', exact=True).last.click()
+        wait_vue(page, 5000)
 
     open_workspace_detail(page, DEMO_SERVER)
 
@@ -386,6 +392,17 @@ def capture_user_flow(page) -> None:
     wait_vue(page, 500)
     shot(page, 'port-expose')
 
+    page.keyboard.press('Escape')
+    wait_vue(page, 1000)
+    demo_card = page.locator('.dohub-workspace-card').filter(
+        has=page.get_by_role('heading', name=DEMO_SERVER, exact=True)
+    ).first
+    stop_btn = demo_card.get_by_role('button', name='Stop', exact=True)
+    if stop_btn.count():
+        stop_btn.click()
+        wait_vue(page, 8000)
+    open_workspace_detail(page, DEMO_SERVER)
+    click_modal_tab(page, 'General')
     edit_btn = page.locator('.dohub-modal-panel').get_by_role('button', name='Edit', exact=True)
     if edit_btn.count():
         edit_btn.click()
@@ -398,44 +415,67 @@ def capture_user_flow(page) -> None:
     wait_vue(page, 1000)
     shot(page, 'servers-start-stop')
 
-    card = page.locator('.dohub-workspace-card').filter(has_text=DEMO_SERVER).first
-    card.locator('button[title="Delete"]').click(force=True)
-    wait_vue(page)
-    page.locator('input[placeholder="delete"]').fill('delete')
-    shot(page, 'servers-delete-modal')
-    page.get_by_role('button', name='Delete', exact=True).last.click(force=True)
-    wait_vue(page, 2000)
+    try:
+        card = page.locator('.dohub-workspace-card').filter(
+            has=page.get_by_role('heading', name=DEMO_SERVER, exact=True)
+        ).first
+        card.locator('button[title="Delete"]').click(force=True, timeout=10000)
+        wait_vue(page)
+        page.locator('input[placeholder="delete"]').fill('delete')
+        shot(page, 'servers-delete-modal')
+        page.get_by_role('button', name='Delete', exact=True).last.click(force=True)
+        wait_vue(page, 2000)
+    except Exception as exc:
+        print(f'could not capture servers-delete-modal: {exc}', flush=True)
 
     # Images
-    click_tab(page, 'My images')
-    shot(page, 'images-submit')
-    fill_input_placeholder(page, 'Label', DEMO_IMAGE_LABEL)
-    page.locator('input[placeholder="repository/name"]').fill('codercom/code-server')
-    page.locator('input[placeholder="Default tag"]').fill('latest')
-    page.locator('input[placeholder="Tags (comma-separated)"]').fill('latest')
-    page.get_by_role('button', name='Submit image', exact=True).click()
-    wait_vue(page, 2000)
-    shot(page, 'images-pending')
-
-    if page.get_by_role('button', name='Delete', exact=True).count():
-        page.get_by_role('button', name='Delete', exact=True).first.click()
-        wait_vue(page)
+    try:
+        click_tab(page, 'My images')
+        shot(page, 'images-submit')
+        fill_input_placeholder(page, 'Label', DEMO_IMAGE_LABEL)
+        page.locator('input[placeholder="repository/name"]').fill('codercom/code-server')
+        page.locator('input[placeholder="Default tag"]').fill('latest')
+        page.locator('input[placeholder="Tags (comma-separated)"]').fill('latest')
+        page.get_by_role('button', name='Submit image', exact=True).click()
+        wait_vue(page, 2000)
+        shot(page, 'images-pending')
+        if page.get_by_role('button', name='Delete', exact=True).count():
+            page.get_by_role('button', name='Delete', exact=True).first.click()
+            wait_vue(page)
+    except Exception as exc:
+        print(f'images section skipped: {exc}', flush=True)
 
 
 def delete_demo_server_if_exists(page) -> None:
-    card = page.locator('.dohub-workspace-card').filter(has_text=DEMO_SERVER)
-    if not card.count():
-        return
-    card.first.locator('button[title="Delete"]').click(force=True)
-    wait_vue(page)
-    page.locator('input[placeholder="delete"]').fill('delete')
-    page.get_by_role('button', name='Delete', exact=True).last.click(force=True)
-    wait_vue(page, 3000)
+    try:
+        cards = page.locator('.dohub-workspace-card').filter(
+            has=page.get_by_role('heading', name=DEMO_SERVER, exact=True)
+        )
+        if not cards.count():
+            return
+        del_btn = cards.first.locator('button[title="Delete"]')
+        if not del_btn.count():
+            print(f'skip delete {DEMO_SERVER} (no delete button)', flush=True)
+            return
+        del_btn.click(force=True, timeout=10000)
+        wait_vue(page)
+        confirm = page.locator('input[placeholder="delete"]')
+        confirm.wait_for(state='visible', timeout=15000)
+        confirm.fill('delete')
+        page.get_by_role('button', name='Delete', exact=True).last.click(force=True)
+        wait_vue(page, 3000)
+    except Exception as exc:
+        print(f'could not delete {DEMO_SERVER}: {exc}', flush=True)
 
 
 def capture_admin_flow(page) -> None:
     storage = AUTH / 'admin.json'
     ensure_dohub_login(page, ADMIN_USER, ADMIN_PASS, storage=storage, role='admin')
+    page.goto(DOHUB, wait_until='domcontentloaded', timeout=60000)
+    wait_vue(page, 3000)
+    if not verify_dohub_session(page, ADMIN_USER, admin=True):
+        print('ADMIN: bỏ qua — session admin hết hạn, cập nhật DOCS_ADMIN_COOKIE', file=sys.stderr)
+        return
     install_directpv_safety(page)
 
     shot_directpv_section(page)

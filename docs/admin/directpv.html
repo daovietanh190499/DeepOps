@@ -50,14 +50,14 @@
 </ul></li>
 <li><h3 class="font-semibold tracking-tight text-slate-900">Quản trị viên</h3>
 <ul role="list" class="pl-3 mt-3 space-y-2">
-<li><a href="../admin/overall.html" class="text-slate-600 hover:text-slate-900">Cluster overall</a></li>
-<li><a href="../admin/directpv.html" class="text-blue-700 font-semibold">DirectPV discover &amp; init</a></li>
-<li><a href="../admin/drives.html" class="text-slate-600 hover:text-slate-900">Quản lý drives</a></li>
-<li><a href="../admin/servers.html" class="text-slate-600 hover:text-slate-900">Quản lý servers</a></li>
-<li><a href="../admin/templates.html" class="text-slate-600 hover:text-slate-900">Server templates</a></li>
-<li><a href="../admin/users.html" class="text-slate-600 hover:text-slate-900">Users &amp; accept</a></li>
-<li><a href="../admin/groups.html" class="text-slate-600 hover:text-slate-900">Resource groups</a></li>
-<li><a href="../admin/docker-images.html" class="text-slate-600 hover:text-slate-900">Docker images</a></li>
+<li><a href="overall.html" class="text-slate-600 hover:text-slate-900">Cluster overall</a></li>
+<li><a href="directpv.html" class="text-blue-700 font-semibold">DirectPV discover &amp; init</a></li>
+<li><a href="drives.html" class="text-slate-600 hover:text-slate-900">Quản lý drives</a></li>
+<li><a href="servers.html" class="text-slate-600 hover:text-slate-900">Quản lý servers</a></li>
+<li><a href="templates.html" class="text-slate-600 hover:text-slate-900">Server templates</a></li>
+<li><a href="users.html" class="text-slate-600 hover:text-slate-900">Users &amp; accept</a></li>
+<li><a href="groups.html" class="text-slate-600 hover:text-slate-900">Resource groups</a></li>
+<li><a href="docker-images.html" class="text-slate-600 hover:text-slate-900">Docker images</a></li>
 </ul></li>
 <li><h3 class="font-semibold tracking-tight text-slate-900">Ứng dụng trên Dohub</h3>
 <ul role="list" class="pl-3 mt-3 space-y-2">
@@ -73,7 +73,7 @@
           <h1 class="text-3xl font-bold tracking-tight text-slate-900">DirectPV discover &amp; init</h1>
           <p class="mt-2 text-lg text-slate-600">Khám phá ổ đĩa raw và khởi tạo cho DirectPV (xóa dữ liệu ổ).</p>
         </header>
-        <div class="prose prose-slate mt-8 max-w-none prose-headings:font-semibold prose-a:text-blue-600 prose-code:rounded prose-code:bg-slate-100 prose-code:px-1 prose-pre:bg-slate-900">
+        <div class="prose prose-slate mt-8 max-w-none prose-headings:font-semibold prose-a:text-blue-600 prose-code:rounded prose-code:bg-slate-100 prose-code:px-1 prose-code:before:content-none prose-code:after:content-none prose-pre:bg-slate-900 prose-pre:text-slate-100 prose-pre:[&_code]:bg-transparent prose-pre:[&_code]:text-slate-100 prose-pre:[&_code]:p-0 prose-pre:[&_code]:before:content-none prose-pre:[&_code]:after:content-none">
 <div class="rounded-xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-900 my-4"><strong>Cảnh báo:</strong> <code>Init drives</code> <strong>format và xóa toàn bộ dữ liệu</strong> trên ổ được chọn. Chỉ chọn ổ dành riêng cho DirectPV, không phải OS disk.</div>
 
 <figure class="my-6"><img src="../assets/screenshots/admin-directpv-discover.png" alt="Discover" class="w-full rounded-xl border shadow-sm"></figure>
@@ -101,7 +101,7 @@ kubectl directpv init /tmp/directpv-drives.yaml --dangerous</code></pre>
 
         </div>
       </article>
-      <dl class="mt-10 flex border-t border-slate-200 pt-6"><div class="mr-auto text-left"><dt class="text-sm text-slate-600">Trước</dt><dd class="mt-1"><a href="../admin/overall.html" class="font-semibold text-slate-900 hover:underline">Cluster overall</a></dd></div><div class="ml-auto text-right"><dt class="text-sm text-slate-600">Tiếp</dt><dd class="mt-1"><a href="../admin/drives.html" class="font-semibold text-slate-900 hover:underline">Quản lý drives</a></dd></div></dl>
+      <dl class="mt-10 flex border-t border-slate-200 pt-6"><div class="mr-auto text-left"><dt class="text-sm text-slate-600">Trước</dt><dd class="mt-1"><a href="overall.html" class="font-semibold text-slate-900 hover:underline">Cluster overall</a></dd></div><div class="ml-auto text-right"><dt class="text-sm text-slate-600">Tiếp</dt><dd class="mt-1"><a href="drives.html" class="font-semibold text-slate-900 hover:underline">Quản lý drives</a></dd></div></dl>
     </div>
   </main>
 </body>

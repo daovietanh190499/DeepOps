@@ -2,7 +2,7 @@
 
 Static documentation site for [Dohub](https://iaihub.uet.edu.vn), published via GitHub Pages:
 
-**https://daovietanh190499.github.io/DeepOps/**
+**https://daovietanh190499.github.io/DeepOps/docs/**
 
 ## Cấu trúc
 
@@ -42,7 +42,7 @@ Placeholder SVG được tạo bằng:
 python3 scripts/make_placeholder.py
 ```
 
-Thay bằng screenshot PNG cùng tên (bỏ `.svg`, dùng `.png`) và cập nhật thẻ `<img>` trong content nếu cần.
+Thay bằng screenshot PNG cùng tên trong `assets/screenshots/` (chỉ `.png`, không dùng `.svg`).
 
 Script chụp ảnh (Playwright):
 
