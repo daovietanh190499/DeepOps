@@ -1424,6 +1424,9 @@
                     <spec-row label="Pull policy" :value="modalWorkspace.image_pull_policy || 'IfNotPresent'"></spec-row>
                     <spec-row label="Ports" :value="(modalWorkspace.exposed_ports || []).join(', ') || '8080'"></spec-row>
                     <spec-row label="Command" :value="formatContainerCommand(modalWorkspace.container_command)"></spec-row>
+                    <spec-row v-if="modalWorkspace.init_container_enabled"
+                              label="Init container"
+                              :value="modalInitContainerSummary"></spec-row>
                 </div>
                 <div>
                     <p class="mb-2 font-semibold text-slate-700">Environment variables</p>
@@ -2107,6 +2110,33 @@
                             <input v-model="form.command_text" type="text" placeholder="leave empty for image default"
                                    class="mt-1 w-full rounded-lg border px-3 py-2 text-sm font-mono">
                         </div>
+                        <div class="rounded-lg border border-slate-200 bg-slate-50/60 p-3 space-y-3">
+                            <label class="flex items-start gap-3 cursor-pointer">
+                                <input v-model="form.init_container_enabled" type="checkbox" class="mt-0.5 rounded border-slate-300">
+                                <span>
+                                    <span class="text-sm font-medium text-slate-700">Init container</span>
+                                    <span class="block text-xs text-slate-500 mt-0.5">Run one init container before the main container starts. It uses the <strong>same volume mounts and environment variables</strong> as the main container.</span>
+                                </span>
+                            </label>
+                            <div v-if="form.init_container_enabled" class="space-y-3 pl-7 border-l-2 border-slate-200">
+                                <div>
+                                    <label class="text-sm font-medium text-slate-600">Init container image</label>
+                                    <select v-model="form.init_container_image_source"
+                                            class="mt-1 w-full rounded-lg border px-3 py-2 text-sm font-mono bg-white">
+                                        <option value="busybox">busybox:1.36</option>
+                                        <option v-if="initContainerMainImageAvailable" value="main"
+                                                v-text="'Same as main (' + form.docker_repository + ':' + form.docker_tag + ')'"></option>
+                                    </select>
+                                    <p v-if="!initContainerMainImageAvailable" class="mt-1 text-xs text-slate-500">Select a Docker image above to use the main container image for the init container.</p>
+                                </div>
+                                <div>
+                                    <label class="text-sm font-medium text-slate-600">Init container command (space-separated)</label>
+                                    <input v-model="form.init_container_command_text" type="text"
+                                           placeholder="e.g. sh -c &quot;mkdir -p /home/coder/data&quot;"
+                                           class="mt-1 w-full rounded-lg border px-3 py-2 text-sm font-mono bg-white">
+                                </div>
+                            </div>
+                        </div>
                         <div>
                             <label class="text-sm font-medium text-slate-600">Environment variables</label>
                             <p class="mt-1 text-xs text-slate-500">Click a row to load it into the editor. Long keys and values wrap instead of overflowing.</p>
@@ -2167,6 +2197,7 @@
                             <spec-row label="Pull policy" :value="form.image_pull_policy || 'IfNotPresent'"></spec-row>
                             <spec-row label="Ports" :value="form.ports_text || '8080'"></spec-row>
                             <spec-row label="Command" :value="form.command_text || '(default)'"></spec-row>
+                            <spec-row label="Init container" :value="form.init_container_enabled ? (initContainerImageLabel + (form.init_container_command_text ? ' · ' + form.init_container_command_text : '')) : 'disabled'"></spec-row>
                             <spec-row label="ENV" :value="Object.keys(form.env_vars).length + ' variable(s)'"></spec-row>
                         </div>
                         <p v-if="runError" class="text-sm text-rose-600" v-text="runError"></p>

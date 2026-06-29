@@ -6,6 +6,9 @@ from .config import get_hub_config
 from .gpu_resources import parse_gpu_resources
 from .k8s_env import CODEHUB_CHART_PATH, DEFAULT_PORT, DOMAIN_NAME, NAMESPACE
 
+USER_INIT_BUSYBOX_REPO = os.environ.get('USER_INIT_BUSYBOX_REPO', 'busybox')
+USER_INIT_BUSYBOX_TAG = os.environ.get('USER_INIT_BUSYBOX_TAG', '1.36')
+
 
 def _storage_class() -> str:
     return get_hub_config().get('storage', {}).get('storageClassName', 'directpv-min-io')
@@ -105,6 +108,28 @@ def build_spawn_config(workspace) -> dict:
     cm_name = file_mounts_configmap_name(workspace)
     cm_volumes, cm_volume_mounts = build_configmap_volume_specs(file_mount_rows, cm_name)
 
+    user_init_container = None
+    if workspace.init_container_enabled:
+        use_main = (
+            workspace.init_container_image_source == workspace.INIT_IMAGE_MAIN
+            and (workspace.docker_repository or '').strip()
+        )
+        if use_main:
+            init_repo = workspace.docker_repository
+            init_tag = workspace.docker_tag
+            init_pull = workspace.image_pull_policy or 'IfNotPresent'
+        else:
+            init_repo = USER_INIT_BUSYBOX_REPO
+            init_tag = USER_INIT_BUSYBOX_TAG
+            init_pull = 'IfNotPresent'
+        user_init_container = {
+            'enabled': True,
+            'repository': init_repo,
+            'tag': init_tag,
+            'pull_policy': init_pull,
+            'command': list(workspace.init_container_command or []),
+        }
+
     return {
         'workspace_id': str(workspace.id),
         'username': user.username,
@@ -137,6 +162,7 @@ def build_spawn_config(workspace) -> dict:
         'exec_shell': workspace.exec_shell or 'bash',
         'backup_secret_name': backup_secret_name(workspace),
         'node_hostname': (workspace.node_hostname or '').strip(),
+        'user_init_container': user_init_container,
     }
 
 
@@ -246,21 +272,9 @@ def _helm_base_cmd(config: dict) -> list[str]:
     env_vars = dict(config.get('env_vars', {}))
     if env_vars.get('password'):
         env_vars['PASSWORD'] = env_vars.pop('password')
-    has_auth = False
     for key in ('PASSWORD', 'HASHED_PASSWORD'):
         if env_vars.get(key):
             cmd.extend(['--set-string', f'env.secret.{key}={env_vars.pop(key)}'])
-            has_auth = True
-    if has_auth:
-        cmd.extend(['--set', 'auth.resetConfigOnDeploy=true'])
-        if pvc_volume_mounts:
-            first_mount = pvc_volume_mounts[0]
-            cmd.extend([
-                '--set-string', f'auth.resetVolumeName={first_mount["name"]}',
-                '--set-string', f'auth.resetMountPath={first_mount["mountPath"]}',
-            ])
-            if first_mount.get('subPath'):
-                cmd.extend(['--set-string', f'auth.resetSubPath={first_mount["subPath"]}'])
 
     env_list = [{'name': k, 'value': str(v)} for k, v in env_vars.items()]
     if env_list:
@@ -289,6 +303,21 @@ def _helm_base_cmd(config: dict) -> list[str]:
     )
     cmd.extend(['--set-json', f'volumes={json.dumps(volumes)}'])
     cmd.extend(['--set-json', f'volumeMounts={json.dumps(volume_mounts)}'])
+
+    user_init = config.get('user_init_container')
+    if user_init and user_init.get('enabled'):
+        cmd.extend([
+            '--set', 'userInitContainer.enabled=true',
+            '--set-string', f'userInitContainer.image.repository={user_init["repository"]}',
+            '--set-string', f'userInitContainer.image.tag={user_init["tag"]}',
+            '--set', f'userInitContainer.image.pullPolicy={user_init.get("pull_policy", "IfNotPresent")}',
+            '--set-json', f'userInitContainer.volumeMounts={json.dumps(volume_mounts)}',
+        ])
+        init_cmd = user_init.get('command') or []
+        if init_cmd:
+            cmd.extend(['--set-json', f'userInitContainer.command={json.dumps(init_cmd)}'])
+    else:
+        cmd.extend(['--set', 'userInitContainer.enabled=false'])
 
     cmd.extend([
         '--set', 'sidecars.always=true',

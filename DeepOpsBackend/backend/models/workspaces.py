@@ -191,6 +191,22 @@ class Workspace(models.Model):
     backup_folders = models.JSONField(default=list, blank=True)
     backup_rclone_config = models.TextField(blank=True, default='')
     container_command = models.JSONField(default=_default_command, blank=True)
+    INIT_IMAGE_MAIN = 'main'
+    INIT_IMAGE_BUSYBOX = 'busybox'
+    INIT_IMAGE_CHOICES = (
+        (INIT_IMAGE_MAIN, 'main'),
+        (INIT_IMAGE_BUSYBOX, 'busybox'),
+    )
+    init_container_enabled = models.BooleanField(
+        default=False,
+        help_text='Run a single user-defined initContainer before the main container',
+    )
+    init_container_image_source = models.CharField(
+        max_length=16,
+        choices=INIT_IMAGE_CHOICES,
+        default=INIT_IMAGE_BUSYBOX,
+    )
+    init_container_command = models.JSONField(default=_default_command, blank=True)
     privileged = models.BooleanField(
         default=False,
         help_text='Run code-server container with securityContext.privileged=true',
@@ -283,6 +299,9 @@ class Workspace(models.Model):
             'exposed_ports': self.exposed_ports or [],
             'ws_tunnel_ports': self.ws_tunnel_ports if isinstance(self.ws_tunnel_ports, list) else [],
             'container_command': self.container_command or [],
+            'init_container_enabled': self.init_container_enabled,
+            'init_container_image_source': self.init_container_image_source or self.INIT_IMAGE_BUSYBOX,
+            'init_container_command': self.init_container_command or [],
             'privileged': self.privileged,
             'custom_hostname': (self.custom_hostname or '').strip(),
             'default_hostname': self.default_hostname,

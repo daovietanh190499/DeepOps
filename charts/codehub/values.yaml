@@ -144,14 +144,15 @@ secret:
 env:
   secret: {}
 
-# When true and PASSWORD is in env.secret, remove stale config.yaml on PVC before start
-# (code-server only applies PASSWORD on first init; old PVC keeps old hash)
-auth:
-  resetConfigOnDeploy: false
-  # Used when persistence.enabled=false and PVC mounts come from volumeMounts JSON
-  resetVolumeName: ""
-  resetMountPath: ""
-  resetSubPath: ""
+# Optional user-defined initContainer (same volumeMounts and env as main container)
+userInitContainer:
+  enabled: false
+  image:
+    repository: busybox
+    tag: "1.36"
+    pullPolicy: IfNotPresent
+  command: []
+  volumeMounts: []
 
 extraEnv: []
 

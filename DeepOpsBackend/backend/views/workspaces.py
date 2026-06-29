@@ -213,6 +213,19 @@ def _apply_workspace_fields(ws: Workspace, data: dict, owner: User | None = None
         ws.exposed_ports = [int(p) for p in data['exposed_ports']]
     if 'container_command' in data:
         ws.container_command = parse_container_command(data['container_command'])
+    if 'init_container_enabled' in data:
+        ws.init_container_enabled = bool(data['init_container_enabled'])
+    if 'init_container_image_source' in data:
+        src = (data.get('init_container_image_source') or Workspace.INIT_IMAGE_BUSYBOX).strip()
+        allowed = {c[0] for c in Workspace.INIT_IMAGE_CHOICES}
+        if src not in allowed:
+            return 'invalid init_container_image_source'
+        ws.init_container_image_source = src
+    if 'init_container_command' in data:
+        ws.init_container_command = parse_container_command(data['init_container_command'])
+    if ws.init_container_enabled:
+        if ws.init_container_image_source == Workspace.INIT_IMAGE_MAIN and not (ws.docker_repository or '').strip():
+            ws.init_container_image_source = Workspace.INIT_IMAGE_BUSYBOX
     if 'privileged' in data:
         requested = bool(data['privileged'])
         if requested and not can_change_privileged(owner):

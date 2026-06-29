@@ -357,6 +357,9 @@ function defaultForm() {
         image_pull_policy: 'IfNotPresent',
         ports_text: '8080',
         command_text: '',
+        init_container_enabled: false,
+        init_container_image_source: 'busybox',
+        init_container_command_text: '',
         env_vars: {},
         privileged: false,
         custom_hostname: '',
@@ -573,6 +576,11 @@ function formPayload(form) {
         env_vars: { ...form.env_vars },
         exposed_ports: parsePorts(form.ports_text),
         container_command: parseCommand(form.command_text),
+        init_container_enabled: !!form.init_container_enabled,
+        init_container_image_source: form.init_container_image_source || 'busybox',
+        init_container_command: form.init_container_enabled
+            ? parseCommand(form.init_container_command_text)
+            : [],
         privileged: !!form.privileged,
         custom_hostname: (form.custom_hostname || '').trim(),
     }
@@ -1210,6 +1218,25 @@ const appVue = new Vue({
                 return this.editingWorkspace.default_hostname
             }
             return '(default on save)'
+        },
+        initContainerMainImageAvailable() {
+            return !!(this.form.docker_repository || '').trim()
+        },
+        initContainerImageLabel() {
+            if (this.form.init_container_image_source === 'main' && this.initContainerMainImageAvailable) {
+                return this.form.docker_repository + ':' + this.form.docker_tag
+            }
+            return 'busybox:1.36'
+        },
+        modalInitContainerSummary() {
+            const ws = this.modalWorkspace
+            if (!ws || !ws.init_container_enabled) return 'disabled'
+            const useMain = ws.init_container_image_source === 'main' && (ws.docker_repository || '').trim()
+            const image = useMain
+                ? ws.docker_repository + ':' + ws.docker_tag
+                : 'busybox:1.36'
+            const cmd = formatCommand(ws.init_container_command || [])
+            return cmd ? image + ' · ' + cmd : image
         },
         filteredPlanTemplates() {
             if (!this.resourceLimits.limited) return this.planTemplates
@@ -3834,7 +3861,13 @@ const appVue = new Vue({
                 const tags = (img.tags && img.tags.length) ? img.tags : [img.default_tag || 'latest']
                 this.form.docker_tag = tags.includes(img.default_tag) ? img.default_tag : tags[0]
             }
+            this.ensureInitContainerImageSource()
             this.syncDockerImageSearchQuery()
+        },
+        ensureInitContainerImageSource() {
+            if (this.form.init_container_image_source === 'main' && !this.initContainerMainImageAvailable) {
+                this.form.init_container_image_source = 'busybox'
+            }
         },
         dockerImageDisplayLabel(img) {
             if (!img) return ''
@@ -4490,6 +4523,12 @@ const appVue = new Vue({
             this.form.command_text = (ws.container_command && ws.container_command.length)
                 ? formatCommand(ws.container_command)
                 : ''
+            this.form.init_container_enabled = !!ws.init_container_enabled
+            this.form.init_container_image_source = ws.init_container_image_source || 'busybox'
+            this.form.init_container_command_text = (ws.init_container_command && ws.init_container_command.length)
+                ? formatCommand(ws.init_container_command)
+                : ''
+            this.ensureInitContainerImageSource()
             this.form.env_vars = { ...(ws.env_vars || {}) }
             this.form.privileged = !!ws.privileged
             this.form.custom_hostname = ws.custom_hostname || ''

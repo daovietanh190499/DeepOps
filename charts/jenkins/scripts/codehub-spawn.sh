@@ -63,7 +63,6 @@ HELM_CMD=(
   --set "podLabels.${NAMESPACE}-username=${USERNAME}"
   --set "secret.name=${USERNAME}-secret"
   --set-string "env.secret.PASSWORD=${PASSWORD}"
-  --set auth.resetConfigOnDeploy=true
   --set serviceAccount.create=false
   --set serviceAccount.automount=false
   --set serviceAccount.name=default
