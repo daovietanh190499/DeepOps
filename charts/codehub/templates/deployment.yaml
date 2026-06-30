@@ -54,10 +54,8 @@ spec:
           command:
             {{- toYaml . | nindent 12 }}
           {{- end }}
-          {{- with $userInit.volumeMounts }}
           volumeMounts:
-            {{- toYaml . | nindent 12 }}
-          {{- end }}
+            {{- include "codehub.containerVolumeMounts" . | nindent 12 }}
       {{- end }}
       containers:
         - name: {{ .Chart.Name }}
@@ -107,16 +105,7 @@ spec:
           resources:
             {{- toYaml $resources | nindent 12 }}
           volumeMounts:
-            {{- if .Values.persistence.enabled }}
-            - name: workspace-volume
-              mountPath: {{ .Values.persistence.mountPath | default "/home/coder" }}
-              {{- with .Values.persistence.subPath }}
-              subPath: {{ . }}
-              {{- end }}
-            {{- end }}
-            {{- with .Values.volumeMounts }}
-            {{- toYaml . | nindent 12 }}
-            {{- end }}
+            {{- include "codehub.containerVolumeMounts" . | nindent 12 }}
         {{- if or .Values.sidecars.always .Values.portTunnel.enabled }}
         - name: port-tunnel
           image: "{{ .Values.portTunnel.image.repository }}:{{ .Values.portTunnel.image.tag }}"

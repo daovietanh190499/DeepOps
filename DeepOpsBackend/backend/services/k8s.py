@@ -10,6 +10,32 @@ USER_INIT_BUSYBOX_REPO = os.environ.get('USER_INIT_BUSYBOX_REPO', 'busybox')
 USER_INIT_BUSYBOX_TAG = os.environ.get('USER_INIT_BUSYBOX_TAG', '1.36')
 
 
+def _normalize_limit_ratio(raw) -> float:
+    try:
+        ratio = float(raw)
+    except (TypeError, ValueError):
+        return 1.5
+    return ratio if ratio in (1.0, 1.5) else 1.5
+
+
+def _workspace_resource_limits(workspace) -> tuple[float, float, str]:
+    """Return (cpu_request, cpu_limit, memory_limit) for Helm resources."""
+    from backend.models import Workspace
+
+    ratio = _normalize_limit_ratio(
+        getattr(workspace, 'resource_limit_ratio', None) or Workspace.LIMIT_RATIO_1_5,
+    )
+    cpu_request = float(workspace.cpu)
+    cpu_limit = cpu_request if ratio == 1.0 else cpu_request * 1.5
+    if ratio == 1.0:
+        memory_limit = str(workspace.ram)
+    else:
+        ram_str = str(workspace.ram)
+        ram_value = int(ram_str[:-1]) if ram_str.endswith('G') else int(ram_str)
+        memory_limit = f'{int(ram_value * 1.5)}G'
+    return cpu_request, cpu_limit, memory_limit
+
+
 def _storage_class() -> str:
     return get_hub_config().get('storage', {}).get('storageClassName', 'directpv-min-io')
 
@@ -92,8 +118,7 @@ def build_spawn_config(workspace) -> dict:
     from .workspace_mounts import build_pvc_volume_specs, spawn_drive_mounts
 
     gpu_spec = parse_gpu_resources(workspace.gpu)
-    ram_str = str(workspace.ram)
-    ram_value = int(ram_str[:-1]) if ram_str.endswith('G') else int(ram_str)
+    _, max_cpu, max_ram = _workspace_resource_limits(workspace)
 
     ports_raw = workspace.exposed_ports or []
     ports = [int(p) for p in ports_raw] if ports_raw else [int(DEFAULT_PORT)]
@@ -137,9 +162,10 @@ def build_spawn_config(workspace) -> dict:
         'release_name': workspace.release_name,
         'hostname': workspace.hostname,
         'cpu': workspace.cpu,
-        'max_cpu': workspace.cpu * 1.5,
-        'max_ram': f'{int(ram_value * 1.5)}G',
+        'max_cpu': max_cpu,
+        'max_ram': max_ram,
         'ram': workspace.ram,
+        'resource_limit_ratio': _normalize_limit_ratio(getattr(workspace, 'resource_limit_ratio', 1.5)),
         'gpu_enabled': gpu_spec['enabled'],
         'gpu_count': gpu_spec['count'],
         'gpu_memory_mib': gpu_spec['memory_mib'],
@@ -311,7 +337,6 @@ def _helm_base_cmd(config: dict) -> list[str]:
             '--set-string', f'userInitContainer.image.repository={user_init["repository"]}',
             '--set-string', f'userInitContainer.image.tag={user_init["tag"]}',
             '--set', f'userInitContainer.image.pullPolicy={user_init.get("pull_policy", "IfNotPresent")}',
-            '--set-json', f'userInitContainer.volumeMounts={json.dumps(volume_mounts)}',
         ])
         init_cmd = user_init.get('command') or []
         if init_cmd:

@@ -13,6 +13,7 @@ from backend.models import DockerImage, User, UserDrive, Workspace
 from backend.services.github_auth import auth
 from backend.services.k8s import (
     _helm_release_status,
+    _normalize_limit_ratio,
     get_codehub_workspace,
     remove_codehub,
     stop_codehub,
@@ -190,6 +191,8 @@ def _apply_workspace_fields(ws: Workspace, data: dict, owner: User | None = None
             return 'invalid cpu'
     if 'gpu' in data:
         ws.gpu = normalize_gpu_value(data.get('gpu'))
+    if 'resource_limit_ratio' in data:
+        ws.resource_limit_ratio = _normalize_limit_ratio(data.get('resource_limit_ratio'))
     if 'image_pull_policy' in data:
         policy = (data.get('image_pull_policy') or Workspace.PULL_IF_NOT_PRESENT).strip()
         allowed = {c[0] for c in Workspace.PULL_POLICY_CHOICES}

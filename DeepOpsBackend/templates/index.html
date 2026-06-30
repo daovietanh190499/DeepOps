@@ -1958,6 +1958,18 @@
                                     <option v-for="r in equipmentList.ram" :key="r" :value="r" v-text="r"></option>
                                 </select></div>
                             <div class="sm:col-span-2">
+                                <label class="text-sm font-medium text-slate-600">Limit / request ratio (CPU &amp; RAM)</label>
+                                <select v-model.number="form.resource_limit_ratio" class="mt-1 w-full rounded-lg border px-3 py-2 text-sm">
+                                    <option :value="1.5">1.5× — limit = 1.5 × request (default)</option>
+                                    <option :value="1">1× — limit = request</option>
+                                </select>
+                                <p class="mt-1 text-xs text-slate-500">
+                                    Kubernetes <code class="rounded bg-slate-100 px-1">resources.limits</code> for CPU and memory.
+                                    Example: CPU request <strong v-text="form.cpu"></strong> vCPU → limit <strong v-text="formCpuLimit"></strong> vCPU;
+                                    RAM request <strong v-text="form.ram"></strong> → limit <strong v-text="formRamLimit"></strong>.
+                                </p>
+                            </div>
+                            <div class="sm:col-span-2">
                                 <label class="text-sm font-medium text-slate-600">Node</label>
                                 <select v-model="form.node_hostname" class="mt-1 w-full rounded-lg border px-3 py-2 text-sm font-mono">
                                     <option value="auto">auto</option>
@@ -2115,7 +2127,7 @@
                                 <input v-model="form.init_container_enabled" type="checkbox" class="mt-0.5 rounded border-slate-300">
                                 <span>
                                     <span class="text-sm font-medium text-slate-700">Init container</span>
-                                    <span class="block text-xs text-slate-500 mt-0.5">Run one init container before the main container starts. It uses the <strong>same volume mounts and environment variables</strong> as the main container.</span>
+                                    <span class="block text-xs text-slate-500 mt-0.5">Run one init container before the main container starts. It uses the <strong>same volume mounts, file mounts (ConfigMap), and environment variables</strong> as the main container.</span>
                                 </span>
                             </label>
                             <div v-if="form.init_container_enabled" class="space-y-3 pl-7 border-l-2 border-slate-200">
@@ -2187,8 +2199,8 @@
                         <div class="rounded-xl bg-slate-50 px-4 py-2 text-sm">
                             <spec-row label="Name" :value="form.name"></spec-row>
                             <spec-row v-if="canChangeDomain" label="Domain" :value="formEffectiveHostname"></spec-row>
-                            <spec-row label="CPU" :value="form.cpu + ' vCPU'"></spec-row>
-                            <spec-row label="RAM" :value="form.ram"></spec-row>
+                            <spec-row label="CPU" :value="form.cpu + ' vCPU (limit ' + formCpuLimit + ')'"></spec-row>
+                            <spec-row label="RAM" :value="form.ram + ' (limit ' + formRamLimit + ')'"></spec-row>
                             <spec-row label="Node" :value="form.node_hostname || 'auto'"></spec-row>
                             <spec-row label="Drives" :value="selectedDrivesLabel"></spec-row>
                             <spec-row label="GPU" :value="form.gpu || 'none'"></spec-row>

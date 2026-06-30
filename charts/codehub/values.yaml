@@ -152,7 +152,6 @@ userInitContainer:
     tag: "1.36"
     pullPolicy: IfNotPresent
   command: []
-  volumeMounts: []
 
 extraEnv: []
 

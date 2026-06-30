@@ -147,6 +147,16 @@ class Workspace(models.Model):
     slug = models.SlugField(max_length=48)
     cpu = models.FloatField(default=2)
     ram = models.CharField(max_length=64, default='4G')
+    LIMIT_RATIO_1 = 1.0
+    LIMIT_RATIO_1_5 = 1.5
+    LIMIT_RATIO_CHOICES = (
+        (LIMIT_RATIO_1, '1'),
+        (LIMIT_RATIO_1_5, '1.5'),
+    )
+    resource_limit_ratio = models.FloatField(
+        default=LIMIT_RATIO_1_5,
+        help_text='Multiplier from CPU/RAM request to Kubernetes limit (1 or 1.5)',
+    )
     user_drive = models.ForeignKey(
         UserDrive,
         on_delete=models.PROTECT,
@@ -286,6 +296,7 @@ class Workspace(models.Model):
             'username': self.user.username,
             'cpu': self.cpu,
             'ram': self.ram,
+            'resource_limit_ratio': float(self.resource_limit_ratio or self.LIMIT_RATIO_1_5),
             'node_hostname': self.node_hostname or '',
             'drive_id': str(self.user_drive_id) if self.user_drive_id else None,
             'drive_name': self.user_drive.name if self.user_drive_id and self.user_drive else None,

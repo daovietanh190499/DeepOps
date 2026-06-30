@@ -363,6 +363,7 @@ function defaultForm() {
         env_vars: {},
         privileged: false,
         custom_hostname: '',
+        resource_limit_ratio: 1.5,
     }
 }
 
@@ -583,7 +584,25 @@ function formPayload(form) {
             : [],
         privileged: !!form.privileged,
         custom_hostname: (form.custom_hostname || '').trim(),
+        resource_limit_ratio: normalizeLimitRatio(form.resource_limit_ratio),
     }
+}
+
+function normalizeLimitRatio(raw) {
+    const ratio = Number(raw)
+    return ratio === 1 ? 1 : 1.5
+}
+
+function computeCpuLimit(cpu, ratio) {
+    const value = Number(cpu) || 0
+    return normalizeLimitRatio(ratio) === 1 ? value : value * 1.5
+}
+
+function computeRamLimit(ram, ratio) {
+    const text = String(ram || '4G')
+    if (normalizeLimitRatio(ratio) === 1) return text
+    const n = parseInt(text, 10)
+    return Number.isNaN(n) ? text : `${n * 1.5}G`
 }
 
 const LEGACY_GPU_ALIASES = {
@@ -1227,6 +1246,12 @@ const appVue = new Vue({
                 return this.form.docker_repository + ':' + this.form.docker_tag
             }
             return 'busybox:1.36'
+        },
+        formCpuLimit() {
+            return computeCpuLimit(this.form.cpu, this.form.resource_limit_ratio)
+        },
+        formRamLimit() {
+            return computeRamLimit(this.form.ram, this.form.resource_limit_ratio)
         },
         modalInitContainerSummary() {
             const ws = this.modalWorkspace
@@ -4510,6 +4535,7 @@ const appVue = new Vue({
             this.form.name = ws.name || ''
             this.form.cpu = ws.cpu || 2
             this.form.ram = ws.ram || '4G'
+            this.form.resource_limit_ratio = normalizeLimitRatio(ws.resource_limit_ratio ?? 1.5)
             this.form.gpu = ws.gpu || 'none'
             this.form.node_hostname = (ws.node_hostname || '').trim() ? (ws.node_hostname || '') : 'auto'
             // Ensure the Docker image dropdown reflects the existing config.

@@ -162,3 +162,21 @@ traefik.ingress.kubernetes.io/router.middlewares: {{ $root.Release.Namespace }}-
 traefik.ingress.kubernetes.io/router.priority: {{ $root.Values.sidecarIngress.priority | default "1000" | quote }}
 {{- end }}
 {{- end -}}
+
+{{/*
+Shared volumeMounts for main container and user initContainer (PVC, ConfigMap file mounts, shm, …).
+*/}}
+{{- define "codehub.containerVolumeMounts" -}}
+{{- $items := list -}}
+{{- if .Values.persistence.enabled -}}
+{{- $item := dict "name" "workspace-volume" "mountPath" (.Values.persistence.mountPath | default "/home/coder") -}}
+{{- if .Values.persistence.subPath -}}
+{{- $_ := set $item "subPath" .Values.persistence.subPath -}}
+{{- end -}}
+{{- $items = append $items $item -}}
+{{- end -}}
+{{- with .Values.volumeMounts -}}
+{{- $items = concat $items . -}}
+{{- end -}}
+{{- toYaml $items -}}
+{{- end -}}
