@@ -865,6 +865,10 @@ const appVue = new Vue({
         showPlanTemplateBulkModal: false,
         clusterOverview: null,
         clusterLoading: false,
+        clusterResourcesUsage: { ok: true, fetched_at: '', nodes: [], error: '' },
+        clusterResourcesUsageLoading: false,
+        clusterResourcesUsageError: '',
+        clusterResourcesUsageLastFetchMs: 0,
         joinCommand: '',
         joinCommandRaw: '',
         joinCommandLoading: false,
@@ -1326,6 +1330,43 @@ const appVue = new Vue({
                 this.statusPollTimer = null
             }
         },
+        pct(used, total) {
+            const u = Number(used || 0)
+            const t = Number(total || 0)
+            if (!t || t <= 0) return 0
+            return Math.max(0, Math.min(100, (u / t) * 100))
+        },
+        fmt2(n) {
+            const x = Number(n || 0)
+            if (!Number.isFinite(x)) return '0'
+            const v = Math.round(x * 100) / 100
+            return (Number.isInteger(v) ? String(v) : String(v))
+        },
+        async loadClusterResourcesUsage(force) {
+            if (!this.is_login) return
+            if (this.menu !== 'servers') return
+            const now = Date.now()
+            if (!force && this.clusterResourcesUsageLastFetchMs && now - this.clusterResourcesUsageLastFetchMs < 30000) {
+                return
+            }
+            this.clusterResourcesUsageLoading = true
+            this.clusterResourcesUsageError = ''
+            try {
+                const res = await fetch('cluster/resources_usage')
+                const data = await res.json().catch(() => ({}))
+                const result = data.result || {}
+                if (res.status !== 200 || !result.ok) {
+                    this.clusterResourcesUsageError = result.error || 'Failed to load resources usage'
+                    return
+                }
+                this.clusterResourcesUsage = result
+                this.clusterResourcesUsageLastFetchMs = now
+            } catch (e) {
+                this.clusterResourcesUsageError = (e && e.message) ? e.message : 'Failed to load resources usage'
+            } finally {
+                this.clusterResourcesUsageLoading = false
+            }
+        },
         startSshNodeStatusPolling() {
             this.stopSshNodeStatusPolling()
             if (!this.is_login || this.menu !== 'admin-overall') return
@@ -1766,6 +1807,7 @@ const appVue = new Vue({
             const tasks = []
             if (m === 'drives' || m === 'servers') tasks.push(this.pollMyDriveStatuses())
             if (m === 'servers') tasks.push(this.pollMyWorkspaceStatuses())
+            if (m === 'servers') tasks.push(this.loadClusterResourcesUsage(false))
             if (m === 'admin-drives') tasks.push(this.pollAdminDriveStatuses())
             if (m === 'admin-servers') tasks.push(this.pollAdminWorkspaceStatuses())
             if (m === 'admin-overall') await this.loadClusterOverview()
@@ -3196,7 +3238,10 @@ const appVue = new Vue({
             this.mobileNavOpen = false
             window.history.replaceState({}, '', '/?tab=' + menu)
             if (menu === 'drives') await this.reloadMyDrives(1)
-            if (menu === 'servers') await this.reloadMyWorkspaces(1)
+            if (menu === 'servers') {
+                await this.loadClusterResourcesUsage(true)
+                await this.reloadMyWorkspaces(1)
+            }
             if (menu === 'images') await this.reloadMyImages(1)
             if (menu === 'admin-overall') {
                 await this.loadClusterOverview()

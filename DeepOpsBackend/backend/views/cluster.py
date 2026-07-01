@@ -10,6 +10,7 @@ from backend.services.cluster import (
     get_k8s_nodes,
     get_microk8s_join_command,
 )
+from backend.services.resources_usage import get_cluster_resources_usage
 from backend.services.directpv_discover import (
     discover_drives,
     init_drives,
@@ -18,6 +19,7 @@ from backend.services.directpv_discover import (
 )
 from backend.services.github_auth import auth
 from backend.views.drives import _require_admin
+from backend.views.workspaces import _require_accepted
 
 
 def _parse_body(request) -> dict:
@@ -39,6 +41,17 @@ def admin_cluster_overview(request, user):
             'directpv': get_directpv_drives(),
         },
     })
+
+
+@auth.verify
+@require_http_methods(['GET'])
+def cluster_resources_usage(request, user):
+    denied = _require_accepted(user)
+    if denied:
+        return denied
+    result = get_cluster_resources_usage()
+    status = 200 if result.get('ok') else 500
+    return JsonResponse({'result': result}, status=status)
 
 
 @auth.verify

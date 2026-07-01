@@ -36,6 +36,7 @@ urlpatterns = [
     path('drives/bulk_create', drive_views.drive_bulk_create, name='drive-bulk-create'),
     path('drives/<uuid:drive_id>', drive_views.drive_delete, name='drive-delete'),
     path('admin/cluster/overview', cluster_views.admin_cluster_overview, name='admin-cluster-overview'),
+    path('cluster/resources_usage', cluster_views.cluster_resources_usage, name='cluster-resources-usage'),
     path('admin/cluster/join-command', cluster_views.admin_cluster_join_command, name='admin-cluster-join'),
     path('admin/cluster/directpv/discover', cluster_views.admin_directpv_discover, name='admin-directpv-discover'),
     path('admin/cluster/directpv/discover/run', cluster_views.admin_directpv_discover_run, name='admin-directpv-discover-run'),
