@@ -25,7 +25,7 @@ REMOTE_RE = re.compile(r'^[A-Za-z0-9_-]+:.+')
 
 
 def backup_secret_name(workspace: Workspace) -> str:
-    return f'{workspace.user.username}-{workspace.slug}-backup'
+    return f'{workspace.user.resource_username}-{workspace.slug}-backup'
 
 
 def workspace_backup_volume_options(workspace: Workspace) -> list[dict]:

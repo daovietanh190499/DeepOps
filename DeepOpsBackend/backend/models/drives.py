@@ -37,7 +37,7 @@ class UserDrive(models.Model):
     @property
     def claim_name(self) -> str:
         ns = os.environ.get('NAMESPACE', 'dohub')
-        return f'drive-{ns}-{self.user.username}-{self.slug}'
+        return f'drive-{ns}-{self.user.resource_username}-{self.slug}'
 
     def save(self, *args, **kwargs):
         if not self.slug:

@@ -55,6 +55,12 @@ class User(models.Model):
     def __str__(self):
         return self.username
 
+    @property
+    def resource_username(self) -> str:
+        from backend.services.k8s_names import normalize_resource_username
+
+        return normalize_resource_username(self.username)
+
     def issue_access_key(self):
         self.access_key = str(uuid.uuid4())
         self.save(update_fields=['access_key'])

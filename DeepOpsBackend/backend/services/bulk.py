@@ -70,7 +70,7 @@ def provision_user_drive(user: User, name: str, size: str) -> tuple[UserDrive | 
     """Create DB record and PVC. Returns (drive, error_message, logs)."""
     drive = UserDrive(user=user, name=name, size=size)
     drive.save()
-    logs, code = create_drive_pvc(drive.claim_name, size, user.username, str(drive.id))
+    logs, code = create_drive_pvc(drive.claim_name, size, user.resource_username, str(drive.id))
     if code != 0:
         drive.delete()
         return None, 'pvc create failed', logs

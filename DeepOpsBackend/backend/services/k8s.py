@@ -157,7 +157,7 @@ def build_spawn_config(workspace) -> dict:
 
     return {
         'workspace_id': str(workspace.id),
-        'username': user.username,
+        'username': user.resource_username,
         'slug': slug,
         'release_name': workspace.release_name,
         'hostname': workspace.hostname,
@@ -182,7 +182,7 @@ def build_spawn_config(workspace) -> dict:
         'configmap_volumes': cm_volumes,
         'configmap_volume_mounts': cm_volume_mounts,
         'file_mounts_configmap_name': cm_name if file_mount_rows else '',
-        'secret_name': f'{user.username}-{slug}-secret',
+        'secret_name': f'{user.resource_username}-{slug}-secret',
         'ws_tunnel_ports': list(workspace.ws_tunnel_ports or []) if isinstance(workspace.ws_tunnel_ports, list) else [],
         'privileged': workspace.privileged,
         'exec_shell': workspace.exec_shell or 'bash',

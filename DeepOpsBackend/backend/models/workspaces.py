@@ -274,12 +274,12 @@ class Workspace(models.Model):
     @property
     def release_name(self) -> str:
         ns = __import__('os').environ.get('NAMESPACE', 'dohub')
-        return f'{ns}-{self.user.username}-{self.slug}'
+        return f'{ns}-{self.user.resource_username}-{self.slug}'
 
     @property
     def default_hostname(self) -> str:
         domain = __import__('os').environ.get('DOMAIN_NAME', 'dohub.com')
-        return f'{self.slug}-{self.user.username}.{domain}'
+        return f'{self.slug}-{self.user.resource_username}.{domain}'
 
     @property
     def hostname(self) -> str:

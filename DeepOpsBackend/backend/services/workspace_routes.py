@@ -28,11 +28,19 @@ PORT_TUNNEL_SUFFIX = 'port-tunnel'
 
 
 def port_tunnel_ingress_path(workspace: Workspace) -> str:
-    return sidecar_tunnel_path(workspace.user.username, workspace.slug, PORT_TUNNEL_SUFFIX)
+    return sidecar_tunnel_path(
+        workspace.user.resource_username,
+        workspace.slug,
+        PORT_TUNNEL_SUFFIX,
+    )
 
 
 def port_tunnel_path_prefix(workspace: Workspace) -> str:
-    return sidecar_tunnel_path_prefix(workspace.user.username, workspace.slug, PORT_TUNNEL_SUFFIX)
+    return sidecar_tunnel_path_prefix(
+        workspace.user.resource_username,
+        workspace.slug,
+        PORT_TUNNEL_SUFFIX,
+    )
 
 
 def port_tunnel_wss_url(workspace: Workspace) -> str:
