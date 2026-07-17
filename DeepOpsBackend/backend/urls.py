@@ -10,6 +10,7 @@ from backend.views import ssh_nodes as ssh_nodes_views
 from backend.views import tunnel as tunnel_views
 from backend.views import workspaces as ws_views
 from backend.views import nodes as nodes_views
+from backend.views import users_search as users_search_views
 
 urlpatterns = [
     path('', views.index, name='index'),
@@ -18,6 +19,7 @@ urlpatterns = [
     path('logout', views.logout, name='logout'),
     path('user_state', views.user_state, name='user-state'),
     path('all_users', views.all_users, name='all-users'),
+    path('users/search', users_search_views.users_search, name='users-search'),
     path('admin/users/search', group_views.admin_user_search, name='admin-user-search'),
     path('admin/resource_groups', group_views.admin_resource_groups, name='admin-resource-groups'),
     path('admin/resource_groups/create', group_views.admin_resource_group_create, name='admin-resource-group-create'),
@@ -83,6 +85,8 @@ urlpatterns = [
     path('workspaces/<uuid:workspace_id>/export', ws_views.workspace_export, name='workspace-export'),
     path('workspaces/<uuid:workspace_id>/start', ws_views.workspace_start, name='workspace-start'),
     path('workspaces/<uuid:workspace_id>/stop', ws_views.workspace_stop, name='workspace-stop'),
+    path('workspaces/<uuid:workspace_id>/collaborators/<int:collaborator_user_id>', ws_views.workspace_collaborator_detail, name='workspace-collaborator-detail'),
+    path('workspaces/<uuid:workspace_id>/collaborators', ws_views.workspace_collaborators, name='workspace-collaborators'),
     path('workspaces/<uuid:workspace_id>', ws_views.workspace_detail, name='workspace-detail'),
     path('workspaces', ws_views.my_workspaces, name='my-workspaces'),
     path('workspaces/status', ws_views.my_workspaces_status, name='my-workspaces-status'),

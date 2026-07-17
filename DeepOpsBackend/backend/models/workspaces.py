@@ -321,3 +321,36 @@ class Workspace(models.Model):
             'hostname': self.hostname,
             'release_name': self.release_name,
         }
+
+
+class WorkspaceCollaborator(models.Model):
+    """
+    Access control for a workspace owned by another user.
+
+    Owner and admins implicitly have all permissions; this model is only for non-owners.
+    """
+
+    workspace = models.ForeignKey(
+        Workspace,
+        on_delete=models.CASCADE,
+        related_name='collaborators',
+    )
+    user = models.ForeignKey(
+        User,
+        on_delete=models.CASCADE,
+        related_name='workspace_collaborations',
+    )
+    can_start_stop = models.BooleanField(default=False)
+    can_edit = models.BooleanField(default=False)
+    can_terminal = models.BooleanField(default=False)
+    can_delete = models.BooleanField(default=False)
+    can_manage_collaborators = models.BooleanField(default=False)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        unique_together = ('workspace', 'user')
+        ordering = ['-updated_at']
+
+    def __str__(self):
+        return f'{self.workspace_id}:{self.user.username}'

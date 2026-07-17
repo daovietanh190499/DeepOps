@@ -1026,10 +1026,20 @@ const appVue = new Vue({
         showCreateServerModal: false,
         showBulkCreateServerModal: false,
         editingWorkspace: null,
+        workspaceCollaborators: [],
+        workspaceCollaboratorsLoading: false,
+        workspaceCollaboratorsError: '',
+        newCollaborator: { username: '', can_start_stop: true, can_edit: false, can_terminal: false, can_delete: false, can_manage_collaborators: false },
+        collaboratorUserSearchQuery: '',
+        collaboratorUserDropdownOpen: false,
+        collaboratorUserHighlightIndex: -1,
+        collaboratorUserSearchTimer: null,
+        collaboratorUserSearchResults: [],
         k8sNodeOptions: [],
         k8sNodeOptionsError: '',
         current_user: '',
         is_admin: false,
+        userIsAccepted: true,
         runLoading: false,
         runError: '',
         modalWorkspace: null,
@@ -1071,6 +1081,7 @@ const appVue = new Vue({
             adminWorkspaces: false,
             adminDrives: false,
         },
+        // Workspace detail modal: extra tab
     },
     computed: {
         canConfirmDelete() {
@@ -2335,6 +2346,7 @@ const appVue = new Vue({
                     sidecar_ready: false,
                 },
             }
+            // Load collaborators lazily when user opens Collaborators tab.
         },
         closeWorkspaceModal() {
             this.stopWorkspaceLogsPoll()
@@ -2357,6 +2369,16 @@ const appVue = new Vue({
                 this.destroyWorkspaceTerminal()
                 this.fetchWorkspaceLogs()
                 this.startWorkspaceLogsPoll()
+                return
+            }
+            if (tab === 'collaborators') {
+                this.destroyMonitorCharts()
+                this.destroyWorkspaceTerminal()
+                this.collaboratorUserSearchQuery = ''
+                this.collaboratorUserDropdownOpen = false
+                this.collaboratorUserHighlightIndex = -1
+                this.collaboratorUserSearchResults = []
+                if (this.modalWorkspace) this.loadWorkspaceCollaborators(this.modalWorkspace)
                 return
             }
             if (tab === 'monitor') {
@@ -3489,6 +3511,10 @@ const appVue = new Vue({
             const u = data.result
             this.current_user = u.username
             this.is_admin = u.role === 'admin'
+            this.userIsAccepted = !!u.is_accept
+            if (!this.userIsAccepted) {
+                this.showToast('Please contact an administrator to activate your account.')
+            }
             this.resourceLimits = u.resource_limits || { limited: false, limits: null, equipment: null, can_change_privileged: false, can_change_domain: false }
             this.refreshEquipmentFromLimits()
         },
@@ -4542,12 +4568,195 @@ const appVue = new Vue({
             await this.loadDockerImages()
             await this.loadK8sNodeOptions()
             this.editingWorkspace = null
+            this.workspaceCollaborators = []
+            this.workspaceCollaboratorsError = ''
             this.showCreateServerModal = true
         },
         closeCreateServerModal() {
             this.showCreateServerModal = false
             this.runError = ''
             this.editingWorkspace = null
+        },
+        canManageCollaborators(ws) {
+            const a = ws && ws.access
+            return !!(a && a.can_manage_collaborators)
+        },
+        async loadWorkspaceCollaborators(ws) {
+            if (!ws || !ws.id) return
+            if (!this.canManageCollaborators(ws)) return
+            this.workspaceCollaboratorsLoading = true
+            this.workspaceCollaboratorsError = ''
+            try {
+                const res = await fetch('workspaces/' + ws.id + '/collaborators')
+                const data = await res.json().catch(() => ({}))
+                if (res.status !== 200) {
+                    this.workspaceCollaboratorsError = data.message || 'Failed to load collaborators'
+                    this.workspaceCollaborators = []
+                    return
+                }
+                this.workspaceCollaborators = Array.isArray(data.result) ? data.result : []
+            } catch (e) {
+                this.workspaceCollaboratorsError = e.message || 'Failed to load collaborators'
+                this.workspaceCollaborators = []
+            } finally {
+                this.workspaceCollaboratorsLoading = false
+            }
+        },
+        openWorkspaceCollaboratorsTab() {
+            this.switchModalTab('collaborators')
+        },
+        collaboratorWorkspace() {
+            return this.modalWorkspace
+        },
+        async addWorkspaceCollaborator() {
+            const ws = this.collaboratorWorkspace()
+            if (!ws || !ws.id) return
+            const username = (this.newCollaborator.username || this.collaboratorUserSearchQuery || '').trim()
+            if (!username) {
+                this.showToast('Username required')
+                return
+            }
+            this.workspaceCollaboratorsLoading = true
+            this.workspaceCollaboratorsError = ''
+            try {
+                const res = await fetch('workspaces/' + ws.id + '/collaborators', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        username,
+                        can_start_stop: !!this.newCollaborator.can_start_stop,
+                        can_edit: !!this.newCollaborator.can_edit,
+                        can_terminal: !!this.newCollaborator.can_terminal,
+                        can_delete: !!this.newCollaborator.can_delete,
+                        can_manage_collaborators: !!this.newCollaborator.can_manage_collaborators,
+                    }),
+                })
+                const data = await res.json().catch(() => ({}))
+                if (res.status !== 201) {
+                    this.workspaceCollaboratorsError = data.message || 'Add failed'
+                    this.showToast(data.message || 'Add failed')
+                    return
+                }
+                this.newCollaborator.username = ''
+                this.collaboratorUserSearchQuery = ''
+                this.collaboratorUserSearchResults = []
+                await this.loadWorkspaceCollaborators(ws)
+                this.showToast('Collaborator added')
+            } finally {
+                this.workspaceCollaboratorsLoading = false
+            }
+        },
+        onCollaboratorUserSearchFocus() {
+            this.collaboratorUserDropdownOpen = true
+            this.collaboratorUserHighlightIndex = -1
+            this.queueCollaboratorUserSearch()
+        },
+        onCollaboratorUserSearchInput() {
+            this.collaboratorUserDropdownOpen = true
+            this.collaboratorUserHighlightIndex = -1
+            this.newCollaborator.username = (this.collaboratorUserSearchQuery || '').trim()
+            this.queueCollaboratorUserSearch()
+        },
+        onCollaboratorUserSearchBlur() {
+            window.setTimeout(() => {
+                this.collaboratorUserDropdownOpen = false
+                this.collaboratorUserHighlightIndex = -1
+            }, 120)
+        },
+        queueCollaboratorUserSearch() {
+            if (this.collaboratorUserSearchTimer) window.clearTimeout(this.collaboratorUserSearchTimer)
+            this.collaboratorUserSearchTimer = window.setTimeout(() => this.searchCollaboratorUsers(), 200)
+        },
+        async searchCollaboratorUsers() {
+            const q = (this.collaboratorUserSearchQuery || '').trim()
+            if (!q) {
+                this.collaboratorUserSearchResults = []
+                return
+            }
+            try {
+                const res = await fetch('users/search?q=' + encodeURIComponent(q))
+                const data = await res.json().catch(() => ({}))
+                if (res.status !== 200) {
+                    this.collaboratorUserSearchResults = []
+                    return
+                }
+                const arr = Array.isArray(data.result) ? data.result : []
+                this.collaboratorUserSearchResults = arr
+            } catch {
+                this.collaboratorUserSearchResults = []
+            }
+        },
+        selectCollaboratorUser(u) {
+            if (!u) return
+            this.newCollaborator.username = u.username || ''
+            this.collaboratorUserSearchQuery = u.username || ''
+            this.collaboratorUserDropdownOpen = false
+            this.collaboratorUserHighlightIndex = -1
+        },
+        collaboratorUserHighlightNext() {
+            if (!this.collaboratorUserSearchResults.length) return
+            this.collaboratorUserHighlightIndex = Math.min(
+                this.collaboratorUserSearchResults.length - 1,
+                (this.collaboratorUserHighlightIndex < 0 ? -1 : this.collaboratorUserHighlightIndex) + 1,
+            )
+        },
+        collaboratorUserHighlightPrev() {
+            if (!this.collaboratorUserSearchResults.length) return
+            if (this.collaboratorUserHighlightIndex <= 0) this.collaboratorUserHighlightIndex = 0
+            else this.collaboratorUserHighlightIndex -= 1
+        },
+        collaboratorUserSelectHighlighted() {
+            const idx = this.collaboratorUserHighlightIndex
+            if (idx < 0) return
+            const u = this.collaboratorUserSearchResults[idx]
+            if (u) this.selectCollaboratorUser(u)
+        },
+        async saveWorkspaceCollaboratorPerms(c) {
+            const ws = this.collaboratorWorkspace()
+            if (!ws || !ws.id || !c || !c.user_id) return
+            this.workspaceCollaboratorsLoading = true
+            this.workspaceCollaboratorsError = ''
+            try {
+                const res = await fetch('workspaces/' + ws.id + '/collaborators/' + c.user_id, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        can_start_stop: !!c.can_start_stop,
+                        can_edit: !!c.can_edit,
+                        can_terminal: !!c.can_terminal,
+                        can_delete: !!c.can_delete,
+                        can_manage_collaborators: !!c.can_manage_collaborators,
+                    }),
+                })
+                const data = await res.json().catch(() => ({}))
+                if (res.status !== 200) {
+                    this.workspaceCollaboratorsError = data.message || 'Save failed'
+                    this.showToast(data.message || 'Save failed')
+                    return
+                }
+                this.showToast('Permissions saved')
+            } finally {
+                this.workspaceCollaboratorsLoading = false
+            }
+        },
+        async removeWorkspaceCollaborator(c) {
+            const ws = this.collaboratorWorkspace()
+            if (!ws || !ws.id || !c || !c.user_id) return
+            this.workspaceCollaboratorsLoading = true
+            this.workspaceCollaboratorsError = ''
+            try {
+                const res = await fetch('workspaces/' + ws.id + '/collaborators/' + c.user_id, { method: 'DELETE' })
+                const data = await res.json().catch(() => ({}))
+                if (res.status !== 200) {
+                    this.workspaceCollaboratorsError = data.message || 'Remove failed'
+                    this.showToast(data.message || 'Remove failed')
+                    return
+                }
+                await this.loadWorkspaceCollaborators(ws)
+                this.showToast('Collaborator removed')
+            } finally {
+                this.workspaceCollaboratorsLoading = false
+            }
         },
         async loadK8sNodeOptions() {
             this.k8sNodeOptionsError = ''

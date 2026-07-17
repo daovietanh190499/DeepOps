@@ -9,7 +9,7 @@ from django.http import HttpResponse, JsonResponse
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_http_methods
 
-from backend.models import DockerImage, User, UserDrive, Workspace
+from backend.models import DockerImage, User, UserDrive, Workspace, WorkspaceCollaborator
 from backend.services.github_auth import auth
 from backend.services.k8s import (
     _helm_release_status,
@@ -122,6 +122,52 @@ def _workspace_list_payload(ws: Workspace) -> dict:
     return data
 
 
+def _workspace_access(user: User, ws: Workspace) -> dict | None:
+    """Returns permission map for this user on a workspace, or None if no access."""
+    if user.role == User.ROLE_ADMIN:
+        return {
+            'is_owner': False,
+            'is_admin': True,
+            'can_view': True,
+            'can_start_stop': True,
+            'can_edit': True,
+            'can_delete': True,
+            'can_manage_collaborators': True,
+            'can_terminal': True,
+        }
+    if ws.user_id == user.id:
+        return {
+            'is_owner': True,
+            'is_admin': False,
+            'can_view': True,
+            'can_start_stop': True,
+            'can_edit': True,
+            'can_delete': True,
+            'can_manage_collaborators': True,
+            'can_terminal': True,
+        }
+    collab = WorkspaceCollaborator.objects.filter(workspace=ws, user=user).first()
+    if not collab:
+        return None
+    return {
+        'is_owner': False,
+        'is_admin': False,
+        'can_view': True,
+        'can_start_stop': bool(collab.can_start_stop),
+        'can_edit': bool(collab.can_edit),
+        'can_terminal': bool(getattr(collab, 'can_terminal', False)),
+        'can_delete': bool(collab.can_delete),
+        'can_manage_collaborators': bool(collab.can_manage_collaborators),
+    }
+
+
+def _workspace_list_payload_for_user(user: User, ws: Workspace) -> dict:
+    data = _workspace_list_payload(ws)
+    data['access'] = _workspace_access(user, ws) or {'can_view': False}
+    data['shared_with_me'] = ws.user_id != user.id
+    return data
+
+
 def _workspace_status_payloads(workspaces) -> list[dict]:
     ws_list = list(workspaces)
     k8s_map = live_workspace_k8s_status_batch(ws_list)
@@ -158,9 +204,18 @@ def _get_workspace_for_user(user, workspace_id):
     ws = Workspace.objects.filter(id=workspace_id).select_related('user', 'user_drive').first()
     if not ws:
         return None, JsonResponse({'message': 'not found'}, status=404)
-    if user.role != User.ROLE_ADMIN and ws.user_id != user.id:
+    if user.role != User.ROLE_ADMIN and not _workspace_access(user, ws):
         return None, JsonResponse({'message': 'no permission'}, status=403)
     return ws, None
+
+
+def _require_workspace_permission(user: User, ws: Workspace, perm: str) -> JsonResponse | None:
+    access = _workspace_access(user, ws)
+    if not access:
+        return JsonResponse({'message': 'no permission'}, status=403)
+    if not access.get(perm, False):
+        return JsonResponse({'message': 'no permission'}, status=403)
+    return None
 
 
 def _parse_body(request) -> dict:
@@ -372,14 +427,16 @@ def my_workspaces(request, user):
     per_page = min(500, max(6, int(request.GET.get('per_page', 12))))
     name_filter = (request.GET.get('name') or '').strip()
 
-    qs = Workspace.objects.filter(user=user).select_related('user', 'user_drive').order_by('-updated_at')
+    qs = Workspace.objects.filter(
+        Q(user=user) | Q(collaborators__user=user)
+    ).distinct().select_related('user', 'user_drive').order_by('-updated_at')
     if name_filter:
         qs = qs.filter(name__icontains=name_filter)
 
     paginator = Paginator(qs, per_page)
     page_obj = paginator.get_page(page)
     return JsonResponse({
-        'result': [_workspace_list_payload(ws) for ws in page_obj.object_list],
+        'result': [_workspace_list_payload_for_user(user, ws) for ws in page_obj.object_list],
         'pagination': {
             'page': page_obj.number,
             'per_page': per_page,
@@ -400,10 +457,102 @@ def my_workspaces_status(request, user):
         ids = _parse_status_ids(request)
     except json.JSONDecodeError:
         return JsonResponse({'message': 'invalid json'}, status=400)
-    qs = Workspace.objects.filter(user=user)
+    qs = Workspace.objects.filter(Q(user=user) | Q(collaborators__user=user)).distinct()
     if ids:
         qs = qs.filter(id__in=ids)
     return JsonResponse({'result': _workspace_status_payloads(qs)})
+
+
+def _collaborator_payload(c: WorkspaceCollaborator) -> dict:
+    u = c.user
+    return {
+        'user_id': u.id,
+        'username': u.username,
+        'image': u.image or '',
+        'can_start_stop': bool(c.can_start_stop),
+        'can_edit': bool(c.can_edit),
+        'can_terminal': bool(getattr(c, 'can_terminal', False)),
+        'can_delete': bool(c.can_delete),
+        'can_manage_collaborators': bool(c.can_manage_collaborators),
+        'created_at': c.created_at.isoformat() if c.created_at else '',
+        'updated_at': c.updated_at.isoformat() if c.updated_at else '',
+    }
+
+
+@auth.verify
+@csrf_exempt
+@require_http_methods(['GET', 'POST'])
+def workspace_collaborators(request, user, workspace_id):
+    denied = _require_accepted(user)
+    if denied:
+        return denied
+    ws, err = _get_workspace_for_user(user, workspace_id)
+    if err:
+        return err
+
+    # Only owner/admin or users explicitly allowed to manage collaborators.
+    denied = _require_workspace_permission(user, ws, 'can_manage_collaborators')
+    if denied:
+        return denied
+
+    if request.method == 'GET':
+        qs = WorkspaceCollaborator.objects.filter(workspace=ws).select_related('user').order_by('-updated_at')
+        return JsonResponse({'result': [_collaborator_payload(c) for c in qs]})
+
+    try:
+        data = _parse_body(request)
+    except json.JSONDecodeError:
+        return JsonResponse({'message': 'invalid json'}, status=400)
+
+    username = (data.get('username') or '').strip()
+    if not username:
+        return JsonResponse({'message': 'username required'}, status=400)
+    target = User.objects.filter(username__iexact=username).first()
+    if not target:
+        return JsonResponse({'message': 'user not found'}, status=404)
+    if target.id == ws.user_id:
+        return JsonResponse({'message': 'owner already has access'}, status=400)
+
+    c, _created = WorkspaceCollaborator.objects.get_or_create(workspace=ws, user=target)
+    for key in ('can_start_stop', 'can_edit', 'can_terminal', 'can_delete', 'can_manage_collaborators'):
+        if key in data:
+            setattr(c, key, bool(data.get(key)))
+    c.save()
+    return JsonResponse({'result': _collaborator_payload(c)}, status=201)
+
+
+@auth.verify
+@csrf_exempt
+@require_http_methods(['PUT', 'PATCH', 'DELETE'])
+def workspace_collaborator_detail(request, user, workspace_id, collaborator_user_id: int):
+    denied = _require_accepted(user)
+    if denied:
+        return denied
+    ws, err = _get_workspace_for_user(user, workspace_id)
+    if err:
+        return err
+    denied = _require_workspace_permission(user, ws, 'can_manage_collaborators')
+    if denied:
+        return denied
+
+    c = WorkspaceCollaborator.objects.filter(workspace=ws, user_id=collaborator_user_id).select_related('user').first()
+    if not c:
+        return JsonResponse({'message': 'not found'}, status=404)
+
+    if request.method == 'DELETE':
+        c.delete()
+        return JsonResponse({'message': 'success'})
+
+    try:
+        data = _parse_body(request)
+    except json.JSONDecodeError:
+        return JsonResponse({'message': 'invalid json'}, status=400)
+
+    for key in ('can_start_stop', 'can_edit', 'can_terminal', 'can_delete', 'can_manage_collaborators'):
+        if key in data:
+            setattr(c, key, bool(data.get(key)))
+    c.save()
+    return JsonResponse({'result': _collaborator_payload(c)})
 
 
 @auth.verify
@@ -448,6 +597,9 @@ def workspace_detail(request, user, workspace_id):
         return err
 
     if request.method == 'DELETE':
+        denied = _require_workspace_permission(user, ws, 'can_delete')
+        if denied:
+            return denied
         if settings.DEFAULT_SPAWNER == 'k8s':
             exit_code = remove_codehub(ws.release_name)
             if exit_code != 0:
@@ -456,6 +608,9 @@ def workspace_detail(request, user, workspace_id):
         ws.delete()
         return JsonResponse({'message': 'success'})
 
+    denied = _require_workspace_permission(user, ws, 'can_edit')
+    if denied:
+        return denied
     if live_workspace_state(ws) != Workspace.STATE_OFFLINE:
         return JsonResponse({'message': 'stop server before editing'}, status=400)
     try:
@@ -555,6 +710,9 @@ def workspace_start(request, user, workspace_id):
     ws, err = _get_workspace_for_user(user, workspace_id)
     if err:
         return err
+    denied = _require_workspace_permission(user, ws, 'can_start_stop')
+    if denied:
+        return denied
     state = live_workspace_state(ws)
     if state != Workspace.STATE_OFFLINE:
         return JsonResponse({'message': 'already running or pending'}, status=400)
@@ -571,6 +729,9 @@ def workspace_stop(request, user, workspace_id):
     ws, err = _get_workspace_for_user(user, workspace_id)
     if err:
         return err
+    denied = _require_workspace_permission(user, ws, 'can_start_stop')
+    if denied:
+        return denied
     try:
         state = live_workspace_state(ws)
     except Exception:

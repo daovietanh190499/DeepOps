@@ -4,7 +4,13 @@ from .platform import PlatformEquipmentOption, ServerPlanTemplate
 from .servers import ServerOption
 from .users import User, UserServer
 from .ssh_nodes import SSHNode, SSHNodeManagerKey
-from .workspaces import DockerImage, Workspace, WorkspaceDriveMount, WorkspaceFileMount
+from .workspaces import (
+    DockerImage,
+    Workspace,
+    WorkspaceCollaborator,
+    WorkspaceDriveMount,
+    WorkspaceFileMount,
+)
 
 __all__ = [
     'ServerOption',
@@ -12,6 +18,7 @@ __all__ = [
     'UserServer',
     'DockerImage',
     'Workspace',
+    'WorkspaceCollaborator',
     'WorkspaceDriveMount',
     'WorkspaceFileMount',
     'UserDrive',

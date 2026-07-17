@@ -9,7 +9,7 @@ from urllib.parse import parse_qs, unquote
 from asgiref.sync import sync_to_async
 from django.http import parse_cookie
 
-from backend.models import User, Workspace
+from backend.models import User, Workspace, WorkspaceCollaborator
 from backend.services.workspace_terminal import (
     WorkspaceKubectlExecSession,
     normalize_exec_shell,
@@ -57,7 +57,17 @@ async def _workspace_for_user(user: User, workspace_id: uuid.UUID) -> Workspace 
     )()
     if not ws:
         return None
-    if user.role != User.ROLE_ADMIN and ws.user_id != user.id:
+    if user.role == User.ROLE_ADMIN or ws.user_id == user.id:
+        return ws
+    # Collaborators need explicit terminal permission.
+    allowed = await sync_to_async(
+        WorkspaceCollaborator.objects.filter(
+            workspace=ws,
+            user=user,
+            can_terminal=True,
+        ).exists
+    )()
+    if not allowed:
         return None
     return ws
 
